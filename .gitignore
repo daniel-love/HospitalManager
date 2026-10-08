@@ -3,3 +3,6 @@ dist
 .DS_Store
 *.local
 coverage
+
+# Local Claude Code settings (dev preview config etc.)
+.claude/
