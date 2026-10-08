@@ -88,3 +88,26 @@ describe("fixtures in saves", () => {
     expect(snapshot(loaded)).toEqual(snapshot(state));
   });
 });
+
+describe("plans in saves", () => {
+  it("saves and restores a plan", async () => {
+    const { buildPreview, addToPlan } = await import("@sim/plan");
+    const state = buildSmallAE();
+    const { preview } = buildPreview(state);
+    addToPlan(state, preview, {
+      type: "build_floor",
+      floor: 0,
+      rect: { x: 19, y: 2, w: 3, h: 3 },
+    });
+    expect(roundTrip(state).plan).toEqual(state.plan);
+  });
+
+  it("upgrades a version-1 save (no plans) with an empty plan", () => {
+    const save = JSON.parse(JSON.stringify(encodeSave(buildSmallAE(), "old")));
+    save.version = 1;
+    delete save.state.plan;
+    const { state } = decodeSave(save);
+    expect(state.plan).toEqual([]);
+    expect(state.version).toBe(2);
+  });
+});

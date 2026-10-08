@@ -14,7 +14,14 @@ import { outlineTiles, type Rect } from "@sim/world/rect";
 import { Camera } from "./camera";
 import { TILE_SIZE } from "./constants";
 import { drawBlock, drawFixture, ObjectLayer } from "./objectLayer";
-import { GHOST_BAD, GHOST_OK, GHOST_REMOVE, STAFF_COLOUR } from "./palette";
+import {
+  GHOST_BAD,
+  GHOST_OK,
+  GHOST_REMOVE,
+  PLAN_ADDED,
+  PLAN_REMOVED,
+  STAFF_COLOUR,
+} from "./palette";
 import { RoomLabelLayer } from "./roomLabelLayer";
 import { TilemapLayer } from "./tilemapLayer";
 
@@ -50,6 +57,8 @@ export class Renderer {
   private readonly labels = new RoomLabelLayer();
   private readonly overlay = new Container();
   private readonly selection = new Graphics();
+  /** Blueprint tint over tiles a plan changes (plan mode only). */
+  private readonly planOverlay = new Graphics();
   private readonly ghost = new Graphics();
   private readonly hoverBox = new Graphics();
   /** Tile under the mouse pointer, or null when off-map. */
@@ -75,7 +84,7 @@ export class Renderer {
       .rect(0, 0, TILE_SIZE, TILE_SIZE)
       .stroke({ width: 2, color: 0xffffff, alpha: 0.9, alignment: 1 });
     this.hoverBox.visible = false;
-    this.overlay.addChild(this.selection, this.ghost, this.hoverBox);
+    this.overlay.addChild(this.planOverlay, this.selection, this.ghost, this.hoverBox);
     this.world.addChild(
       this.tilemap.container,
       this.objects.container,
@@ -105,15 +114,22 @@ export class Renderer {
     return this.tilemap.visibleChunkCount;
   }
 
-  /** Switches to a different state (after loading a save or starting anew). */
+  /**
+   * Switches to a different state: after loading, starting anew, or swapping
+   * between the real hospital and the plan preview. The camera only resets if
+   * the map size changed.
+   */
   setState(state: SimState): void {
+    const old = this.state.floors[0]!;
     this.state = state;
     const grid = state.floors[0]!;
     this.tilemap.destroy();
     this.tilemap = new TilemapLayer(grid);
     this.world.addChildAt(this.tilemap.container, 0);
     this.objects.clear();
-    this.camera.setBounds(grid.width * TILE_SIZE, grid.height * TILE_SIZE);
+    if (grid.width !== old.width || grid.height !== old.height) {
+      this.camera.setBounds(grid.width * TILE_SIZE, grid.height * TILE_SIZE);
+    }
     this.setGhost(null);
     this.setSelection(null);
     this.syncContent();
@@ -179,6 +195,27 @@ export class Renderer {
           .stroke({ width: 1.5, color: c, alpha: 0.7 });
       }
     }
+  }
+
+  /**
+   * Tints the tiles a plan would change: blue where it adds or alters
+   * something, red where it removes something. Null clears it.
+   */
+  setPlanOverlay(diff: { added: number[]; removed: number[] } | null): void {
+    const g = this.planOverlay.clear();
+    if (!diff) return;
+    const width = this.state.floors[0]!.width;
+    const T = TILE_SIZE;
+    const draw = (tiles: number[], colour: number) => {
+      for (const i of tiles) {
+        const x = i % width;
+        const y = (i - x) / width;
+        g.rect(x * T, y * T, T, T);
+      }
+      g.fill({ color: colour, alpha: 0.3 });
+    };
+    draw(diff.added, PLAN_ADDED);
+    draw(diff.removed, PLAN_REMOVED);
   }
 
   /** Highlights a set of tiles (the selected room), or clears with null. */

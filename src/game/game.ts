@@ -2,10 +2,14 @@
  * Wires the pieces together: SimState + fixed-step loop + renderer + camera
  * and build controls + UI signals. Owns the per-frame callback and is the one
  * place that applies player commands to the state.
+ *
+ * In plan mode, commands go into the build plan instead (see sim/plan.ts), and
+ * the map, tools and inspector all show the plan preview ("viewState").
  */
 import { equipmentById, objectDef, roomById } from "@data/catalogue";
 import { autosave } from "@save/saveManager";
 import { applyCommand, type Command, type CommandResult } from "@sim/commands";
+import { addToPlan, buildPreview, commitPlan, planDiff, type PlanPreview } from "@sim/plan";
 import { tick } from "@sim/sim";
 import { createSimState, type SimState } from "@sim/state";
 import { clockFromTick, formatClock, TICKS_PER_SECOND_1X } from "@sim/time";
@@ -20,6 +24,8 @@ import {
   hud,
   inspector,
   mapHelp,
+  planning,
+  planSummary,
   saveDialogOpen,
   showToast,
   type InspectorData,
@@ -27,7 +33,7 @@ import {
 import { tileHelp } from "@ui/help";
 import { BuildController } from "./buildController";
 import { FixedStepLoop, type Speed } from "./loop";
-import { describeAccess } from "./tools";
+import { describeAccess, formatMoney } from "./tools";
 
 const HUD_INTERVAL_MS = 100;
 /** How long the mouse must rest on something before its help card appears. */
@@ -52,6 +58,8 @@ export class Game {
   private lastHovered = "";
   private hoverSince = 0;
   private lastDay: number;
+  /** The plan applied to a copy of the state; null when there's no plan. */
+  private preview: PlanPreview | null = null;
 
   // Debug stat accumulators.
   private fps = 0;
@@ -75,19 +83,34 @@ export class Game {
         this.onCanvasClick(button);
       },
     });
+    // The build tools see (and edit) the plan preview while planning.
     this.build = new BuildController(renderer, this);
     this.lastDay = clockFromTick(state.tick).day;
+    if (state.plan.length > 0) this.rebuildPreview();
     window.addEventListener("keydown", (e) => this.onKey(e));
     renderer.app.ticker.add((t) => this.frame(t.deltaMS));
     this.publishHud();
   }
 
-  /** Applies a player command, updating the view. `quiet` suppresses error toasts. */
+  /** What the map shows: the plan preview while planning, otherwise the real hospital. */
+  get viewState(): SimState {
+    return planning.value && this.preview ? this.preview.state : this.state;
+  }
+
+  /**
+   * Applies a player command (or, in plan mode, adds it to the plan), updating
+   * the view. `quiet` suppresses error toasts.
+   */
   apply(cmd: Command, quiet = false): CommandResult {
-    const result = applyCommand(this.state, cmd);
+    const result = planning.value
+      ? addToPlan(this.state, this.ensurePreview(), cmd)
+      : applyCommand(this.state, cmd);
     if (result.ok) {
       mapHelp.value = null;
       this.renderer.layoutChanged(result.changed);
+      // Real building can get in the way of planned steps (or shift item ids).
+      if (!planning.value && this.state.plan.length > 0) this.rebuildPreview();
+      this.refreshPlanView();
       this.publishInspector();
       this.publishHud();
     } else if (!quiet) {
@@ -96,11 +119,62 @@ export class Game {
     return result;
   }
 
+  /** Enters or leaves plan mode. The plan itself is kept either way. */
+  setPlanning(on: boolean): void {
+    if (on === planning.value) return;
+    if (on) this.rebuildPreview();
+    planning.value = on;
+    document.body.classList.toggle("planning", on);
+    this.renderer.setState(this.viewState);
+    this.refreshPlanView();
+    this.build.refresh();
+    this.publishInspector();
+  }
+
+  undoPlan(): void {
+    if (this.state.plan.length === 0) return;
+    this.state.plan.pop();
+    this.rebuildPreview();
+  }
+
+  clearPlan(): void {
+    this.state.plan = [];
+    this.rebuildPreview();
+  }
+
+  /** Builds the whole plan for real (if affordable) and leaves plan mode. */
+  buildPlan(): void {
+    const result = commitPlan(this.state);
+    if (!result.ok) {
+      const cost = this.preview?.cost ?? 0;
+      showToast(
+        cost > this.state.money
+          ? `The plan costs ${formatMoney(cost)}; you have ${formatMoney(this.state.money)}`
+          : result.error,
+        "error",
+      );
+      return;
+    }
+    this.preview = null;
+    this.setPlanning(false);
+    this.renderer.setState(this.state);
+    this.refreshPlanView();
+    this.publishInspector();
+    this.publishHud();
+    const what = result.steps === 1 ? "1 planned change" : `${result.steps} planned changes`;
+    showToast(`Built ${what} for ${formatMoney(result.cost)}`);
+  }
+
   /** Replaces the running game, e.g. after loading. Pauses so the player can get their bearings. */
   loadState(state: SimState): void {
     this.state = state;
     this.lastDay = clockFromTick(state.tick).day;
     this.selectedTile = null;
+    this.preview = null;
+    planning.value = false;
+    document.body.classList.remove("planning");
+    if (state.plan.length > 0) this.rebuildPreview();
+    this.refreshPlanView();
     this.renderer.setState(state);
     this.build.refresh();
     this.setSpeed(0);
@@ -144,6 +218,36 @@ export class Game {
   destroy(): void {
     this.controls.destroy();
     this.build.destroy();
+  }
+
+  private ensurePreview(): PlanPreview {
+    if (!this.preview) this.rebuildPreview();
+    return this.preview!;
+  }
+
+  /** Recomputes the preview from the real state, dropping steps that no longer fit. */
+  private rebuildPreview(): void {
+    const { preview, dropped } = buildPreview(this.state);
+    this.preview = preview;
+    if (dropped > 0) {
+      const what =
+        dropped === 1
+          ? "1 planned change no longer fits and was"
+          : `${dropped} planned changes no longer fit and were`;
+      showToast(`${what} removed from the plan`, "error");
+    }
+    if (planning.value) this.renderer.setState(preview.state);
+    this.refreshPlanView();
+    this.publishInspector();
+  }
+
+  /** Updates the blueprint tint and the plan bar. */
+  private refreshPlanView(): void {
+    const steps = this.state.plan.length;
+    planSummary.value = { steps, cost: steps > 0 ? (this.preview?.cost ?? 0) : 0 };
+    this.renderer.setPlanOverlay(
+      planning.value && this.preview ? planDiff(this.state, this.preview.state) : null,
+    );
   }
 
   private frame(deltaMs: number): void {
@@ -199,7 +303,7 @@ export class Game {
       return;
     }
     if (mapHelp.value || performance.now() - this.hoverSince < HOVER_HELP_DELAY_MS) return;
-    const content = tileHelp(this.state, FLOOR, tile.x, tile.y);
+    const content = tileHelp(this.viewState, FLOOR, tile.x, tile.y);
     if (content) mapHelp.value = { ...at, content };
   }
 
@@ -225,8 +329,8 @@ export class Game {
       hoveredTile: this.renderer.hoveredTile,
       chunksVisible: this.renderer.visibleChunkCount,
       mapSize: { width: grid.width, height: grid.height },
-      rooms: this.state.rooms.length,
-      objects: Object.keys(this.state.objects).length,
+      rooms: this.viewState.rooms.length,
+      objects: Object.keys(this.viewState.objects).length,
     };
   }
 
@@ -238,10 +342,10 @@ export class Game {
       this.renderer.setSelection(null);
       return;
     }
-    const grid = this.state.floors[FLOOR]!;
+    const grid = this.viewState.floors[FLOOR]!;
     const data: InspectorData = { tile };
 
-    const obj = itemsAt(this.state, FLOOR, tile.x, tile.y)[0];
+    const obj = itemsAt(this.viewState, FLOOR, tile.x, tile.y)[0];
     const def = obj && objectDef(obj.defId);
     if (def) {
       data.object = {
@@ -257,12 +361,12 @@ export class Game {
       };
     }
 
-    const room = roomAt(this.state, FLOOR, tile.x, tile.y);
+    const room = roomAt(this.viewState, FLOOR, tile.x, tile.y);
     const roomDef = room && roomById.get(room.typeId);
     if (room && roomDef) {
       const counts = new Map<string, number>();
       for (const id of room.objectIds) {
-        const name = equipmentById.get(this.state.objects[id]!.defId)?.name;
+        const name = equipmentById.get(this.viewState.objects[id]!.defId)?.name;
         if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
       }
       data.room = {
@@ -301,9 +405,17 @@ export class Game {
 
   private onKey(e: KeyboardEvent): void {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-    if (e.repeat) return;
+    if (e.code === "KeyZ" && (e.ctrlKey || e.metaKey) && planning.value) {
+      e.preventDefault();
+      this.undoPlan();
+      return;
+    }
+    // Leave browser shortcuts (⌘R, Ctrl+P…) alone.
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     const speed = SPEED_KEYS[e.code];
-    if (speed !== undefined) {
+    if (e.code === "KeyP") {
+      this.setPlanning(!planning.value);
+    } else if (speed !== undefined) {
       this.setSpeed(speed);
     } else if (e.code === "Space") {
       e.preventDefault();

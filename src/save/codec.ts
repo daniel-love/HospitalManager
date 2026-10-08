@@ -49,6 +49,48 @@ const objectSchema = z.object({
   rotation: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
 });
 
+const int = z.number().int();
+const rectSchema = z.object({ x: int, y: int, w: int.min(0), h: int.min(0) });
+const rotationSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
+const floorIndex = int.min(0);
+
+/** Every build command, as stored in a saved plan. */
+const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("build_floor"), floor: floorIndex, rect: rectSchema }),
+  z.object({ type: z.literal("remove_floor"), floor: floorIndex, rect: rectSchema }),
+  z.object({
+    type: z.literal("build_walls"),
+    floor: floorIndex,
+    rect: rectSchema,
+    wall: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  }),
+  z.object({ type: z.literal("demolish"), floor: floorIndex, rect: rectSchema }),
+  z.object({
+    type: z.literal("zone"),
+    floor: floorIndex,
+    rect: rectSchema,
+    roomType: z.string().nullable(),
+  }),
+  z.object({
+    type: z.literal("place_object"),
+    floor: floorIndex,
+    defId: z.string(),
+    x: int,
+    y: int,
+    rotation: rotationSchema,
+  }),
+  z.object({ type: z.literal("remove_objects"), floor: floorIndex, rect: rectSchema }),
+  z.object({ type: z.literal("remove_object"), floor: floorIndex, id: int.positive() }),
+  z.object({
+    type: z.literal("move_object"),
+    floor: floorIndex,
+    id: int.positive(),
+    x: int,
+    y: int,
+    rotation: rotationSchema,
+  }),
+]);
+
 const saveSchema = z.object({
   format: z.literal(SAVE_FORMAT),
   version: z.literal(SIM_STATE_VERSION),
@@ -66,6 +108,7 @@ const saveSchema = z.object({
     floors: z.array(floorSchema).min(1),
     objects: z.array(objectSchema),
     nextObjectId: z.number().int().positive(),
+    plan: z.array(z.object({ cmd: commandSchema, createdId: int.positive().optional() })),
   }),
 });
 
@@ -96,6 +139,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       })),
       objects: Object.values(state.objects),
       nextObjectId: state.nextObjectId,
+      plan: state.plan,
     },
   };
 }
@@ -129,6 +173,10 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     floors,
     objects: {},
     nextObjectId: s.nextObjectId,
+    // Checked when the game builds its plan preview, which drops steps that no longer fit.
+    plan: s.plan.map(({ cmd, createdId }) =>
+      createdId === undefined ? { cmd } : { cmd, createdId },
+    ),
     rooms: [],
   };
   for (const obj of s.objects) restoreObject(state, floors, obj);

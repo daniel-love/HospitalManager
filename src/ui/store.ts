@@ -94,3 +94,8 @@ export function showToast(text: string, kind: Toast["kind"] = "info"): void {
 export const mapHelp = signal<{ x: number; y: number; content: HelpContent } | null>(null);
 /** Hover help for the build palette entry under the mouse. */
 export const paletteHelp = signal<{ x: number; y: number; content: HelpContent } | null>(null);
+
+/** Plan mode: build actions go into the plan instead of being built. */
+export const planning = signal(false);
+/** Size and net cost of the current plan (kept when leaving plan mode). */
+export const planSummary = signal<{ steps: number; cost: number }>({ steps: 0, cost: 0 });

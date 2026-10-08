@@ -5,11 +5,12 @@
  * after loading.
  */
 import { STARTING_CASH } from "@data/economy";
+import type { PlanEntry } from "./plan";
 import { createRng, type RngState } from "./rng";
 import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 
-export const SIM_STATE_VERSION = 1;
+export const SIM_STATE_VERSION = 2;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -61,6 +62,8 @@ export interface SimState {
   /** Keyed by object id. */
   objects: Record<number, PlacedObject>;
   nextObjectId: number;
+  /** Build plan (blueprint) not yet built or paid for. See plan.ts. */
+  plan: PlanEntry[];
   /** Derived (not saved): rebuilt by detectRooms() after every layout change. */
   rooms: Room[];
 }
@@ -86,6 +89,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     floors: [createFloorGrid(width, height)],
     objects: {},
     nextObjectId: 1,
+    plan: [],
     rooms: [],
   };
 }

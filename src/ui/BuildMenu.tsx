@@ -10,7 +10,7 @@ import { WallType } from "@sim/world/grid";
 import { CATEGORY_COLOURS } from "@render/palette";
 import { useEffect } from "preact/hooks";
 import { CATEGORY_NAMES, equipmentHelp, roomTypeHelp, simpleHelp, type HelpContent } from "./help";
-import { buildTab, paletteHelp, tool, type BuildTab } from "./store";
+import { buildTab, paletteHelp, planning, tool, type BuildTab } from "./store";
 
 const TABS: { id: BuildTab; label: string }[] = [
   { id: "construction", label: "Construction" },
@@ -21,10 +21,20 @@ const TABS: { id: BuildTab; label: string }[] = [
 const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
-export function BuildBar() {
+export function BuildBar({ onTogglePlan }: { onTogglePlan: () => void }) {
   const open = buildTab.value;
   return (
     <nav class="buildbar" aria-label="Build">
+      <button
+        class={`plan-toggle${planning.value ? " active" : ""}`}
+        aria-pressed={planning.value}
+        title="Plan mode (P): lay out changes and see the cost before building anything"
+        onMouseDown={noFocus}
+        onClick={onTogglePlan}
+      >
+        Plan
+      </button>
+      <span class="buildbar-divider" aria-hidden="true" />
       {TABS.map((t) => (
         <button
           key={t.id}

@@ -16,18 +16,19 @@ A UK-set, top-down hospital **design and management** sim inspired by _Prison Ar
 
 ## Controls
 
-| Action                 | Input                                                                                               |
-| ---------------------- | --------------------------------------------------------------------------------------------------- |
-| Pan                    | WASD / arrow keys, or drag (right/middle button, left with no tool, or Ctrl/⌘ + left drag any time) |
-| Zoom                   | Mouse wheel / trackpad pinch                                                                        |
-| Build                  | Pick a tool from the bottom bar, then drag (or click to place)                                      |
-| Rotate equipment       | R                                                                                                   |
-| Move equipment         | Equipment → Move equipment, or select an item and press Move; click to put down                     |
-| Cancel tool / deselect | Right-click or Esc                                                                                  |
-| Inspect a room         | Click it with no tool selected                                                                      |
-| Quick help             | Rest the mouse on a room, item or door, or on any build palette entry                               |
-| Pause / speeds         | Space, 1–4                                                                                          |
-| Debug overlay          | F3 or `                                                                                             |
+| Action                 | Input                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Pan                    | WASD / arrow keys, or drag (right/middle button, left with no tool, or Ctrl/⌘ + left drag any time)                |
+| Zoom                   | Mouse wheel / trackpad pinch                                                                                       |
+| Build                  | Pick a tool from the bottom bar, then drag (or click to place)                                                     |
+| Plan mode              | P (or the Plan button): lay out changes and see the cost, then Build plan. Ctrl/⌘+Z undoes the last planned change |
+| Rotate equipment       | R                                                                                                                  |
+| Move equipment         | Equipment → Move equipment, or select an item and press Move; click to put down                                    |
+| Cancel tool / deselect | Right-click or Esc                                                                                                 |
+| Inspect a room         | Click it with no tool selected                                                                                     |
+| Quick help             | Rest the mouse on a room, item or door, or on any build palette entry                                              |
+| Pause / speeds         | Space, 1–4                                                                                                         |
+| Debug overlay          | F3 or `                                                                                                            |
 
 ## Development
 

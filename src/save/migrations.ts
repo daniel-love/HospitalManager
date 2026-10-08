@@ -7,7 +7,10 @@ import { SIM_STATE_VERSION } from "@sim/state";
 
 type RawSave = Record<string, unknown> & { version: number };
 
-const migrations: Record<number, (save: RawSave) => RawSave> = {};
+const migrations: Record<number, (save: RawSave) => RawSave> = {
+  // v2 added build plans (plan mode).
+  1: (save) => ({ ...save, state: { ...(save.state as object), plan: [] } }),
+};
 
 export function migrate(raw: unknown): unknown {
   if (typeof raw !== "object" || raw === null || !("version" in raw)) return raw;

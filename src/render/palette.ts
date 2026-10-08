@@ -22,6 +22,10 @@ export const CATEGORY_COLOURS: Record<EquipmentDef["category"], number> = {
 /** Marks the side of an item that staff work from (NHS-ish blue). */
 export const STAFF_COLOUR = 0x2f7fd8;
 
+/** Plan mode blueprint tints. */
+export const PLAN_ADDED = 0x3d8bfd;
+export const PLAN_REMOVED = 0xe0504a;
+
 export const GHOST_OK = 0x5ad17a;
 export const GHOST_BAD = 0xe0504a;
 export const GHOST_REMOVE = 0xe0a040;

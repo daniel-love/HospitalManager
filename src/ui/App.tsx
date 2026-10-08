@@ -4,7 +4,9 @@ import { DebugOverlay } from "./DebugOverlay";
 import { MapHelp, PaletteHelp } from "./HelpCard";
 import { Inspector } from "./Inspector";
 import { CursorInfo, Toasts } from "./Overlays";
+import { PlanBar } from "./PlanBar";
 import { SaveDialog } from "./SaveDialog";
+import { planning } from "./store";
 import { TopBar } from "./TopBar";
 
 export function App({ game }: { game: Game }) {
@@ -13,7 +15,8 @@ export function App({ game }: { game: Game }) {
       <TopBar game={game} />
       <Palette />
       <Inspector onClose={() => game.select(null)} onMove={(id) => game.startMove(id)} />
-      <BuildBar />
+      <PlanBar game={game} />
+      <BuildBar onTogglePlan={() => game.setPlanning(!planning.value)} />
       <Toasts />
       <DebugOverlay />
       <CursorInfo />

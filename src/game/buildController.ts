@@ -17,7 +17,7 @@ import { isPanModifier } from "@render/cameraControls";
 import type { Renderer } from "@render/renderer";
 import { NOTHING_TO_CHANGE, planCommand, type Command, type CommandResult } from "@sim/commands";
 import type { SimState } from "@sim/state";
-import { cursorInfo, rotation, tool } from "@ui/store";
+import { cursorInfo, planning, rotation, tool } from "@ui/store";
 import { objectDef } from "@data/catalogue";
 import { objectRect } from "@sim/world/objects";
 import { describePlan, equipmentAt, ghostFor, isPlacementTool, toolCommand } from "./tools";
@@ -25,7 +25,8 @@ import { describePlan, equipmentAt, ghostFor, isPlacementTool, toolCommand } fro
 const FLOOR = 0;
 
 export interface BuildHost {
-  readonly state: SimState;
+  /** The layout the tools work on: the plan preview while planning. */
+  readonly viewState: SimState;
   apply(cmd: Command, quiet?: boolean): CommandResult;
 }
 
@@ -81,7 +82,7 @@ export class BuildController {
 
   /** Picks up a piece of equipment with the move tool, as if it had been clicked. */
   pickUp(objectId: number, grabbed?: { x: number; y: number }): void {
-    const obj = this.host.state.objects[objectId];
+    const obj = this.host.viewState.objects[objectId];
     if (!obj) return;
     rotation.value = obj.rotation;
     tool.value = {
@@ -108,17 +109,18 @@ export class BuildController {
       this.refreshPickUp(tile);
       return;
     }
-    const plan = planCommand(this.host.state, cmd);
+    const plan = planCommand(this.host.viewState, cmd);
     const noop = plan.error === NOTHING_TO_CHANGE;
-    this.renderer.setGhost(ghostFor(cmd, plan, this.host.state, noop));
+    this.renderer.setGhost(ghostFor(cmd, plan, this.host.viewState, noop));
+    const prefix = planning.value ? "Plan · " : "";
     cursorInfo.value = noop
       ? null
-      : { ...this.pointer, text: describePlan(cmd, plan), ok: plan.ok };
+      : { ...this.pointer, text: prefix + describePlan(cmd, plan), ok: plan.ok };
   }
 
   /** Move tool with empty hands: highlight what would be picked up. */
   private refreshPickUp(tile: { x: number; y: number }): void {
-    const obj = equipmentAt(this.host.state, FLOOR, tile);
+    const obj = equipmentAt(this.host.viewState, FLOOR, tile);
     if (!obj) {
       this.renderer.setGhost(null);
       cursorInfo.value = { ...this.pointer, text: "Click equipment to pick it up", ok: true };
@@ -135,7 +137,7 @@ export class BuildController {
   }
 
   private command(tile: { x: number; y: number }): Command | null {
-    const { state } = this.host;
+    const state = this.host.viewState;
     const grid = state.floors[FLOOR]!;
     const start = this.dragStart ?? tile;
     return toolCommand(tool.value!, grid, FLOOR, start, tile, rotation.value, state);
@@ -154,12 +156,12 @@ export class BuildController {
     if (e.button !== 0 || !t || !tile || isPanModifier(e)) return;
     if (t.kind === "move") {
       if (!t.carry) {
-        const obj = equipmentAt(this.host.state, FLOOR, tile);
+        const obj = equipmentAt(this.host.viewState, FLOOR, tile);
         if (obj) this.pickUp(obj.id, tile);
       } else {
         const cmd = this.command(tile)!;
         // Dropping it where it already was just puts it down.
-        const unchanged = planCommand(this.host.state, cmd).error === NOTHING_TO_CHANGE;
+        const unchanged = planCommand(this.host.viewState, cmd).error === NOTHING_TO_CHANGE;
         if (unchanged || this.host.apply(cmd).ok) tool.value = { kind: "move", carry: null };
       }
       this.refresh();
@@ -183,7 +185,7 @@ export class BuildController {
       this.painting = `${tile.x},${tile.y}`;
       const cmd = this.command(tile)!;
       // While painting, silently skip tiles where the item doesn't fit.
-      if (planCommand(this.host.state, cmd).ok) this.host.apply(cmd, true);
+      if (planCommand(this.host.viewState, cmd).ok) this.host.apply(cmd, true);
     }
     this.refresh();
   }

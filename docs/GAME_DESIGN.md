@@ -89,6 +89,8 @@ So there are three modes at game start: **NHS Trust**, **Private Hospital** and 
 
 Build mode has three sub-modes: **Construction**, **Cosmetics** and **Equipment**.
 
+**Plan mode** (blueprints) works across all of them: while it's on, every build action goes into a plan instead of being built. The map shows the hospital as it would be, with planned changes tinted, and room checklists, costs and validity all reflect the plan. Nothing is built or paid for until the player builds the plan, which happens all at once and only if it's affordable. Plans are saved with the game. When builder agents arrive (M7), the plan becomes their work queue.
+
 ### 4.1 Construction
 
 **Grid:** square tiles of about 1 m, viewed top-down. The hospital site has an exterior (grass, roads, paths) and an interior you construct.
