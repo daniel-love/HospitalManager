@@ -46,9 +46,16 @@
 **Step 8 (2026-10-09).** ARCHITECTURE (module layout, land, vehicle routing, migrations that add content) and GAME_DESIGN (exterior elements, arrival channels) updated for the road.
 **M3.5 is complete.**
 
+## Playtest backlog
+
+Small fixes and polish from playtesting, to slot in between milestones.
+
+- **Dirty bays and areas:** a visual indicator on the map for couches, trolleys, beds and toilets waiting to be cleaned (and bays closed for a deep clean), so the player can see why a free-looking bay isn't being used.
+- **Unreachable rooms for patients:** warn when patients can't reach a room except through a clinical room (since patients keep to public routes).
+
 ## M4: Outpatients, theatres & specialty gating
 
-**Delivers:** specialties, consultants (resident and on-call with callout delay), outpatient clinics with GP referrals and scheduled appointments, waiting list and RTT, theatres + recovery + elective surgery scheduling and cancellations, imaging (X-ray/CT) and lab. **Specialty gating** of referrals, plus A&E transfer-out when the hospital can't treat. **Medical Examiner as a consultant duty** (GAME_DESIGN §5.6, §6.1): replaces the interim dedicated Medical Examiner role from M3. The player assigns the duty to consultants, who do reviews in set office-hours sessions and clinical work otherwise, and never review a death of a patient they treated.
+**Delivers:** specialties, consultants (resident and on-call with callout delay), outpatient clinics with GP referrals and scheduled appointments, waiting list and RTT, theatres + recovery + elective surgery scheduling and cancellations, imaging (X-ray/CT) and lab. **Specialty gating** of referrals, plus A&E transfer-out when the hospital can't treat. **Medical Examiner as a consultant duty** (GAME_DESIGN §5.6, §6.1): replaces the interim dedicated Medical Examiner role from M3. The player assigns the duty to consultants, who do reviews in set office-hours sessions and clinical work otherwise, and never review a death of a patient they treated. **Shared mobile equipment:** some kit is a wheeled machine shared across a department rather than one per bay, as in a real ED. A 12-lead ECG (and later portable X-ray and ultrasound) serves any Majors Bay within a walking distance of where it's kept, like the central monitor's response distance, with staff fetching it and only one patient using it at a time. Replaces the interim rule that each bay needs its own ECG.
 **Done when:** adding a cardiology clinic and consultant causes cardiology referrals to start, and removing them stops them.
 
 ## M5: Administration depth

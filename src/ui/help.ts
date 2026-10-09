@@ -2,7 +2,7 @@
  * Content for hover help cards: room types and equipment in the build
  * palette, and rooms, items and doors on the map.
  */
-import { content, objectDef, roomById } from "@data/catalogue";
+import { conditionEquipment, content, objectDef, roomById } from "@data/catalogue";
 import { EQUIPMENT_CATEGORY_NAMES } from "@data/equipment";
 import type { EquipmentDef, RoomDef } from "@data/schema";
 import { describeAccess, formatMoney } from "@game/tools";
@@ -52,12 +52,16 @@ function requirementLines(def: RoomDef): HelpItem[] {
 
 export function roomTypeHelp(def: RoomDef): HelpContent {
   const lines = requirementLines(def);
+  const extras = conditionEquipment(def.id).map((e) => ({
+    text: `${e.items.join(" and ")}: ${e.conditions.join(", ").toLowerCase()}`,
+  }));
   return {
     title: def.name,
     subtitle: def.department,
     body: def.description,
     sections: [
       { heading: "To be valid", items: lines.length > 0 ? lines : [{ text: "No requirements" }] },
+      ...(extras.length > 0 ? [{ heading: "For some conditions", items: extras }] : []),
     ],
     footer: "Drag over floor to zone. Rooms are free to zone.",
   };
@@ -118,6 +122,7 @@ export function tileHelp(state: SimState, floor: number, x: number, y: number): 
 
   if (!room || !roomDef) return null;
   const failing = room.checks.filter((c) => !c.ok);
+  const lacking = room.forConditions.filter((c) => !c.ok);
   return {
     title: roomDef.name,
     badge: room.valid ? { text: "Valid", ok: true } : { text: "Needs work", ok: false },
@@ -135,6 +140,14 @@ export function tileHelp(state: SimState, floor: number, x: number, y: number): 
                   })),
                 }
               : { heading: "Requirements", items: [{ text: "All met", ok: true }] },
+            ...(lacking.length > 0
+              ? [
+                  {
+                    heading: "Can't treat yet",
+                    items: lacking.map((c) => ({ text: `${c.label} (${c.detail})` })),
+                  },
+                ]
+              : []),
           ],
     footer: "Click for full details",
   };

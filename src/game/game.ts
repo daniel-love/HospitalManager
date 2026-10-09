@@ -641,6 +641,7 @@ export class Game {
         size: `${room.bounds.w}×${room.bounds.h} (${room.tiles.length} m²)`,
         valid: room.valid,
         checks: room.checks,
+        forConditions: room.forConditions,
         capabilities: room.capabilities,
         items: [...counts].map(([name, count]) => ({ name, count })),
       };

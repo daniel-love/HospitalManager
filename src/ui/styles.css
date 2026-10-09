@@ -348,6 +348,10 @@ button {
 .checklist .bad {
   color: var(--bad);
 }
+/* Advisory: not needed to work, but some patients can't be treated without it. */
+.checklist .advice {
+  color: #f2c94c;
+}
 .tags {
   display: flex;
   flex-wrap: wrap;

@@ -52,6 +52,49 @@ export function equipmentNamesFor(capability: string): string[] {
   return [item?.name ?? capability];
 }
 
+/** Extra equipment a room type needs for some conditions (see conditionEquipment). */
+export interface ConditionEquipment {
+  capability: string;
+  /** What to put in the room, e.g. ["ECG (12-lead)"]. */
+  items: string[];
+  /** Conditions that need it here, e.g. ["Chest pain"]. */
+  conditions: string[];
+}
+
+/**
+ * Equipment a room type needs beyond being valid, for the conditions whose
+ * pathway steps use it there: e.g. a Majors Bay needs an ECG (12-lead) for
+ * chest pain. Leaves out anything the room's own requirements already
+ * guarantee (a Majors Bay always has oxygen).
+ */
+export function conditionEquipment(roomType: string): ConditionEquipment[] {
+  const def = roomById.get(roomType);
+  if (!def) return [];
+  const guaranteed = (cap: string): boolean => {
+    const combo = content.capabilityCombos.find((c) => c.capability === cap);
+    if (combo) return combo.requires.every(guaranteed);
+    return def.required.some((req) =>
+      req.anyOf.every((id) => equipmentById.get(id)?.capabilities.includes(cap)),
+    );
+  };
+  const byCap = new Map<string, Set<string>>();
+  for (const c of content.conditions) {
+    for (const step of c.pathway) {
+      if (step.room !== roomType) continue;
+      for (const cap of step.capabilities) {
+        if (guaranteed(cap)) continue;
+        if (!byCap.has(cap)) byCap.set(cap, new Set());
+        byCap.get(cap)!.add(c.name);
+      }
+    }
+  }
+  return [...byCap].map(([capability, names]) => ({
+    capability,
+    items: equipmentNamesFor(capability),
+    conditions: [...names],
+  }));
+}
+
 /** "Junior Doctor or Emergency Nurse Practitioner"; plural: "Junior Doctors or …". */
 export function roleNames(roles: readonly StaffRoleId[], plural = false): string {
   const names = roles.map((r) => (staffRoleById.get(r)?.name ?? r) + (plural ? "s" : ""));

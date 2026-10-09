@@ -93,6 +93,8 @@ export interface InspectorData {
     size: string;
     valid: boolean;
     checks: RoomCheck[];
+    /** Advisory equipment for some conditions (doesn't affect validity). */
+    forConditions: RoomCheck[];
     capabilities: string[];
     items: { name: string; count: number }[];
   };

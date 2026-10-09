@@ -9,7 +9,14 @@
  * Rooms are derived data: detectRooms() rebuilds them all from the grid. At
  * 200×200 that is a few milliseconds, cheap enough to run after every build.
  */
-import { content, equipmentById, objectDef, roomByCode, roomById } from "@data/catalogue";
+import {
+  conditionEquipment,
+  content,
+  equipmentById,
+  objectDef,
+  roomByCode,
+  roomById,
+} from "@data/catalogue";
 import type { RoomDef } from "@data/schema";
 import type { Room, RoomCheck, SimState } from "../state";
 import { isWallOrDoor, tileIndex, type FloorGrid } from "./grid";
@@ -36,6 +43,7 @@ export function detectRooms(state: SimState): void {
         capabilities: [],
         checks: [],
         valid: false,
+        forConditions: [],
       });
     }
   });
@@ -166,6 +174,11 @@ function evaluateRoom(state: SimState, room: Room, rooms: Room[]): void {
   room.checks = checks;
   room.valid = checks.every((c) => c.ok);
   room.capabilities = capabilitiesOf(defIds);
+  room.forConditions = conditionEquipment(room.typeId).map((e) => ({
+    label: e.items.join(" and "),
+    ok: room.capabilities.includes(e.capability),
+    detail: `for ${e.conditions.join(", ").toLowerCase()}`,
+  }));
 }
 
 /**

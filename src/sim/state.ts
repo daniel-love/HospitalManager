@@ -62,6 +62,11 @@ export interface Room {
   capabilities: string[];
   checks: RoomCheck[];
   valid: boolean;
+  /**
+   * Advisory: equipment some conditions need here, beyond being valid
+   * (e.g. an ECG for chest pain). Doesn't affect `valid`.
+   */
+  forConditions: RoomCheck[];
 }
 
 export interface SimState {

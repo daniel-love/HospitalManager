@@ -63,6 +63,21 @@ export function Inspector({
               ))}
             </ul>
           )}
+          {room.forConditions.length > 0 && (
+            <>
+              <h4 title="Not needed for the room to work, but some patients can't be treated here without it">
+                For some conditions
+              </h4>
+              <ul class="checklist">
+                {room.forConditions.map((c) => (
+                  <li key={c.label} class={c.ok ? "ok" : "advice"}>
+                    <span aria-hidden="true">{c.ok ? "✓" : "–"}</span> {c.label}
+                    {c.detail && <span class="dim"> ({c.detail})</span>}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           {room.items.length > 0 && (
             <>
               <h4>Equipment</h4>
