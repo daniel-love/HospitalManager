@@ -386,6 +386,17 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v19: staff remember when they last had a job.
+  18: (save) => {
+    const state = save.state as { tick: number; staff: object[] };
+    return {
+      ...save,
+      state: {
+        ...state,
+        staff: state.staff.map((s) => ({ ...s, lastActiveTick: state.tick })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

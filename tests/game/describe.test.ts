@@ -80,7 +80,7 @@ describe("UI descriptions", () => {
         expect(r.progress).toBeGreaterThanOrEqual(0);
         expect(r.progress).toBeLessThanOrEqual(1);
       }
-      if (r.status === "free") expect(r.activity).toBe("Free");
+      if (r.status === "free") expect(r.activity).toMatch(/^Free( for \S.*)?$/);
     }
   });
 });

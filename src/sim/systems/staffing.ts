@@ -80,6 +80,7 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
       jobId: null,
       desk: null,
       hiredTick: state.tick,
+      lastActiveTick: state.tick,
       morale: MORALE_START,
     };
     state.staff[staff.id] = staff;
@@ -120,6 +121,7 @@ export function staffTitle(s: Staff): string {
 
 export function updateStaff(state: SimState): void {
   for (const s of Object.values(state.staff)) {
+    if (s.jobId !== null) s.lastActiveTick = state.tick;
     if (s.role === "receptionist") staffDesk(state, s);
     else if (s.onCall?.state === "leaving") {
       if (s.jobId !== null) s.onCall = { state: "in", at: state.tick };

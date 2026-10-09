@@ -66,6 +66,8 @@ function busyDayBeforeTransfers(): SimState {
     p.curtainUntil = null; // Curtains came later too (v17).
     p.retriaged = null; // And re-triage (v18).
   }
+  // Staff's last job came later too (v19): upgrading counts it from the save.
+  for (const s of Object.values(state.staff)) s.lastActiveTick = state.tick;
   return state;
 }
 

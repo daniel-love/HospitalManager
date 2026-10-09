@@ -231,6 +231,8 @@ export interface Staff extends AgentBase {
   /** Receptionists: the desk they staff. Nurses: the nurse station they wait at. */
   desk: number | null;
   hiredTick: number;
+  /** The last tick they had a job (or when hired): how long a free member of staff has been idle. */
+  lastActiveTick: number;
   /** 0–100. Falls after deaths they're involved in; recovers slowly. (Effects from M5.) */
   morale: number;
 }

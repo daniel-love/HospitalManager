@@ -566,7 +566,11 @@ export function staffState(state: SimState, s: Staff): StaffState {
       ? { status: "on_the_way", activity: "Going to the nurse station", ...none }
       : { status: "at_desk", activity: "At the nurse station, watching the beds", ...none };
   }
-  if (!job) return { status: "free", activity: "Free", ...none };
+  if (!job) {
+    const mins = Math.floor((state.tick - s.lastActiveTick) / TICKS_PER_MINUTE);
+    const activity = mins < 1 ? "Free" : `Free for ${formatWait(mins)}`;
+    return { status: "free", activity, ...none };
+  }
   const patient = job.patientId === null ? undefined : state.patients[job.patientId];
   const who = patient?.name ?? "a patient";
   let what: string;

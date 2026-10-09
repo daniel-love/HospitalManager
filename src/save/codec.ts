@@ -222,6 +222,7 @@ const staffSchema = z.object({
   jobId: nullableInt,
   desk: nullableInt,
   hiredTick: int.min(0),
+  lastActiveTick: int.min(0),
   morale: num.min(0).max(100),
 });
 
