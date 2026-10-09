@@ -118,6 +118,9 @@ export class TilemapLayer {
           g.rect(px, py, T, T).fill(PATH_COLOUR);
         } else if (surface === FloorType.Road) {
           g.rect(px, py, T, T).fill(ROAD_COLOUR);
+          // An Ambulance Bay zoned on the access road.
+          const room = roomByCode.get(grid.zone[i]!);
+          if (room) g.rect(px, py, T, T).fill({ color: room.colour, alpha: ZONE_ALPHA });
         } else {
           g.rect(px, py, T, T).fill(GRASS_SHADES[tileHash(x, y) % GRASS_SHADES.length]!);
         }

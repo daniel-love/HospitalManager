@@ -569,7 +569,7 @@ export function describeReport(state: SimState): ReportData {
       waiting: Object.values(state.patients).filter((p) => p.stage === "awaiting_bed").length,
     },
     ambulances: {
-      parked: Object.values(state.ambulances).filter((a) => a.space).length,
+      parked: Object.values(state.ambulances).filter((a) => a.phase === "parked").length,
       waiting: ambulancesWaiting(state),
       spaces: parkingSpaces(state).length,
     },

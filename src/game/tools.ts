@@ -6,6 +6,7 @@ import type { Ghost, GhostTone } from "@render/renderer";
 import type { Command, CommandResult } from "@sim/commands";
 import { objectDef } from "@data/catalogue";
 import type { Access } from "@data/schema";
+import type { SurfaceId } from "@data/structures";
 import type { PlacedObject, Rotation, SimState } from "@sim/state";
 import type { FloorGrid, WallType } from "@sim/world/grid";
 import {
@@ -20,6 +21,7 @@ import { rectFromCorners } from "@sim/world/rect";
 
 export type Tool =
   | { kind: "floor" }
+  | { kind: "pave"; surface: SurfaceId }
   | { kind: "remove_floor" }
   | { kind: "wall"; wall: WallType }
   | { kind: "demolish" }
@@ -63,6 +65,8 @@ export function toolCommand(
   switch (tool.kind) {
     case "floor":
       return { type: "build_floor", floor, rect };
+    case "pave":
+      return { type: "pave", floor, rect, surface: tool.surface };
     case "remove_floor":
       return { type: "remove_floor", floor, rect };
     case "wall":

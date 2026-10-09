@@ -101,7 +101,13 @@ describe("why patients are waiting", () => {
   });
 
   it("names a full room, with how many are in use", () => {
-    const reasons = reasonsAfter(SMALL_AE_TEAM, 10);
-    expect(reasons.some((r) => /No free Minors Cubicle \(2 of 2 in use/.test(r))).toBe(true);
+    // Two cubicles can't keep up, so at some point in the morning someone waits for one.
+    const state = staffedSmallAE(3, SMALL_AE_TEAM);
+    const seen: string[] = [];
+    for (let hour = 1; hour <= 12; hour++) {
+      for (let i = 0; i < 60 * TICKS_PER_MINUTE; i++) tick(state);
+      for (const p of Object.values(state.patients)) seen.push(waitReason(state, p) ?? "");
+    }
+    expect(seen.some((r) => /No free Minors Cubicle \(2 of 2 in use/.test(r))).toBe(true);
   });
 });

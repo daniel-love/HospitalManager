@@ -341,6 +341,24 @@ describe("the site in saves", () => {
   });
 });
 
+describe("ambulances in saves", () => {
+  it("upgrades a version-9 save's ambulances to parked or waiting where they were", () => {
+    const state = staffedSmallAE(1);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v9")));
+    save.version = 9;
+    const space = { x: 4, y: 6, w: 3, h: 6 };
+    const old = { arrived: 0, patientId: null, handedOver: null, leaveAt: null };
+    save.state.ambulances = [
+      { id: 1, space, ...old },
+      { id: 2, space: null, ...old },
+    ];
+    save.state.nextAmbulanceId = 3;
+    const loaded = decodeSave(save).state;
+    expect(loaded.ambulances[1]).toMatchObject({ phase: "parked", x: 5, y: 9, route: [] });
+    expect(loaded.ambulances[2]).toMatchObject({ phase: "arriving", space: null, x: 0, y: 0 });
+  });
+});
+
 describe("fixtures in saves", () => {
   it("restores a fixture over a bed into the right layers", async () => {
     const { applyAll } = await import("../fixtures/smallAE");

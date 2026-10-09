@@ -216,10 +216,26 @@ export interface ParkingSpace {
  */
 export interface Ambulance {
   id: number;
-  /** Tick it reached the hospital. */
+  /** Tick it reached the hospital (came onto the map, on a map with a road). */
   arrived: number;
-  /** Where it's parked, or null while it waits for a free space. */
+  /**
+   * arriving: driving in, or queueing on the road for a space; parked: at its
+   * space with the patient; leaving: driving off the map.
+   */
+  phase: "arriving" | "parked" | "leaving";
+  /** Its space (driving to it, or parked), or null while it waits for one or leaves. */
   space: ParkingSpace | null;
+  /** Centre tile, now and at the previous tick (for smooth drawing). */
+  x: number;
+  y: number;
+  prevX: number;
+  prevY: number;
+  /** Tiles still to drive through, flattened [x0, y0, x1, y1, ...]. */
+  route: number[];
+  /** Layout version the route was planned on. */
+  routeVersion: number;
+  /** The end of the road it came in from: 0 west, 1 east. */
+  from: 0 | 1;
   patientId: number | null;
   /** Tick the crew handed over, or null. */
   handedOver: number | null;

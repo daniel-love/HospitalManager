@@ -134,6 +134,8 @@ export const roomDefSchema = z.object({
   minSize: z.tuple([z.number().int().min(1), z.number().int().min(1)]),
   /** Must be fully bounded by walls and doors, with at least one door. */
   enclosed: z.boolean(),
+  /** Can be zoned on the player's access road as well as on foundations (outdoor hardstanding). */
+  onRoad: z.boolean().default(false),
   required: z.array(roomRequirementSchema),
   minSeats: z.number().int().positive().optional(),
   /**

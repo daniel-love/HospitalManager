@@ -52,3 +52,7 @@ export function unionRect(a: Rect | null, b: Rect | null): Rect | null {
     h: Math.max(a.y + a.h, b.y + b.h) - y,
   };
 }
+
+export function contains(r: Rect, x: number, y: number): boolean {
+  return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h;
+}

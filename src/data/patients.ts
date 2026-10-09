@@ -9,6 +9,11 @@
  * roughly 70% walk in (GAME_DESIGN §2.4).
  */
 export const WALK_INS_PER_DAY = 50;
+/**
+ * Share of walk-ins who come by bus; the rest walk, are dropped off or park,
+ * and arrive along the pavement. Most UK A&E walk-ins come by car.
+ */
+export const WALK_IN_BY_BUS = 0.2;
 
 /**
  * Ambulance arrivals per day at the default "realism" setting: about a third
@@ -32,6 +37,11 @@ export const AMBULANCES_BY_HOUR = [
 export const HANDOVER_TARGET_MINS = 15;
 export const HANDOVER_MINS: [number, number] = [8, 15];
 /** After handover, the crew cleans and restocks before the ambulance leaves its bay. */
+/**
+ * Ambulance driving speed on site, in tiles per tick: about 15 mph, slowed by
+ * the same factor as walking (see PATIENT_SPEED).
+ */
+export const AMBULANCE_SPEED = 2;
 export const AMBULANCE_TURNAROUND_MINS: [number, number] = [5, 15];
 
 /**

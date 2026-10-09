@@ -166,6 +166,38 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v10: ambulances drive in along the road, so they have a position and route.
+  9: (save) => {
+    type Space = { x: number; y: number; w: number; h: number };
+    const state = save.state as {
+      ambulances: { space: Space | null }[];
+      site: { road: { y: number } } | null;
+    };
+    // Parked ones sit at their space; waiting ones queue at the west end of the road.
+    const waitAt = { x: 0, y: state.site ? state.site.road.y + 1 : 0 };
+    return {
+      ...save,
+      state: {
+        ...state,
+        ambulances: state.ambulances.map((a) => {
+          const at = a.space
+            ? { x: a.space.x + Math.floor(a.space.w / 2), y: a.space.y + Math.floor(a.space.h / 2) }
+            : waitAt;
+          return {
+            ...a,
+            phase: a.space ? "parked" : "arriving",
+            x: at.x,
+            y: at.y,
+            prevX: at.x,
+            prevY: at.y,
+            route: [],
+            routeVersion: 0,
+            from: 0,
+          };
+        }),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

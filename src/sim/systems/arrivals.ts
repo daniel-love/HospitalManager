@@ -13,15 +13,16 @@ import {
   ARRIVALS_BY_HOUR,
   BLADDER_HOURS,
   START_MOOD,
+  WALK_IN_BY_BUS,
   WALK_INS_PER_DAY,
 } from "@data/patients";
-import type { Patient } from "../agents";
+import type { Patient, Point } from "../agents";
 import { warn } from "../events";
-import { receptionDesks, siteEntrance } from "../places";
+import { arrivalPoints, receptionDesks, siteEntrance } from "../places";
 import { chance, nextFloat, nextInt, pick } from "../rng";
 import type { SimState } from "../state";
 import { clockFromTick, TICKS_PER_MINUTE } from "../time";
-import { ambulanceArrives, parkingSpaces } from "./ambulances";
+import { ambulanceArrives, baySpaces, parkingSpaces, stretcherSpot } from "./ambulances";
 import { rollDeterioration } from "./deterioration";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
@@ -46,6 +47,16 @@ export function updateArrivals(state: SimState): void {
   const walkIn = chance(state.rng, arrivalRate(state.tick) * volume);
   // Ambulances only come to a hospital with somewhere to park them.
   if (ambulance && parkingSpaces(state).length > 0) ambulanceArrives(state);
+  else if (ambulance && baySpaces(state).length > 0) {
+    warn(
+      state,
+      "ambulance_no_road",
+      TICKS_PER_HOUR * 6,
+      "An ambulance went to another hospital: it couldn't drive to your Ambulance Bay. Link the bay to the road with an access road at least 3 tiles wide.",
+      "bad",
+      stretcherSpot(baySpaces(state)[0]!),
+    );
+  }
   if (walkIn) walkInArrives(state);
 }
 
@@ -62,7 +73,19 @@ function walkInArrives(state: SimState): void {
     );
     return;
   }
-  spawnPatient(state, entrance);
+  spawnPatient(state, walkInPoint(state) ?? entrance);
+}
+
+/**
+ * Where a walk-in turns up on a map with a public road: off the bus, or along
+ * the pavement from either end (on foot, or dropped off or parked nearby).
+ */
+export function walkInPoint(state: SimState): Point | null {
+  const [west, east, busStop] = arrivalPoints(state);
+  if (!west || !east || !busStop) return null;
+  const r = nextFloat(state.rng);
+  if (r < WALK_IN_BY_BUS) return busStop;
+  return r < WALK_IN_BY_BUS + (1 - WALK_IN_BY_BUS) / 2 ? west : east;
 }
 
 /**

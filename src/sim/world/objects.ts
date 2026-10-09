@@ -122,13 +122,13 @@ function accessProblem(req: AccessRequirement): string {
     : "It needs clear space around it";
 }
 
-/** Whether someone could stand on a tile: floor, no wall, door or object. */
+/** Whether someone could stand on a tile: floor or paving, no wall, door or object. */
 export function isStandable(grid: FloorGrid, x: number, y: number, ignoreId = -1): boolean {
   if (!inBounds(grid, x, y)) return false;
   const i = tileIndex(grid, x, y);
   const occupant = grid.objectId[i];
   return (
-    grid.floorType[i] === FloorType.Floor &&
+    grid.floorType[i] !== FloorType.Grass &&
     !isWallOrDoor(grid, i) &&
     (occupant === -1 || occupant === ignoreId)
   );

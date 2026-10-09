@@ -6,7 +6,7 @@
  * Someone who has died is shown only as a covered shape (never graphic),
  * and isn't drawn once they're in the mortuary.
  *
- * Parked ambulances are drawn beneath everyone, and a paramedic stands
+ * Ambulances (driving or parked) are drawn beneath everyone, and a paramedic stands
  * beside each patient still waiting to be handed over.
  *
  * Views are pooled by agent id: created when an agent appears, destroyed
@@ -16,6 +16,7 @@ import { Container, Graphics } from "pixi.js";
 import { TRIAGE_CATEGORIES } from "@data/patients";
 import type { AgentBase, Ambulance, Patient, Staff } from "@sim/agents";
 import type { SimState } from "@sim/state";
+import { SPACE_L, SPACE_W } from "@sim/systems/ambulances";
 import { TILE_SIZE } from "./constants";
 import {
   AMBULANCE_GREEN,
@@ -45,7 +46,8 @@ export class AgentLayer {
   private readonly vehicles = new Container();
   private readonly people = new Container();
   private readonly views = new Map<number, View>();
-  private readonly ambulances = new Map<number, Graphics>();
+  /** Each ambulance's body, and the way it's facing (radians, 0 = along y). */
+  private readonly ambulances = new Map<number, { g: Graphics; angle: number }>();
 
   constructor() {
     this.container.addChild(this.vehicles, this.people);
@@ -54,7 +56,7 @@ export class AgentLayer {
 
   /** Positions every agent, interpolated `alpha` of the way from last tick to this one. */
   update(state: SimState, alpha: number): void {
-    this.updateAmbulances(Object.values(state.ambulances));
+    this.updateAmbulances(Object.values(state.ambulances), alpha);
     const live = new Set<number>();
     for (const p of Object.values(state.patients)) {
       if (p.stage === "in_mortuary") continue;
@@ -80,24 +82,40 @@ export class AgentLayer {
   clear(): void {
     for (const v of this.views.values()) v.g.destroy();
     this.views.clear();
-    for (const g of this.ambulances.values()) g.destroy();
+    for (const v of this.ambulances.values()) v.g.destroy();
     this.ambulances.clear();
   }
 
-  private updateAmbulances(all: Ambulance[]): void {
-    const parked = new Set<number>();
+  private updateAmbulances(all: Ambulance[], alpha: number): void {
+    const live = new Set<number>();
+    const T = TILE_SIZE;
     for (const a of all) {
-      if (!a.space) continue;
-      parked.add(a.id);
-      if (this.ambulances.has(a.id)) continue;
-      const g = new Graphics();
-      drawAmbulance(g, a);
-      this.vehicles.addChild(g);
-      this.ambulances.set(a.id, g);
+      live.add(a.id);
+      let view = this.ambulances.get(a.id);
+      if (!view) {
+        view = { g: new Graphics(), angle: 0 };
+        drawAmbulance(view.g);
+        this.vehicles.addChild(view.g);
+        this.ambulances.set(a.id, view);
+      }
+      if (a.phase === "parked" && a.space) {
+        // Centred in its space, lengthways.
+        const { x, y, w, h } = a.space;
+        view.g.position.set((x + w / 2) * T, (y + h / 2) * T);
+        view.angle = h >= w ? 0 : Math.PI / 2;
+      } else {
+        const dx = a.x - a.prevX;
+        const dy = a.y - a.prevY;
+        if (Math.hypot(dx, dy) > 1e-6) view.angle = Math.atan2(-dx, dy);
+        const x = a.prevX + dx * alpha;
+        const y = a.prevY + dy * alpha;
+        view.g.position.set((x + 0.5) * T, (y + 0.5) * T);
+      }
+      view.g.rotation = view.angle;
     }
-    for (const [id, g] of this.ambulances) {
-      if (!parked.has(id)) {
-        g.destroy();
+    for (const [id, view] of this.ambulances) {
+      if (!live.has(id)) {
+        view.g.destroy();
         this.ambulances.delete(id);
       }
     }
@@ -177,29 +195,25 @@ function drawStaff(g: Graphics, s: Staff, selected: boolean): void {
   g.circle(0, 0, STAFF_RADIUS).fill(ROLE_COLOURS[s.role]).stroke({ width: 2, color: 0xffffff });
 }
 
-/** A parked ambulance: yellow with a band of green and yellow squares (programmer art). */
-function drawAmbulance(g: Graphics, a: Ambulance): void {
+/**
+ * An ambulance, centred on the origin and lying along the y axis: yellow with
+ * a band of green and yellow squares (programmer art). It fills a 3×6 space
+ * less a margin.
+ */
+function drawAmbulance(g: Graphics): void {
   const T = TILE_SIZE;
-  const { x, y, w, h } = a.space!;
   const pad = T * 0.2;
-  const left = x * T + pad;
-  const top = y * T + pad;
-  const width = w * T - pad * 2;
-  const height = h * T - pad * 2;
+  const width = SPACE_W * T - pad * 2;
+  const height = SPACE_L * T - pad * 2;
+  const left = -width / 2;
+  const top = -height / 2;
   g.roundRect(left, top, width, height, 6)
     .fill(AMBULANCE_YELLOW)
     .stroke({ width: 2, color: 0x2b2b2b });
   // Battenburg band along the length.
-  const long = height >= width;
   const n = 8;
-  for (let i = 0; i < n; i++) {
-    if (i % 2 === 1) continue;
-    if (long) {
-      const bh = height / n;
-      g.rect(left + width * 0.15, top + i * bh, width * 0.7, bh).fill(AMBULANCE_GREEN);
-    } else {
-      const bw = width / n;
-      g.rect(left + i * bw, top + height * 0.15, bw, height * 0.7).fill(AMBULANCE_GREEN);
-    }
+  const bh = height / n;
+  for (let i = 0; i < n; i += 2) {
+    g.rect(left + width * 0.15, top + i * bh, width * 0.7, bh).fill(AMBULANCE_GREEN);
   }
 }

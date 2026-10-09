@@ -138,7 +138,7 @@ export function planDiff(real: SimState, preview: SimState, floor = 0) {
 /** Whether tile i of `g` has something `other` doesn't. */
 function has(g: FloorGrid, i: number, other: FloorGrid): boolean {
   return (
-    (g.floorType[i] !== 0 && other.floorType[i] === 0) ||
+    (g.floorType[i] !== 0 && other.floorType[i] !== g.floorType[i]) ||
     (g.wall[i] !== 0 && other.wall[i] !== g.wall[i]) ||
     (g.door[i] !== 0 && other.door[i] !== g.door[i]) ||
     (g.zone[i] !== 0 && other.zone[i] !== g.zone[i]) ||

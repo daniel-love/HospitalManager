@@ -68,6 +68,12 @@ const siteSchema = z.object({
 /** Every build command, as stored in a saved plan. */
 const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("build_floor"), floor: floorIndex, rect: rectSchema }),
+  z.object({
+    type: z.literal("pave"),
+    floor: floorIndex,
+    rect: rectSchema,
+    surface: z.enum(["path", "road"]),
+  }),
   z.object({ type: z.literal("remove_floor"), floor: floorIndex, rect: rectSchema }),
   z.object({
     type: z.literal("build_walls"),
@@ -228,7 +234,15 @@ const spaceSchema = z.object({ x: int, y: int, w: int.positive(), h: int.positiv
 const ambulanceSchema = z.object({
   id: int.positive(),
   arrived: int.min(0),
+  phase: z.enum(["arriving", "parked", "leaving"]),
   space: spaceSchema.nullable(),
+  x: num,
+  y: num,
+  prevX: num,
+  prevY: num,
+  route: z.array(int),
+  routeVersion: int.min(0),
+  from: z.union([z.literal(0), z.literal(1)]),
   patientId: nullableInt,
   handedOver: nullableInt,
   leaveAt: nullableInt,

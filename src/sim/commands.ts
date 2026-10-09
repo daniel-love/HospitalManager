@@ -9,7 +9,7 @@
  */
 import { objectDef, roomById, wallByType } from "@data/catalogue";
 import { RESALE_FRACTION } from "@data/economy";
-import { FOUNDATION_COST_PER_TILE } from "@data/structures";
+import { FOUNDATION_COST_PER_TILE, surfaceCost, surfaces, type SurfaceId } from "@data/structures";
 import type { PlacedObject, Rotation, SimState } from "./state";
 import { FloorType, isPublic, tileIndex, WallType, type FloorGrid } from "./world/grid";
 import {
@@ -22,19 +22,21 @@ import {
   objectRect,
   placementProblem,
 } from "./world/objects";
-import { clipRect, outlineTiles, rectTiles, unionRect, type Rect } from "./world/rect";
+import { clipRect, contains, outlineTiles, rectTiles, unionRect, type Rect } from "./world/rect";
 import { detectRooms } from "./world/rooms";
 
 export type Command =
-  /** Lay foundations: grass → floor. */
+  /** Lay foundations: grass or paving → floor. */
   | { type: "build_floor"; floor: number; rect: Rect }
+  /** Lay outdoor paving (footpath or access road) on grass or other paving. */
+  | { type: "pave"; floor: number; rect: Rect; surface: SurfaceId }
   /** Back to grass, removing everything on those tiles. */
   | { type: "remove_floor"; floor: number; rect: Rect }
   /** Walls around the rect's outline (a 1-wide rect is a straight line). */
   | { type: "build_walls"; floor: number; rect: Rect; wall: WallType }
   /** Removes walls and doors in the rect. */
   | { type: "demolish"; floor: number; rect: Rect }
-  /** Paints a room type onto floor tiles; null clears zoning. Free. */
+  /** Paints a room type onto floor (or, for some rooms, access road); null clears zoning. Free. */
   | { type: "zone"; floor: number; rect: Rect; roomType: string | null }
   /** Places equipment, or a door into a wall. */
   | {
@@ -116,6 +118,8 @@ function run(state: SimState, cmd: Command, commit: boolean): Outcome {
   switch (cmd.type) {
     case "build_floor":
       return buildFloor(grid, clip(grid, cmd.rect), commit);
+    case "pave":
+      return pave(state, grid, clip(grid, cmd.rect), cmd.surface, commit);
     case "remove_floor":
       return removeFloor(state, grid, cmd.floor, clip(grid, cmd.rect), commit);
     case "build_walls":
@@ -139,23 +143,73 @@ function clip(grid: FloorGrid, r: Rect): Rect {
   return clipRect(r, grid.width, grid.height);
 }
 
+/** Cost of replacing a tile's surface with foundations: paving is dug up for half back. */
+function foundationCost(grid: FloorGrid, i: number): number {
+  return FOUNDATION_COST_PER_TILE - refund(surfaceCost(grid.floorType[i]!));
+}
+
 function buildFloor(grid: FloorGrid, rect: Rect, commit: boolean): Outcome {
   let count = 0;
+  let cost = 0;
   let onPublic = false;
   for (const { x, y } of rectTiles(rect)) {
     const i = tileIndex(grid, x, y);
-    if (isPublic(grid, i)) onPublic = true;
-    if (grid.floorType[i] !== FloorType.Grass) continue;
+    if (isPublic(grid, i)) {
+      onPublic = true;
+      continue;
+    }
+    if (grid.floorType[i] === FloorType.Floor) continue;
     count++;
+    cost += foundationCost(grid, i);
     if (commit) grid.floorType[i] = FloorType.Floor;
   }
   const error = count === 0 && onPublic ? PUBLIC_LAND : undefined;
-  return {
-    cost: count * FOUNDATION_COST_PER_TILE,
-    count,
-    changed: rect,
-    ...(error ? { error } : {}),
-  };
+  return { cost, count, changed: rect, ...(error ? { error } : {}) };
+}
+
+/** Error for paving over a building. */
+export const PAVE_OVER_FLOOR = "Remove the floor first";
+
+/**
+ * Lays paving. On the council's pavement only an access road can go, as a
+ * dropped kerb (vehicle crossover) for ambulances to cross; the council
+ * still owns it, so there's nothing to refund.
+ */
+function pave(
+  state: SimState,
+  grid: FloorGrid,
+  rect: Rect,
+  surface: SurfaceId,
+  commit: boolean,
+): Outcome {
+  const def = surfaces.find((s) => s.id === surface);
+  if (!def) return { cost: 0, count: 0, changed: null, error: "Unknown surface" };
+  const pavements = state.site?.pavements ?? [];
+  const crossing = (x: number, y: number) =>
+    def.type === FloorType.Road && pavements.some((p) => contains(p, x, y));
+  let count = 0;
+  let cost = 0;
+  let onPublic = false;
+  let onFloor = false;
+  for (const { x, y } of rectTiles(rect)) {
+    const i = tileIndex(grid, x, y);
+    const was = grid.floorType[i]!;
+    const council = isPublic(grid, i);
+    if (council && !crossing(x, y)) onPublic = true;
+    else if (was === FloorType.Floor) onFloor = true;
+    if ((council && !crossing(x, y)) || was === FloorType.Floor || was === def.type) continue;
+    count++;
+    cost += def.costPerTile - (council ? 0 : refund(surfaceCost(was)));
+    if (commit) {
+      grid.floorType[i] = def.type;
+      // Only access road keeps zoning (an Ambulance Bay); a path can't hold a room.
+      if (def.type !== FloorType.Road) grid.zone[i] = 0;
+    }
+  }
+  let error: string | undefined;
+  if (count === 0 && onFloor) error = PAVE_OVER_FLOOR;
+  else if (count === 0 && onPublic) error = PUBLIC_LAND;
+  return { cost, count, changed: rect, ...(error ? { error } : {}) };
 }
 
 function removeFloor(
@@ -180,7 +234,7 @@ function removeFloor(
     }
     if (grid.floorType[i] === FloorType.Grass) continue;
     count++;
-    cost -= refund(FOUNDATION_COST_PER_TILE + wallCost(grid.wall[i]!));
+    cost -= refund(surfaceCost(grid.floorType[i]!) + wallCost(grid.wall[i]!));
   }
   if (count === 0 && onPublic) return { cost: 0, count: 0, changed: null, error: PUBLIC_LAND };
   // Grass isn't standable, so neighbouring items mustn't face it.
@@ -227,7 +281,7 @@ function buildWalls(
     }
     count++;
     cost += def.costPerTile - refund(wallCost(grid.wall[i]!));
-    if (grid.floorType[i] === FloorType.Grass) cost += FOUNDATION_COST_PER_TILE;
+    if (grid.floorType[i] !== FloorType.Floor) cost += foundationCost(grid, i);
   }
   const victim = accessBlockedBy(state, floor, tiles, new Set());
   if (victim) return { cost: 0, count: 0, changed: null, error: blockedMessage(victim) };
@@ -274,16 +328,24 @@ function demolish(
 
 function zone(grid: FloorGrid, rect: Rect, roomType: string | null, commit: boolean): Outcome {
   let code = 0;
+  // Clearing zoning works on access road too, wherever an Ambulance Bay was.
+  let onRoad = true;
   if (roomType !== null) {
     const def = roomById.get(roomType);
     if (!def) return { cost: 0, count: 0, changed: null, error: "Unknown room type" };
     code = def.code;
+    onRoad = def.onRoad;
   }
+  const zoneable = (i: number) => {
+    const type = grid.floorType[i];
+    if (type === FloorType.Road) return onRoad && !isPublic(grid, i);
+    return type === FloorType.Floor && grid.wall[i] === 0 && grid.door[i] === 0;
+  };
   let count = 0;
   let skipped = 0;
   for (const { x, y } of rectTiles(rect)) {
     const i = tileIndex(grid, x, y);
-    if (grid.floorType[i] !== FloorType.Floor || grid.wall[i] !== 0 || grid.door[i] !== 0) {
+    if (!zoneable(i)) {
       skipped++;
       continue;
     }
@@ -291,7 +353,10 @@ function zone(grid: FloorGrid, rect: Rect, roomType: string | null, commit: bool
     count++;
     if (commit) grid.zone[i] = code;
   }
-  const error = count === 0 && skipped > 0 && code !== 0 ? "Rooms need floor" : undefined;
+  let error: string | undefined;
+  if (count === 0 && skipped > 0 && code !== 0) {
+    error = onRoad ? "Needs access road or floor" : "Rooms need floor";
+  }
   return { cost: 0, count, changed: rect, ...(error ? { error } : {}) };
 }
 

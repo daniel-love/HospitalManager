@@ -14,7 +14,7 @@ import type { Point } from "./agents";
 import type { PlacedObject, SimState } from "./state";
 import { tileIndex } from "./world/grid";
 import { frontDirection, isStandable, objectRect, sideTiles } from "./world/objects";
-import { nearestEdgeTile } from "./world/pathfinding";
+import { nearestEdgeTile, nearestTile } from "./world/pathfinding";
 import { rectTiles } from "./world/rect";
 import { roomOfObject } from "./world/rooms";
 
@@ -308,9 +308,21 @@ export function queueSpots(state: SimState): Point[] {
 const entranceCache = new WeakMap<SimState, { version: number; at: Point | null }>();
 
 /**
- * The edge-of-map tile where people arrive and leave: the nearest one on
- * foot from A&E reception (or, without one, from any room). Null when the
- * building can't be reached from outside.
+ * Where people on foot arrive from the public road: both ends of the
+ * hospital-side pavement, then the bus stop. Empty on a map with no road.
+ */
+export function arrivalPoints(state: SimState): Point[] {
+  const site = state.site;
+  if (!site) return [];
+  const p = site.pavements[0];
+  return [{ x: p.x, y: p.y }, { x: p.x + p.w - 1, y: p.y }, site.busStop];
+}
+
+/**
+ * Where people leave to (and new staff turn up): the arrival point nearest
+ * on foot to A&E reception (or, without one, to any room). On a map with no
+ * road, the nearest edge tile. Null when the building can't be reached from
+ * outside.
  */
 export function siteEntrance(state: SimState): Point | null {
   const cached = entranceCache.get(state);
@@ -324,7 +336,10 @@ export function siteEntrance(state: SimState): Point | null {
     const i = room?.tiles[0];
     if (i !== undefined) from = { x: i % grid.width, y: Math.floor(i / grid.width) };
   }
-  const at = from ? nearestEdgeTile(grid, from.x, from.y) : null;
+  const points = new Set(arrivalPoints(state).map((p) => tileIndex(grid, p.x, p.y)));
+  let at: Point | null = null;
+  if (from && points.size > 0) at = nearestTile(grid, from.x, from.y, (i) => points.has(i));
+  else if (from) at = nearestEdgeTile(grid, from.x, from.y);
   entranceCache.set(state, { version: state.layoutVersion, at });
   return at;
 }

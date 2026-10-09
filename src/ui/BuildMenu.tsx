@@ -3,10 +3,10 @@
  * palette for the open tab. Choosing an entry selects a build tool.
  */
 import { content, equipmentSections, roomSections } from "@data/catalogue";
-import { FOUNDATION_COST_PER_TILE } from "@data/structures";
+import { FOUNDATION_COST_PER_TILE, surfaces } from "@data/structures";
 import { formatMoney, isPlacementTool, sameTool, type Tool } from "@game/tools";
 import { WallType } from "@sim/world/grid";
-import { CATEGORY_COLOURS } from "@render/palette";
+import { CATEGORY_COLOURS, PATH_COLOUR, ROAD_COLOUR } from "@render/palette";
 import { useEffect } from "preact/hooks";
 import { equipmentHelp, roomTypeHelp, simpleHelp, type HelpContent } from "./help";
 import { ListSection } from "./ListSection";
@@ -199,6 +199,18 @@ function ConstructionTools() {
           />
         ))}
       </ListSection>
+      <ListSection title="Outside">
+        {surfaces.map((s) => (
+          <Entry
+            key={s.id}
+            t={{ kind: "pave", surface: s.id }}
+            name={s.name}
+            detail={`${formatMoney(s.costPerTile)}/tile`}
+            swatch={{ colour: s.id === "road" ? ROAD_COLOUR : PATH_COLOUR }}
+            help={s.description}
+          />
+        ))}
+      </ListSection>
       <ListSection title="Doors">
         {content.doors.map((d) => (
           <Entry
@@ -219,8 +231,8 @@ function ConstructionTools() {
         />
         <Entry
           t={{ kind: "remove_floor" }}
-          name="Remove floor"
-          help="Clears everything on the tiles back to grass. Refunds half."
+          name="Remove floor or paving"
+          help="Clears everything on the tiles back to grass, including footpaths and access roads. Refunds half."
         />
       </ListSection>
     </>

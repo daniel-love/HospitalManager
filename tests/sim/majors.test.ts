@@ -257,7 +257,9 @@ describe("a deteriorating patient", () => {
     expect(p.deterioration).toBeNull();
     runUntil(state, () => !state.patients[p.id]);
     expect(state.incidents).toEqual([]);
-    expect(state.today.stats.discharged).toBe(1);
+    // Home, or admitted (to another hospital: this one has no ward), but alive.
+    expect(state.today.stats.departures).toBe(1);
+    expect(state.today.stats.deaths).toBe(0);
   });
 });
 

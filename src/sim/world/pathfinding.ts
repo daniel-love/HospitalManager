@@ -2,9 +2,11 @@
  * Route finding on one floor (ARCHITECTURE §5.3): A* over the 8-connected
  * tile grid.
  *
- * Walkable tiles are floor or grass with no wall and no floor-standing item;
- * doors are walkable but slower, and must be walked straight through (no
- * diagonal steps into or out of a doorway). Diagonal steps can't cut the
+ * Walkable tiles are floor, paving or grass with no wall and no
+ * floor-standing item; grass costs double (it's walked at half speed), so
+ * people keep to paths where they can. Doors are walkable but slower, and
+ * must be walked straight through (no diagonal steps into or out of a
+ * doorway). Diagonal steps can't cut the
  * corner of a wall or item.
  *
  * Bed mode (a patient being wheeled on a bed or trolley) also needs
@@ -15,10 +17,14 @@
  * number so they never need clearing.
  */
 import { doorByCode } from "@data/catalogue";
-import { tileIndex, type FloorGrid } from "./grid";
+import { FloorType, tileIndex, type FloorGrid } from "./grid";
 
 /** Extra cost of stepping onto a door tile (opening it, waiting for others). */
 const DOOR_COST = 0.6;
+/** Grass is walked at half speed (systems/movement.ts), so a step on it costs double. */
+export const GRASS_COST = 2;
+/** Extra cost of a step against the traffic on the public road. */
+const WRONG_LANE_COST = 2;
 const SQRT2 = Math.SQRT2;
 
 export function isWalkable(grid: FloorGrid, i: number): boolean {
@@ -108,6 +114,9 @@ const DIRS = [
  * getting up off a couch); the goal must be walkable. Null if unreachable.
  * `bed`: route for a bed (see isBedPassable); the goal itself need only be
  * walkable, as it's the last step beside the destination bed.
+ * `vehicle`: route for a vehicle instead, over the tiles marked 1 (see
+ * world/vehicles.ts); the goal must be among them. Driving against the
+ * flow of traffic on the public road costs extra, so vehicles keep left.
  */
 export function findPath(
   grid: FloorGrid,
@@ -116,14 +125,17 @@ export function findPath(
   gx: number,
   gy: number,
   bed = false,
+  vehicle?: { tiles: Uint8Array; lane: Int8Array },
 ): number[] | null {
+  const drivable = vehicle?.tiles;
   const { width, height } = grid;
   const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < width && y < height;
   if (!inside(sx, sy) || !inside(gx, gy)) return null;
   const start = tileIndex(grid, sx, sy);
   const goal = tileIndex(grid, gx, gy);
   if (start === goal) return [];
-  if (!isWalkable(grid, goal)) return null;
+  const open = drivable ? (i: number) => drivable[i] === 1 : (i: number) => isWalkable(grid, i);
+  if (!open(goal)) return null;
 
   const b = getBuffers(width * height);
   const gen = b.generation;
@@ -184,15 +196,18 @@ export function findPath(
       const ny = cy + dy;
       if (!inside(nx, ny)) continue;
       const n = tileIndex(grid, nx, ny);
-      if (b.closed[n] === gen || !isWalkable(grid, n)) continue;
+      if (b.closed[n] === gen || !open(n)) continue;
       if (bed && n !== goal && !isBedPassable(grid, n)) continue;
       const diagonal = dx !== 0 && dy !== 0;
       if (diagonal) {
         if (curIsDoor || grid.door[n] !== 0) continue;
-        if (!isWalkable(grid, tileIndex(grid, cx + dx, cy))) continue;
-        if (!isWalkable(grid, tileIndex(grid, cx, cy + dy))) continue;
+        if (!open(tileIndex(grid, cx + dx, cy))) continue;
+        if (!open(tileIndex(grid, cx, cy + dy))) continue;
       }
-      const step = (diagonal ? SQRT2 : 1) + (grid.door[n] !== 0 ? DOOR_COST : 0);
+      // Vehicles only use tarmac, so grass and doors don't come into it.
+      const ground = !drivable && grid.floorType[n] === FloorType.Grass ? GRASS_COST : 1;
+      let step = (diagonal ? SQRT2 : 1) * ground + (grid.door[n] !== 0 ? DOOR_COST : 0);
+      if (vehicle && dx !== 0 && vehicle.lane[n] === -dx) step += WRONG_LANE_COST;
       const g = b.g[cur]! + step;
       if (b.seen[n] === gen && g >= b.g[n]!) continue;
       b.seen[n] = gen;
@@ -211,13 +226,31 @@ function unwind(b: Buffers, goal: number): number[] {
 }
 
 /**
- * The nearest tile on the map's edge reachable on foot from (x, y), by
- * breadth-first search. That's where people arrive from and leave to.
+ * The nearest tile on the map's edge reachable on foot from (x, y). On a map
+ * without a public road, that's where people arrive from and leave to.
  */
 export function nearestEdgeTile(
   grid: FloorGrid,
   x: number,
   y: number,
+): { x: number; y: number } | null {
+  const { width, height } = grid;
+  return nearestTile(grid, x, y, (i) => {
+    const cx = i % width;
+    const cy = (i - cx) / width;
+    return cx === 0 || cy === 0 || cx === width - 1 || cy === height - 1;
+  });
+}
+
+/**
+ * The nearest walkable tile matching `isGoal` reachable on foot from (x, y),
+ * by breadth-first search (counting steps, not walking time).
+ */
+export function nearestTile(
+  grid: FloorGrid,
+  x: number,
+  y: number,
+  isGoal: (i: number) => boolean,
 ): { x: number; y: number } | null {
   const { width, height } = grid;
   if (x < 0 || y < 0 || x >= width || y >= height) return null;
@@ -233,9 +266,7 @@ export function nearestEdgeTile(
     const cur = b.heap[head++]!;
     const cx = cur % width;
     const cy = (cur - cx) / width;
-    if (cx === 0 || cy === 0 || cx === width - 1 || cy === height - 1) {
-      if (isWalkable(grid, cur)) return { x: cx, y: cy };
-    }
+    if (isGoal(cur) && isWalkable(grid, cur)) return { x: cx, y: cy };
     for (const [dx, dy] of DIRS.slice(0, 4)) {
       const nx = cx + dx;
       const ny = cy + dy;

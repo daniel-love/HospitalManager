@@ -7,13 +7,15 @@
 import { PATIENT_SPEED, STAFF_SPEED } from "@data/patients";
 import type { AgentBase, Point } from "../agents";
 import type { SimState } from "../state";
-import { tileIndex } from "../world/grid";
+import { FloorType, tileIndex } from "../world/grid";
 import { findPath } from "../world/pathfinding";
 
 /** Ticks to wait before retrying a route that couldn't be found. */
 const RETRY_TICKS = 60;
 /** Walking through a doorway is slower. */
 const DOOR_SPEED_FACTOR = 0.6;
+/** Walking across grass is slower than on floor or paving (see GRASS_COST). */
+const GRASS_SPEED_FACTOR = 0.5;
 const EPS = 1e-6;
 
 export type Arrival = "arrived" | "moving" | "no_route";
@@ -96,9 +98,12 @@ export function moveAgents(state: SimState): void {
     if (agent.path.length === 0) return;
     const tx = Math.round(agent.x);
     const ty = Math.round(agent.y);
-    const inBounds = tx >= 0 && ty >= 0 && tx < grid.width && ty < grid.height;
-    let budget =
-      inBounds && grid.door[tileIndex(grid, tx, ty)] !== 0 ? speed * DOOR_SPEED_FACTOR : speed;
+    let budget = speed;
+    if (tx >= 0 && ty >= 0 && tx < grid.width && ty < grid.height) {
+      const i = tileIndex(grid, tx, ty);
+      if (grid.door[i] !== 0) budget *= DOOR_SPEED_FACTOR;
+      else if (grid.floorType[i] === FloorType.Grass) budget *= GRASS_SPEED_FACTOR;
+    }
     while (budget > EPS && agent.path.length > 0) {
       const wx = agent.path[0]!;
       const wy = agent.path[1]!;

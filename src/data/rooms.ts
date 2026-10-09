@@ -152,9 +152,10 @@ export const rooms: RoomInput[] = [
     colour: 0xe8c547,
     minSize: [3, 6],
     enclosed: false,
+    onRoad: true,
     required: [],
     description:
-      "Hardstanding outside A&E where an ambulance parks while its crew hands the patient over. Zone it on foundations; each clear 3×6 space holds one ambulance. Without one, no ambulances come.",
+      "Hardstanding outside A&E where an ambulance parks while its crew hands the patient over. Zone it on access road (or foundations); each clear 3×6 space holds one ambulance. Without one, no ambulances come.",
   },
   {
     id: "ward",
