@@ -19,6 +19,8 @@ export const WALL_COLOUR = 0x3b4048;
 export const GLASS_COLOUR = 0x9fd3e6;
 /** The lead core drawn in lead-lined (radiation-shielding) walls. */
 export const LEAD_COLOUR = 0x8c96a3;
+/** Privacy curtains: curtain dividers, and curtains drawn round a bed. */
+export const CURTAIN_COLOUR = 0x7fa6c9;
 export const DOOR_COLOUR = 0x9a6a3a;
 export const ZONE_ALPHA = 0.32;
 
@@ -70,6 +72,7 @@ export const SELECTED_RING = 0xffe066;
 export const COVER_COLOURS = {
   watched: 0x4cbb5a,
   remote: 0x2fb5b5,
+  curtained: 0x9a7fd1,
   unstaffed: 0xf0a830,
   blind: 0xe0504a,
 } as const;

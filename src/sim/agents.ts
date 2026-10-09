@@ -193,6 +193,8 @@ export interface Patient extends AgentBase {
   stayUntil: number | null;
   /** Admitted for end-of-life care: they'll die (expectedly) on the ward. */
   endOfLife: boolean;
+  /** Tick their bay's curtain stays drawn until, after care there; null if not drawn. */
+  curtainUntil: number | null;
   /** Being transferred to another hospital, or null. */
   transfer: Transfer | null;
   /** Blood tests and scans sent so far. */

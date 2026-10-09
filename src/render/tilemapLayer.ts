@@ -8,6 +8,7 @@ import { Container, Graphics } from "pixi.js";
 import { roomByCode, roomById } from "@data/catalogue";
 import {
   FloorType,
+  inBounds,
   isPublic,
   isWallOrDoor,
   tileIndex,
@@ -18,6 +19,7 @@ import { contains, type Rect } from "@sim/world/rect";
 import type { Site } from "@sim/world/site";
 import { CHUNK_TILES, TILE_SIZE } from "./constants";
 import {
+  CURTAIN_COLOUR,
   DOOR_COLOUR,
   FLOOR_COLOUR,
   GLASS_COLOUR,
@@ -192,6 +194,8 @@ export class TilemapLayer {
           g.rect(px, py, T, T).fill(FLOOR_COLOUR);
           g.rect(px + 2, py + 2, T - 4, T - 4).fill({ color: GLASS_COLOUR, alpha: 0.9 });
           g.rect(px, py, T, T).stroke({ width: 2, color: WALL_COLOUR, alignment: 1 });
+        } else if (wall === WallType.Curtain) {
+          this.drawCurtainDivider(g, x, y);
         } else if (grid.door[i] !== 0) {
           this.drawDoor(g, x, y);
         }
@@ -213,6 +217,35 @@ export class TilemapLayer {
     l.stroke({ width: 1, color: GRID_LINE_COLOUR, pixelLine: true });
 
     chunk.dirty = false;
+  }
+
+  /**
+   * A curtain divider: floor showing either side of a pleated curtain, which
+   * runs on towards each neighbouring wall or curtain (or along the row).
+   */
+  private drawCurtainDivider(g: Graphics, x: number, y: number): void {
+    const grid = this.grid;
+    const T = TILE_SIZE;
+    const px = x * T;
+    const py = y * T;
+    g.rect(px, py, T, T).fill(FLOOR_COLOUR);
+    const linked = (dx: number, dy: number) =>
+      inBounds(grid, x + dx, y + dy) && grid.wall[tileIndex(grid, x + dx, y + dy)] !== 0;
+    const across = linked(-1, 0) || linked(1, 0);
+    const down = linked(0, -1) || linked(0, 1);
+    const pleat = 6;
+    const cx = px + T / 2;
+    const cy = py + T / 2;
+    if (across || !down) {
+      for (let i = 0; i < T; i += pleat) {
+        g.rect(px + i, cy - 2 + ((i / pleat) % 2), pleat - 1, 4).fill(CURTAIN_COLOUR);
+      }
+    }
+    if (down) {
+      for (let i = 0; i < T; i += pleat) {
+        g.rect(cx - 2 + ((i / pleat) % 2), py + i, 4, pleat - 1).fill(CURTAIN_COLOUR);
+      }
+    }
   }
 
   private isDroppedKerb(x: number, y: number): boolean {

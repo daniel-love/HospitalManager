@@ -80,7 +80,7 @@ const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("build_walls"),
     floor: floorIndex,
     rect: rectSchema,
-    wall: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
+    wall: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   }),
   z.object({ type: z.literal("demolish"), floor: floorIndex, rect: rectSchema }),
   z.object({
@@ -174,6 +174,7 @@ const patientSchema = z.object({
   specialty: z.enum(specialtyIds).nullable(),
   stayUntil: nullableInt,
   endOfLife: z.boolean(),
+  curtainUntil: nullableInt,
   transfer: z
     .object({
       reason: z.string(),

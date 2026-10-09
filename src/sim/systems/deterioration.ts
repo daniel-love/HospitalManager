@@ -306,6 +306,10 @@ function incidentCauses(state: SimState, p: Patient): string[] {
           `The central monitor is a ${far} m walk away, beyond the ${MONITOR_RESPONSE_DISTANCE} m a nurse can respond in time`,
         );
       }
+    } else if (cover === "curtained") {
+      causes.push(
+        `The curtains round their trolley in the ${name} were drawn, hiding them from the nurse station`,
+      );
     } else if (cover === "unstaffed") {
       causes.push(
         `The nurse station that can see their trolley in the ${name} was empty: every nurse was busy`,

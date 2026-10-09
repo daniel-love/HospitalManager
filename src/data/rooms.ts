@@ -79,7 +79,8 @@ export const rooms: RoomInput[] = [
       { label: "Privacy curtain", anyOf: ["privacy_curtain"] },
       { label: "Observations machine", anyOf: anyMonitor },
     ],
-    description: "Treats minor injuries and illnesses. Separate cubicles with walls.",
+    description:
+      "Treats minor injuries and illnesses. Separate cubicles with walls or curtain dividers.",
   },
   {
     id: "majors_bay",

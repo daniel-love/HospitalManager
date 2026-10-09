@@ -364,6 +364,17 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v17: privacy curtains are drawn during and after bedside care.
+  16: (save) => {
+    const state = save.state as { patients: object[] };
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients.map((p) => ({ ...p, curtainUntil: null })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

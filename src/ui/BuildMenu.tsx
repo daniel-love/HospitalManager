@@ -6,7 +6,7 @@ import { content, equipmentSections, roomSections } from "@data/catalogue";
 import { FOUNDATION_COST_PER_TILE, surfaces } from "@data/structures";
 import { formatMoney, isPlacementTool, sameTool, type Tool } from "@game/tools";
 import { WallType } from "@sim/world/grid";
-import { CATEGORY_COLOURS, FOOTPATH_COLOUR, ROAD_COLOUR } from "@render/palette";
+import { CATEGORY_COLOURS, CURTAIN_COLOUR, FOOTPATH_COLOUR, ROAD_COLOUR } from "@render/palette";
 import { useEffect } from "preact/hooks";
 import { equipmentHelp, roomTypeHelp, simpleHelp, type HelpContent } from "./help";
 import { ListSection } from "./ListSection";
@@ -57,6 +57,7 @@ const WALL_SWATCHES: Record<number, number> = {
   [WallType.Standard]: 0x3b4048,
   [WallType.Glass]: 0x9fd3e6,
   [WallType.Lead]: 0x8c96a3,
+  [WallType.Curtain]: CURTAIN_COLOUR,
 };
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
@@ -200,7 +201,7 @@ function ConstructionTools() {
           swatch={{ colour: 0xd9d4c7 }}
           help="Turns grass into buildable floor. Rooms must have floor before you can zone them; walls lay their own."
         />
-        {[WallType.Standard, WallType.Glass, WallType.Lead].map((type) => (
+        {[WallType.Standard, WallType.Glass, WallType.Lead, WallType.Curtain].map((type) => (
           <Entry
             key={type}
             t={{ kind: "wall", wall: type }}

@@ -17,7 +17,7 @@
  */
 import type { Graphics } from "pixi.js";
 import type { Patient, Point, Staff } from "@sim/agents";
-import type { SimState } from "@sim/state";
+import type { PlacedObject, SimState } from "@sim/state";
 import {
   deathStatus,
   deathStepDone,
@@ -28,7 +28,7 @@ import {
 } from "@sim/systems/deaths";
 import { objectRect } from "@sim/world/objects";
 import { TILE_SIZE } from "./constants";
-import { SELECTED_RING } from "./palette";
+import { CURTAIN_COLOUR, SELECTED_RING } from "./palette";
 
 const T = TILE_SIZE;
 const PROGRESS_COLOURS: Record<DeathProgress, number> = {
@@ -36,7 +36,6 @@ const PROGRESS_COLOURS: Record<DeathProgress, number> = {
   waiting: 0xf2c94c,
   blocked: 0xe0504a,
 };
-const CURTAIN = 0x7fa6c9;
 const BLANKET = 0xa9c4de;
 const SHEET = 0xf4f5f7;
 const OUTLINE = 0x8a929c;
@@ -100,11 +99,30 @@ function shapeOf(state: SimState, p: Patient): Shape {
   if (!bed) return { w: 16, h: 26, curtains: { w: T + 10, h: T * 1.4 } };
   const r = objectRect(bed);
   const along = r.w > r.h;
-  return {
-    w: along ? 26 : 16,
-    h: along ? 16 : 26,
-    curtains: { w: r.w * T + 8, h: r.h * T + 8 },
-  };
+  return { w: along ? 26 : 16, h: along ? 16 : 26, curtains: bedCurtainSize(bed) };
+}
+
+/** Curtains round a bed: their size in pixels, centred on it. */
+export function bedCurtainSize(bed: PlacedObject): { w: number; h: number } {
+  const r = objectRect(bed);
+  return { w: r.w * T + 8, h: r.h * T + 8 };
+}
+
+/** Curtains drawn right round a bed: a faint screen with pleats along each side. */
+export function drawBedCurtains(g: Graphics, size: { w: number; h: number }): void {
+  const { w: cw, h: ch } = size;
+  g.roundRect(-cw / 2, -ch / 2, cw, ch, 6).fill({ color: CURTAIN_COLOUR, alpha: 0.18 });
+  const pleat = 6;
+  for (let x = -cw / 2; x < cw / 2 - 1; x += pleat) {
+    const len = Math.min(pleat - 2, cw / 2 - x);
+    g.rect(x, -ch / 2 - 1.5, len, 3).fill(CURTAIN_COLOUR);
+    g.rect(x, ch / 2 - 1.5, len, 3).fill(CURTAIN_COLOUR);
+  }
+  for (let y = -ch / 2; y < ch / 2 - 1; y += pleat) {
+    const len = Math.min(pleat - 2, ch / 2 - y);
+    g.rect(-cw / 2 - 1.5, y, 3, len).fill(CURTAIN_COLOUR);
+    g.rect(cw / 2 - 1.5, y, 3, len).fill(CURTAIN_COLOUR);
+  }
 }
 
 /** What the drawing depends on, so it's only redrawn when that changes. */
@@ -134,23 +152,7 @@ export function drawDeceased(g: Graphics, state: SimState, p: Patient, selected:
   }
   const shape = shapeOf(state, p);
   const { w, h, curtains } = shape;
-  if (curtains) {
-    // Curtains drawn right round the bed: pleats along each side.
-    const cw = curtains.w;
-    const ch = curtains.h;
-    g.roundRect(-cw / 2, -ch / 2, cw, ch, 6).fill({ color: CURTAIN, alpha: 0.18 });
-    const pleat = 6;
-    for (let x = -cw / 2; x < cw / 2 - 1; x += pleat) {
-      const len = Math.min(pleat - 2, cw / 2 - x);
-      g.rect(x, -ch / 2 - 1.5, len, 3).fill(CURTAIN);
-      g.rect(x, ch / 2 - 1.5, len, 3).fill(CURTAIN);
-    }
-    for (let y = -ch / 2; y < ch / 2 - 1; y += pleat) {
-      const len = Math.min(pleat - 2, ch / 2 - y);
-      g.rect(-cw / 2 - 1.5, y, 3, len).fill(CURTAIN);
-      g.rect(cw / 2 - 1.5, y, 3, len).fill(CURTAIN);
-    }
-  }
+  if (curtains) drawBedCurtains(g, curtains);
   if (selected) {
     g.roundRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8, 7).stroke({
       width: 2.5,

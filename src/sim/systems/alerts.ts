@@ -27,6 +27,7 @@ import { roomOfObject } from "../world/rooms";
 import { ambulancesWaiting, needsTrolley } from "./ambulances";
 import { hasCleaningJob, postJob, ticksFor } from "./jobBoard";
 import { inAE } from "./patients";
+import { inCare } from "./curtains";
 import { bedCover, nurseStations, stationsSeeing } from "./monitoring";
 
 const CHECK_EVERY = 30 * TICKS_PER_MINUTE;
@@ -220,7 +221,8 @@ export function updateAlerts(state: SimState): void {
       p.stage === "in_cubicle" &&
       p.bed !== null &&
       watchable.has(p.bed) &&
-      bedCover(state, p.bed) !== "watched",
+      bedCover(state, p.bed) !== "watched" &&
+      !inCare(state, p.id),
   );
   if (unwatched > 0) {
     warn(

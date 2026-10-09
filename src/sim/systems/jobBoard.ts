@@ -6,6 +6,7 @@
 import { CUBICLE_CLEAN_MINS } from "@data/patients";
 import type { Job } from "../agents";
 import { release } from "../places";
+import { noteCareEnded } from "./curtains";
 import { nextFloat, type RngState } from "../rng";
 import type { SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
@@ -50,6 +51,7 @@ export function postJob(state: SimState, j: NewJob): Job {
 
 /** Removes a job, freeing whoever was doing it. */
 export function removeJob(state: SimState, job: Job): void {
+  noteCareEnded(state, job);
   const staff = job.staffId === null ? undefined : state.staff[job.staffId];
   if (staff) {
     staff.jobId = null;

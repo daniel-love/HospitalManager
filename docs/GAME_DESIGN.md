@@ -102,7 +102,7 @@ Build mode has three sub-modes: **Construction**, **Cosmetics** and **Equipment*
 **Structural elements**
 
 - **Foundations / floor:** turns exterior tiles into buildable interior.
-- **Walls:** standard, glazed (they block movement but **not line of sight**), lead-lined (radiation shielding: X-ray and CT rooms must be enclosed by them; drawing over an existing wall upgrades it) and fire walls.
+- **Walls:** standard, glazed (they block movement but **not line of sight**), lead-lined (radiation shielding: X-ray and CT rooms must be enclosed by them; drawing over an existing wall upgrades it) and fire walls. A **curtain divider** is a cheap ceiling-track curtain between neighbouring bays, as in most open-plan Majors areas: it separates rooms and blocks movement and sight, but takes no doors or wall fixtures, and doesn't count as a wall for rooms that must be enclosed.
 - **Doors:** single, double (bed-width, required for bed transfers), automatic (faster flow, more costly), secure (staff only) and fire doors.
 - **Corridors:** not a special object, just floor plus zoning. Corridor width matters: 1 tile is fine for walking, and 2+ tiles are needed for trolleys and beds.
 - **Floors (levels):** multiple storeys, connected by **stairs** (walking only) and **lifts** (beds and wheelchairs; a capacity-limited queue). Ground floor first, with extra floors unlocked by money and planning permission.
@@ -335,7 +335,7 @@ This is a headline mechanic and one of the user's explicit requirements.
 - Each patient has a **monitoring need**: `none`, `periodic` (obs every N minutes), or `continuous`.
 - **Periodic:** generates "obs round" jobs. Missed obs increase deterioration risk.
 - **Continuous** can be satisfied by:
-  1. **Direct observation:** a staffed **nurse station** with **line of sight** to the bed within range. Walls block sight, glass walls and curtains-open don't. This is mandatory in A&E Majors and Resus: the station must have eyes on every bay.
+  1. **Direct observation:** a staffed **nurse station** with **line of sight** to the bed within range. Walls and curtain dividers block sight; glass walls and open curtains don't. This is mandatory in A&E Majors and Resus: the station must have eyes on every bay. A bay's **privacy curtain** is drawn while a clinician examines or treats the patient, and for 10 minutes afterwards as they dress and settle. While it's drawn the station can't see the bed (the overlay shows it purple). With someone inside that doesn't matter, but once they leave it's a blind spot until the curtain opens.
   2. **Remote monitoring:** a bedside monitor linked to a **central monitoring station**. The station must be **staffed** and within a **response distance** (walking path length, not straight line) of the bed, so a nurse can reach the patient in time when an alarm sounds.
 - **Coverage overlay:** shows each bed as green (covered), amber (remote only / far) or red (uncovered).
 - **Consequence:** an uncovered deteriorating patient isn't noticed until a periodic check or a companion raises the alarm. Their chance of a cardiac arrest or death rises sharply, and an **incident report** is generated naming the cause ("Bed 7 not visible from the nurse station").

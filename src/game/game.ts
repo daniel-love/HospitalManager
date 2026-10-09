@@ -93,6 +93,7 @@ const FLOOR = 0;
 const COVER_TEXT = {
   watched: { text: "Watched from a staffed nurse station", ok: true },
   remote: { text: "Covered by a staffed central monitor", ok: true },
+  curtained: { text: "Curtains drawn: hidden from the nurse station", ok: false },
   unstaffed: { text: "In sight of a nurse station, but nobody is at it", ok: false },
   blind: { text: "Not visible from any nurse station", ok: false },
 } as const;

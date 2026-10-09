@@ -2,7 +2,15 @@
 import { baseFootprint, objectDef } from "@data/catalogue";
 import type { Access, AccessSide } from "@data/schema";
 import type { PlacedObject, Rotation, SimState } from "../state";
-import { FloorType, inBounds, isWallOrDoor, tileIndex, WallType, type FloorGrid } from "./grid";
+import {
+  FloorType,
+  inBounds,
+  isSolidWall,
+  isWallOrDoor,
+  tileIndex,
+  WallType,
+  type FloorGrid,
+} from "./grid";
 import { rectTiles, type Rect } from "./rect";
 
 /** Footprint rect for a def placed with its top-left at (x, y). */
@@ -171,6 +179,7 @@ export function placementProblem(
       if (occupant !== -1 && occupant !== ignoreId) return "Something is already here";
       if (def.kind === "door") {
         if (grid.wall[i] === WallType.None) return "Doors go in walls";
+        if (!isSolidWall(grid, i)) return "Doors go in walls, not curtains";
         const fixture = mountsRelyingOn(state, floor, [{ x: tx, y: ty }], new Set());
         if (fixture) return noWallMessage(fixture);
         // Both faces of the door must open onto something walkable.
@@ -275,7 +284,7 @@ function mountProblem(
   if (mount === "wall") {
     const behind = sideTiles(r, rotation, "back");
     const onWall = behind.every(
-      (t) => inBounds(grid, t.x, t.y) && grid.wall[tileIndex(grid, t.x, t.y)] !== WallType.None,
+      (t) => inBounds(grid, t.x, t.y) && isSolidWall(grid, tileIndex(grid, t.x, t.y)),
     );
     if (!onWall) return "Needs a wall behind it (the dark edge)";
   }
@@ -329,7 +338,7 @@ export function wallMountRotation(
     const { dx, dy } = frontDirection(rot);
     const bx = x - dx;
     const by = y - dy;
-    return inBounds(grid, bx, by) && grid.wall[tileIndex(grid, bx, by)] !== WallType.None;
+    return inBounds(grid, bx, by) && isSolidWall(grid, tileIndex(grid, bx, by));
   };
   if (wallBehind(preferred)) return preferred;
   return ([0, 1, 2, 3] as Rotation[]).find(wallBehind) ?? null;

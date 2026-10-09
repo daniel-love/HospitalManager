@@ -20,8 +20,17 @@ import { TRIAGE_CATEGORIES } from "@data/patients";
 import { onSite, type AgentBase, type Ambulance, type Patient, type Staff } from "@sim/agents";
 import type { SimState } from "@sim/state";
 import { SPACE_L, SPACE_W } from "@sim/systems/ambulances";
+import { curtainsDrawn } from "@sim/systems/curtains";
 import { TILE_SIZE } from "./constants";
-import { deceasedLook, drawDeceased, drawFamilies, familiesLook, pushOffset } from "./deathMarks";
+import {
+  bedCurtainSize,
+  deceasedLook,
+  drawBedCurtains,
+  drawDeceased,
+  drawFamilies,
+  familiesLook,
+  pushOffset,
+} from "./deathMarks";
 import {
   AMBULANCE_GREEN,
   AMBULANCE_YELLOW,
@@ -80,8 +89,10 @@ export class AgentLayer {
         continue;
       }
       const warning = warningOf(p, state.tick, attended.has(p.id), blinkOn);
-      this.place(p, alpha, patientLook(p, p.id === this.selectedId, warning), (g) =>
-        drawPatient(g, p, p.id === this.selectedId, warning),
+      const bed = p.bed === null ? undefined : state.objects[p.bed];
+      const curtains = bed && curtainsDrawn(state, bed.id) ? bedCurtainSize(bed) : null;
+      this.place(p, alpha, patientLook(p, selected, warning, curtains), (g) =>
+        drawPatient(g, p, selected, warning, curtains),
       );
     }
     for (const s of Object.values(state.staff)) {
@@ -206,15 +217,25 @@ function warningOf(p: Patient, tick: number, attended: boolean, blinkOn: boolean
   return blinkOn ? "unnoticed" : "hidden";
 }
 
-function patientLook(p: Patient, selected: boolean, warning: Warning): string {
-  return `${p.category}|${p.mood < UNHAPPY_MOOD}|${selected}|${warning}|${withCrew(p)}|${onTheMove(p)}`;
+type Curtains = { w: number; h: number } | null;
+
+function patientLook(p: Patient, selected: boolean, warning: Warning, curtains: Curtains): string {
+  return `${p.category}|${p.mood < UNHAPPY_MOOD}|${selected}|${warning}|${withCrew(p)}|${onTheMove(p)}|${curtains?.w}x${curtains?.h}`;
 }
 
 const withCrew = (p: Patient) => p.stage === "awaiting_handover";
 const onTheMove = (p: Patient) => p.stage === "transferring";
 
-function drawPatient(g: Graphics, p: Patient, selected: boolean, warning: Warning): void {
+function drawPatient(
+  g: Graphics,
+  p: Patient,
+  selected: boolean,
+  warning: Warning,
+  curtains: Curtains,
+): void {
   const ring = p.category === 0 ? UNTRIAGED_RING : TRIAGE_CATEGORIES[p.category]!.colour;
+  // Screened for care: the bay's privacy curtain drawn round the bed.
+  if (curtains) drawBedCurtains(g, curtains);
   if (withCrew(p)) {
     // The paramedic staying with them, and the stretcher beneath.
     g.roundRect(-8, -12, 16, 24, 4).fill({ color: 0xffffff, alpha: 0.8 });

@@ -40,6 +40,7 @@ export const walls = [
     name: "Wall",
     costPerTile: 350,
     blocksSight: true,
+    solid: true,
     description: "Standard partition wall.",
   },
   {
@@ -47,6 +48,7 @@ export const walls = [
     name: "Glazed wall",
     costPerTile: 900,
     blocksSight: false,
+    solid: true,
     description: "Blocks movement but not line of sight. Useful for observation.",
   },
   {
@@ -54,8 +56,18 @@ export const walls = [
     name: "Lead-lined wall",
     costPerTile: 1400,
     blocksSight: true,
+    solid: true,
     description:
       "A wall with lead sheet in it, for radiation protection. X-ray and CT rooms must be enclosed by it (doors are lead-lined too). Draw it over existing walls to upgrade them.",
+  },
+  {
+    type: WallType.Curtain,
+    name: "Curtain divider",
+    costPerTile: 150,
+    blocksSight: true,
+    solid: false,
+    description:
+      "Ceiling-track curtain between neighbouring bays, as in most open-plan Majors areas. Separates bays and screens patients, but takes no doors or wall fixtures, and a room that must be enclosed needs real walls.",
   },
 ];
 

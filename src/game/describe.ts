@@ -39,6 +39,7 @@ import {
   mortuarySpaces,
   type DeathStep,
 } from "@sim/systems/deaths";
+import { inCare } from "@sim/systems/curtains";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { annualCost } from "@sim/systems/finance";
 import { formatWait, inAE } from "@sim/systems/patients";
@@ -493,9 +494,13 @@ function monitoringInfo(
         ? "Watched from a staffed nurse station"
         : cover === "remote"
           ? "Covered by a staffed central monitor"
-          : cover === "unstaffed"
-            ? "In sight of a nurse station, but nobody is at it"
-            : "Not visible from any nurse station";
+          : cover === "curtained"
+            ? inCare(state, p.id)
+              ? "Curtains drawn while staff are with them"
+              : "Curtains drawn: hidden from the nurse station"
+            : cover === "unstaffed"
+              ? "In sight of a nurse station, but nobody is at it"
+              : "Not visible from any nurse station";
   }
   const d = p.deterioration;
   const flag =

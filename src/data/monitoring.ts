@@ -12,6 +12,13 @@ export const STATION_SIGHT_RANGE = 12;
  */
 export const MONITOR_RESPONSE_DISTANCE = 25;
 
+/**
+ * After an examination or treatment in a curtained bay, the curtain stays
+ * drawn this long while the patient dresses and settles, keeping the bed out
+ * of the nurse station's sight.
+ */
+export const CURTAIN_LINGER_MINS = 10;
+
 /** Minutes between observations on a ward (NEWS2 0–4: at least every 4–6 hours). */
 export const WARD_OBS_EVERY_MINS = 240;
 

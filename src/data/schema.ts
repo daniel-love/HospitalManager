@@ -97,6 +97,11 @@ export const wallDefSchema = z.object({
   name: z.string().min(1),
   costPerTile: z.number().int().positive(),
   blocksSight: z.boolean(),
+  /**
+   * Built partition: encloses rooms, takes doors and holds wall-mounted
+   * fixtures. A curtain divider isn't one.
+   */
+  solid: z.boolean(),
   description: z.string(),
 });
 export type WallDef = z.infer<typeof wallDefSchema>;

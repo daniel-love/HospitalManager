@@ -30,15 +30,17 @@ import { objectRect } from "../world/objects";
 import { findPath } from "../world/pathfinding";
 import { roomOfObject } from "../world/rooms";
 import { rectTiles } from "../world/rect";
+import { curtainsDrawn } from "./curtains";
 import { postJob, ticksFor } from "./jobBoard";
 import { isAt } from "./movement";
 
 /**
  * watched: a staffed nurse station can see the bed. remote: a staffed
- * central monitor covers it. unstaffed: a station could, but no nurse is at
+ * central monitor covers it. curtained: a station could see it, but its
+ * privacy curtain is drawn. unstaffed: a station could, but no nurse is at
  * it right now. blind: no station sees or monitors it.
  */
-export type BedCover = "watched" | "remote" | "unstaffed" | "blind";
+export type BedCover = "watched" | "remote" | "curtained" | "unstaffed" | "blind";
 
 const stationCache = new WeakMap<SimState, { version: number; stations: PlacedObject[] }>();
 
@@ -164,13 +166,20 @@ export function monitorTooFar(state: SimState, bedId: number): number | null {
   return best !== null && best > MONITOR_RESPONSE_DISTANCE ? best : null;
 }
 
+/** Stations that can see a bed right now: none while its curtain is drawn. */
+function seeingNow(state: SimState, bedId: number): number[] {
+  const seeing = stationsSeeing(state).get(bedId) ?? [];
+  return seeing.length > 0 && curtainsDrawn(state, bedId) ? [] : seeing;
+}
+
 /** How well a bed is watched right now. Beds that don't need watching count as blind. */
 export function bedCover(state: SimState, bedId: number): BedCover {
-  const seeing = stationsSeeing(state).get(bedId) ?? [];
+  const seeing = seeingNow(state, bedId);
   const remote = monitorsCovering(state).get(bedId) ?? [];
   const staffed = (id: number) => stationNurse(state, state.objects[id]!) !== undefined;
   if (seeing.some(staffed)) return "watched";
   if (remote.some(staffed)) return "remote";
+  if ((stationsSeeing(state).get(bedId)?.length ?? 0) > seeing.length) return "curtained";
   return seeing.length + remote.length > 0 ? "unstaffed" : "blind";
 }
 
@@ -183,7 +192,7 @@ export function watcherOf(
   bedId: number,
 ): { nurse: Staff; remote: boolean } | undefined {
   for (const [ids, remote] of [
-    [stationsSeeing(state).get(bedId) ?? [], false],
+    [seeingNow(state, bedId), false],
     [monitorsCovering(state).get(bedId) ?? [], true],
   ] as const) {
     for (const id of ids) {

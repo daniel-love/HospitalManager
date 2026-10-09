@@ -19,7 +19,7 @@ import {
 } from "@data/catalogue";
 import type { RoomDef, SpecialtyId } from "@data/schema";
 import type { Room, RoomCheck, SimState } from "../state";
-import { isWallOrDoor, tileIndex, WallType, type FloorGrid } from "./grid";
+import { isSolidWall, isWallOrDoor, tileIndex, WallType, type FloorGrid } from "./grid";
 import { isStandable, objectRect, sideTiles } from "./objects";
 
 export function detectRooms(state: SimState): void {
@@ -262,7 +262,10 @@ function sizeCheck(room: Room, minW: number, minH: number): RoomCheck {
   return { label: `At least ${minW}×${minH}`, ok, detail: `${room.bounds.w}×${room.bounds.h}` };
 }
 
-/** Enclosed = every tile's neighbours are in the room, a wall or a door. */
+/**
+ * Enclosed = every tile's neighbours are in the room, a solid wall or a
+ * door. A curtain divider separates rooms but doesn't enclose one.
+ */
 function boundary(
   grid: FloorGrid,
   room: Room,
@@ -286,7 +289,7 @@ function boundary(
         continue;
       }
       if (grid.door[n] !== 0) hasDoor = true;
-      else if (grid.roomId[n] !== room.id && !isWallOrDoor(grid, n)) enclosed = false;
+      else if (grid.roomId[n] !== room.id && !isSolidWall(grid, n)) enclosed = false;
       else if (grid.wall[n] !== WallType.None && grid.wall[n] !== WallType.Lead) shielded = false;
     }
   }

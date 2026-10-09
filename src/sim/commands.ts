@@ -11,7 +11,14 @@ import { objectDef, roomById, wallByType } from "@data/catalogue";
 import { RESALE_FRACTION } from "@data/economy";
 import { FOUNDATION_COST_PER_TILE, surfaceCost, surfaces, type SurfaceId } from "@data/structures";
 import type { PlacedObject, Rotation, SimState } from "./state";
-import { FloorType, isPublic, tileIndex, WallType, type FloorGrid } from "./world/grid";
+import {
+  FloorType,
+  isPublic,
+  isSolidWall,
+  tileIndex,
+  WallType,
+  type FloorGrid,
+} from "./world/grid";
 import {
   accessBlockedBy,
   blockedMessage,
@@ -273,7 +280,11 @@ function buildWalls(
     const i = tileIndex(grid, x, y);
     if (isPublic(grid, i)) return { cost: 0, count: 0, changed: null, error: PUBLIC_LAND };
     // Redrawing a room outline over its doors keeps the doors.
-    if (grid.door[i] !== 0 || grid.wall[i] === wall) continue;
+    if (grid.door[i] !== 0) {
+      if (def.solid) continue;
+      return { cost: 0, count: 0, changed: null, error: "A curtain can't hold a door" };
+    }
+    if (grid.wall[i] === wall) continue;
     const objId = grid.objectId[i] !== -1 ? grid.objectId[i]! : grid.mountId[i]!;
     if (objId !== -1) {
       const name = objectDef(state.objects[objId]!.defId)?.def.name ?? "equipment";
@@ -285,6 +296,12 @@ function buildWalls(
   }
   const victim = accessBlockedBy(state, floor, tiles, new Set());
   if (victim) return { cost: 0, count: 0, changed: null, error: blockedMessage(victim) };
+  if (!def.solid) {
+    // Swapping a wall for a curtain takes away what its fixtures hang on.
+    const solid = tiles.filter(({ x, y }) => isSolidWall(grid, tileIndex(grid, x, y)));
+    const fixture = mountsRelyingOn(state, floor, solid, new Set());
+    if (fixture) return { cost: 0, count: 0, changed: null, error: noWallMessage(fixture) };
+  }
   if (commit) {
     for (const { x, y } of tiles) {
       const i = tileIndex(grid, x, y);

@@ -53,6 +53,11 @@ export function CoverageLegend() {
       hint: "On a staffed central monitor's screens, within walking distance for a nurse to respond",
     },
     {
+      colour: COVER_COLOURS.curtained,
+      text: "Curtains drawn",
+      hint: "A nurse station could see this bed, but its privacy curtain is drawn for care (and for a while after)",
+    },
+    {
       colour: COVER_COLOURS.unstaffed,
       text: "Station empty",
       hint: "In sight of a nurse station, but no nurse is at it right now",
@@ -65,7 +70,7 @@ export function CoverageLegend() {
     {
       colour: COVER_SEEN,
       text: "Station can see",
-      hint: "Floor in sight of a nurse station. Walls and doors block the view; glazed walls don't.",
+      hint: "Floor in sight of a nurse station. Walls, doors and curtains block the view; glazed walls don't.",
     },
   ];
   return (

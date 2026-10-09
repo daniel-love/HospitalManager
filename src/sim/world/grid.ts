@@ -21,6 +21,11 @@ export const WallType = {
   Glass: 2,
   /** Lead-lined: shields X-ray and CT rooms (radiation protection). */
   Lead: 3,
+  /**
+   * Curtain divider between bays: splits rooms and blocks movement and sight,
+   * but isn't a solid wall (no doors, fixtures or enclosed rooms).
+   */
+  Curtain: 4,
 } as const;
 export type WallType = (typeof WallType)[keyof typeof WallType];
 
@@ -82,6 +87,12 @@ export function tileIndex(grid: FloorGrid, x: number, y: number): number {
 /** Walls and doors are "solid" for room detection: they bound rooms. */
 export function isWallOrDoor(grid: FloorGrid, i: number): boolean {
   return grid.wall[i] !== WallType.None || grid.door[i] !== 0;
+}
+
+/** A built wall (standard, glazed or lead-lined), as opposed to a curtain divider or nothing. */
+export function isSolidWall(grid: FloorGrid, i: number): boolean {
+  const w = grid.wall[i]!;
+  return w !== WallType.None && w !== WallType.Curtain;
 }
 
 /** Council-owned tiles (the public road and pavements) can't be built on. */

@@ -252,6 +252,7 @@ export function spawnPatient(
     specialty: null,
     stayUntil: null,
     endOfLife: false,
+    curtainUntil: null,
     transfer: null,
     investigations: [],
     homeBed: null,
