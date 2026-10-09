@@ -445,7 +445,9 @@ button {
 .modal {
   position: relative;
   width: min(560px, calc(100% - 32px));
-  max-height: calc(100% - 64px);
+  /* The window's height: a percentage resolves against the grid row, which grows to fit. */
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   padding: 16px 18px;

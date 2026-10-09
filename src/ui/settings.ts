@@ -28,9 +28,32 @@ export const AUTOSAVE_OPTIONS: readonly AutosaveOption[] = [
 const DEFAULT_AUTOSAVE: AutosaveOption["id"] = "6h";
 const STORAGE_KEY = "hospital-manager:settings";
 
+export interface AntialiasOption {
+  id: "auto" | "on" | "off";
+  label: string;
+  hint: string;
+}
+
+/**
+ * Smoothing edges (antialiasing). At retina resolution it's the costliest
+ * part of drawing and can make Safari stutter, so "auto" turns it off there.
+ */
+export const ANTIALIAS_OPTIONS: readonly AntialiasOption[] = [
+  { id: "auto", label: "Automatic", hint: "Off on retina screens, where edges look smooth anyway" },
+  {
+    id: "on",
+    label: "On",
+    hint: "Smoothest edges; can stutter on retina screens, especially in Safari",
+  },
+  { id: "off", label: "Off", hint: "Fastest" },
+];
+
 interface Settings {
   autosave: AutosaveOption["id"];
+  antialias: AntialiasOption["id"];
 }
+
+const DEFAULTS: Settings = { autosave: DEFAULT_AUTOSAVE, antialias: "auto" };
 
 function loadSettings(): Settings {
   try {
@@ -38,10 +61,24 @@ function loadSettings(): Settings {
     const autosave = AUTOSAVE_OPTIONS.some((o) => o.id === raw.autosave)
       ? raw.autosave!
       : DEFAULT_AUTOSAVE;
-    return { autosave };
+    const antialias = ANTIALIAS_OPTIONS.some((o) => o.id === raw.antialias)
+      ? raw.antialias!
+      : DEFAULTS.antialias;
+    return { autosave, antialias };
   } catch {
-    return { autosave: DEFAULT_AUTOSAVE };
+    return { ...DEFAULTS };
   }
+}
+
+/**
+ * Whether to antialias, decided once at start-up (a change applies after a
+ * reload). `?antialias=on|off` in the address overrides the setting.
+ */
+export function wantAntialias(): boolean {
+  const param = new URLSearchParams(location.search).get("antialias");
+  const choice = param === "on" || param === "off" ? param : settings.value.antialias;
+  if (choice !== "auto") return choice === "on";
+  return (window.devicePixelRatio || 1) < 2;
 }
 
 export const settings = signal<Settings>(loadSettings());

@@ -25,6 +25,12 @@ export interface HudState {
 export interface DebugStats {
   fps: number;
   frameMs: number;
+  /** Longest gap between display refreshes in the last few seconds (stutter). */
+  worstGapMs: number;
+  /** Refresh gaps over 25 ms in the last few seconds. */
+  longGaps: number;
+  /** Most time our code spent in one refresh in the last few seconds. */
+  worstWorkMs: number;
   simMs: number;
   ticksPerSec: number;
   ticksDropped: number;

@@ -68,12 +68,14 @@ import {
   fourHourShare,
   patientsInDept,
 } from "./describe";
-import { FixedStepLoop, type Speed } from "./loop";
+import { FixedStepLoop, FramePacer, type Speed } from "./loop";
 import { describeAccess, formatMoney } from "./tools";
 
 const HUD_INTERVAL_MS = 100;
 /** Panels with lots of detail (inspector, staff, reports) refresh less often. */
 const PANEL_INTERVAL_MS = 250;
+/** How far back the debug overlay's stutter figures look. */
+const GAP_WINDOW_MS = 5000;
 /** Notifications kept in the feed. */
 const MAX_NOTIFICATIONS = 40;
 /** How close (in tiles) a click must be to a patient or staff member to select them. */
@@ -157,7 +159,14 @@ export class Game {
       if (document.visibilityState === "hidden") this.saveForResume();
     });
     window.addEventListener("pagehide", () => this.saveForResume());
-    renderer.app.ticker.add((t) => this.frame(t.deltaMS));
+    // At most 60 frames a second, evenly paced even on a 120 Hz display.
+    const pacer = new FramePacer(60);
+    renderer.app.ticker.add((t) => {
+      const start = performance.now();
+      const dt = pacer.next(t.deltaMS);
+      if (dt !== null) this.frame(dt);
+      this.noteGap(start, performance.now() - start);
+    });
     this.publishHud();
   }
 
@@ -483,6 +492,21 @@ export class Game {
     }
   }
 
+  /**
+   * Refreshes over the last few seconds, for spotting stutter in the debug
+   * overlay: the real gap since the previous one (timed here, as Pixi caps
+   * its own at 100 ms) and the time our code spent in it.
+   */
+  private gaps: { at: number; ms: number; workMs: number }[] = [];
+  private lastRefresh = 0;
+
+  private noteGap(at: number, workMs: number): void {
+    const ms = this.lastRefresh > 0 ? at - this.lastRefresh : 0;
+    this.lastRefresh = at;
+    this.gaps.push({ at, ms, workMs });
+    while (this.gaps.length > 0 && at - this.gaps[0]!.at > GAP_WINDOW_MS) this.gaps.shift();
+  }
+
   /** Moves new sim events into the notifications feed. */
   private drainEvents(): void {
     const events = this.state.events;
@@ -561,6 +585,9 @@ export class Game {
     debugStats.value = {
       fps: this.fps,
       frameMs: this.frameMs,
+      worstGapMs: this.gaps.reduce((m, g) => Math.max(m, g.ms), 0),
+      worstWorkMs: this.gaps.reduce((m, g) => Math.max(m, g.workMs), 0),
+      longGaps: this.gaps.filter((g) => g.ms > 25).length,
       simMs: this.simMs,
       ticksPerSec: this.ticksPerSec,
       ticksDropped: this.ticksDropped,

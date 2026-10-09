@@ -5,6 +5,7 @@ import { loadLastSave } from "@save/saveManager";
 import { createSimState } from "@sim/state";
 import { siteView } from "@sim/world/site";
 import { App } from "@ui/App";
+import { wantAntialias } from "@ui/settings";
 import { showToast } from "@ui/store";
 import "@ui/styles.css";
 
@@ -20,7 +21,9 @@ async function main(): Promise<void> {
     seed: seed ?? crypto.getRandomValues(new Uint32Array(1))[0]!,
     site: true,
   });
-  const renderer = await Renderer.create(document.getElementById("game")!, state);
+  const renderer = await Renderer.create(document.getElementById("game")!, state, {
+    antialias: wantAntialias(),
+  });
   const game = new Game(state, renderer);
   if (state.site) game.focus(siteView(state.site));
   render(h(App, { game }), document.getElementById("ui")!);

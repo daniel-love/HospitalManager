@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FixedStepLoop } from "@game/loop";
+import { FixedStepLoop, FramePacer } from "@game/loop";
 
 function makeLoop(opts: Partial<ConstructorParameters<typeof FixedStepLoop>[1]> = {}) {
   let ticks = 0;
@@ -91,5 +91,32 @@ describe("FixedStepLoop", () => {
     const stats = loop.advance(100);
     expect(ticks).toBe(4); // 0, 3, 6, 9 ms all under budget; 12 ms is over
     expect(stats.simMs).toBe(12);
+  });
+});
+
+describe("FramePacer", () => {
+  /** Gaps (in display refreshes) between frames that run, with a little timing jitter. */
+  const gaps = (hz: number) => {
+    const pacer = new FramePacer(60);
+    const ran: number[] = [];
+    for (let i = 0; i < 600; i++) {
+      const jitter = ((i * 7919) % 11) / 10 - 0.5; // deterministic ±0.5 ms
+      if (pacer.next(1000 / hz + jitter) !== null) ran.push(i);
+    }
+    return new Set(ran.slice(1).map((r, i) => r - ran[i]!));
+  };
+
+  it("runs every refresh of a 60 Hz display", () => {
+    expect(gaps(60)).toEqual(new Set([1]));
+  });
+
+  it("runs exactly every other refresh of a 120 Hz display", () => {
+    expect(gaps(120)).toEqual(new Set([2]));
+  });
+
+  it("carries skipped time into the frame that runs", () => {
+    const pacer = new FramePacer(60);
+    expect(pacer.next(8.3)).toBeNull();
+    expect(pacer.next(8.4)).toBeCloseTo(16.7);
   });
 });

@@ -7,6 +7,8 @@ export function DebugOverlay() {
   return (
     <pre class="debug">
       {`FPS        ${s.fps.toFixed(0)}  (${s.frameMs.toFixed(1)} ms)
+worst gap  ${s.worstGapMs.toFixed(0)} ms  (${s.longGaps} over 25 ms, last 5 s)
+our work   ${s.worstWorkMs.toFixed(1)} ms at worst
 sim/frame  ${s.simMs.toFixed(2)} ms
 ticks/s    ${s.ticksPerSec.toFixed(0)}
 dropped    ${s.ticksDropped}

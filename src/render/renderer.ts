@@ -9,7 +9,8 @@
  * Frames are drawn on demand, not every tick of the display: render() only
  * draws when something visible has changed (the camera, the hovered tile,
  * the sim moving on, or one of the setters below), so a paused game sitting
- * still costs next to nothing. Drawing is capped at 60 fps.
+ * still costs next to nothing. The game paces frames to 60 fps (FramePacer in
+ * game/loop.ts).
  */
 import { Application, Container, Graphics } from "pixi.js";
 import { objectDef } from "@data/catalogue";
@@ -131,19 +132,27 @@ export class Renderer {
     void document.fonts?.ready.then(() => (this.dirty = true));
   }
 
-  static async create(parent: HTMLElement, state: SimState): Promise<Renderer> {
+  /**
+   * `antialias` smooths edges; at retina resolution it's the costliest part
+   * of drawing and made Safari stall about once a second (see the player's
+   * setting, ui/settings.ts).
+   */
+  static async create(
+    parent: HTMLElement,
+    state: SimState,
+    opts: { antialias: boolean },
+  ): Promise<Renderer> {
     const app = new Application();
     await app.init({
       resizeTo: window,
       background: 0x1d2a17,
-      antialias: true,
+      antialias: opts.antialias,
       autoDensity: true,
       resolution: window.devicePixelRatio || 1,
     });
     parent.appendChild(app.canvas);
     // Draw on demand from render() rather than on every tick of the display.
     app.ticker.remove(app.render, app);
-    app.ticker.maxFPS = 60;
     return new Renderer(app, state);
   }
 

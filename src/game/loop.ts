@@ -100,3 +100,29 @@ export class FixedStepLoop {
     return { ticksRun, simMs, ticksDropped };
   }
 }
+
+/**
+ * Paces frames to at most `fps`, evenly. The display may refresh faster (a
+ * 120 Hz screen): time from skipped refreshes is carried into the next frame
+ * that runs. A small tolerance stops a refresh that arrives a hair early
+ * from being skipped, so a 120 Hz screen draws exactly every other refresh
+ * and a 60 Hz screen every refresh. (Pixi's own maxFPS rounds intervals down
+ * and so skips refreshes unevenly, which makes movement stutter.)
+ */
+export class FramePacer {
+  private pendingMs = 0;
+  private readonly minMs: number;
+
+  constructor(fps: number, toleranceMs = 2) {
+    this.minMs = 1000 / fps - toleranceMs;
+  }
+
+  /** Feed each display refresh; returns the time to run a frame for, or null to skip it. */
+  next(dtMs: number): number | null {
+    this.pendingMs += dtMs;
+    if (this.pendingMs < this.minMs) return null;
+    const dt = this.pendingMs;
+    this.pendingMs = 0;
+    return dt;
+  }
+}
