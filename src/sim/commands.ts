@@ -10,6 +10,7 @@
 import { objectDef, roomById, wallByType } from "@data/catalogue";
 import { RESALE_FRACTION } from "@data/economy";
 import { FOUNDATION_COST_PER_TILE, surfaceCost, surfaces, type SurfaceId } from "@data/structures";
+import { restPoint } from "./places";
 import type { PlacedObject, Rotation, SimState } from "./state";
 import {
   FloorType,
@@ -436,9 +437,17 @@ function moveObject(
     const layer = layerOf(grid, obj.defId);
     for (const { x, y } of rectTiles(from)) layer[tileIndex(grid, x, y)] = -1;
     for (const { x, y } of rectTiles(to)) layer[tileIndex(grid, x, y)] = obj.id;
+    const before = restPoint(obj);
     obj.x = cmd.x;
     obj.y = cmd.y;
     obj.rotation = cmd.rotation;
+    // Anyone lying on it moves with it.
+    const after = restPoint(obj);
+    for (const p of Object.values(state.patients)) {
+      if (p.bed !== obj.id || p.x !== before.x || p.y !== before.y) continue;
+      p.x = p.prevX = after.x;
+      p.y = p.prevY = after.y;
+    }
   }
   return { cost: 0, count: 1, changed };
 }

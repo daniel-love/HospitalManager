@@ -112,6 +112,16 @@ describe("bed movement", () => {
 });
 
 describe("admission", () => {
+  it("keeps a ward patient on their bed when it's moved", () => {
+    const state = quiet();
+    const p = admitted(state);
+    runUntil(state, () => p.stage === "on_ward");
+    const bed = state.objects[p.bed!]!;
+    applyAll(state, [{ type: "move_object", floor: 0, id: bed.id, x: 3, y: 22, rotation: 0 }]);
+    expect([bed.x, bed.y]).toEqual([3, 22]);
+    expect([p.x, p.y]).toEqual([restPoint(bed).x, restPoint(bed).y]);
+  });
+
   it("waits on the A&E trolley, then a porter wheels the patient to a ward bed", () => {
     const state = quiet();
     const p = admitted(state);
