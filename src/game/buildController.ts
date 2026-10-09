@@ -49,8 +49,9 @@ export class BuildController {
     canvas.addEventListener("pointerup", (e) => this.onUp(e), opts);
     canvas.addEventListener("pointerleave", () => this.refresh(), opts);
     this.unsubscribe = [
-      tool.subscribe(() => {
+      tool.subscribe((t) => {
         this.dragStart = null;
+        renderer.setPublicLand(t !== null);
         this.refresh();
       }),
       rotation.subscribe(() => this.refresh()),

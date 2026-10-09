@@ -6,7 +6,7 @@ import { content, equipmentSections, roomSections } from "@data/catalogue";
 import { FOUNDATION_COST_PER_TILE, surfaces } from "@data/structures";
 import { formatMoney, isPlacementTool, sameTool, type Tool } from "@game/tools";
 import { WallType } from "@sim/world/grid";
-import { CATEGORY_COLOURS, PATH_COLOUR, ROAD_COLOUR } from "@render/palette";
+import { CATEGORY_COLOURS, FOOTPATH_COLOUR, ROAD_COLOUR } from "@render/palette";
 import { useEffect } from "preact/hooks";
 import { equipmentHelp, roomTypeHelp, simpleHelp, type HelpContent } from "./help";
 import { ListSection } from "./ListSection";
@@ -206,7 +206,7 @@ function ConstructionTools() {
             t={{ kind: "pave", surface: s.id }}
             name={s.name}
             detail={`${formatMoney(s.costPerTile)}/tile`}
-            swatch={{ colour: s.id === "road" ? ROAD_COLOUR : PATH_COLOUR }}
+            swatch={{ colour: s.id === "road" ? ROAD_COLOUR : FOOTPATH_COLOUR }}
             help={s.description}
           />
         ))}

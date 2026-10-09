@@ -64,6 +64,8 @@ export class Renderer {
   private readonly selection = new Graphics();
   /** Blueprint tint over tiles a plan changes (plan mode only). */
   private readonly planOverlay = new Graphics();
+  /** Council land (the public road), tinted while a build tool is selected. */
+  private readonly publicLand = new Graphics();
   /** What nurse stations can see, and how well each bed is watched. */
   private readonly coverage = new Graphics();
   private readonly ghost = new Graphics();
@@ -86,12 +88,15 @@ export class Renderer {
     this.camera.setViewport(app.screen.width, app.screen.height);
     this.camera.centreOn((grid.width * TILE_SIZE) / 2, (grid.height * TILE_SIZE) / 2);
 
-    this.tilemap = new TilemapLayer(grid);
+    this.tilemap = new TilemapLayer(grid, state.site);
     this.hoverBox
       .rect(0, 0, TILE_SIZE, TILE_SIZE)
       .stroke({ width: 2, color: 0xffffff, alpha: 0.9, alignment: 1 });
     this.hoverBox.visible = false;
+    this.publicLand.visible = false;
+    this.drawPublicLand(state);
     this.overlay.addChild(
+      this.publicLand,
       this.coverage,
       this.planOverlay,
       this.selection,
@@ -138,7 +143,7 @@ export class Renderer {
     this.state = state;
     const grid = state.floors[0]!;
     this.tilemap.destroy();
-    this.tilemap = new TilemapLayer(grid);
+    this.tilemap = new TilemapLayer(grid, state.site);
     this.world.addChildAt(this.tilemap.container, 0);
     this.objects.clear();
     this.agents.clear();
@@ -147,7 +152,29 @@ export class Renderer {
     }
     this.setGhost(null);
     this.setSelection(null);
+    this.drawPublicLand(state);
     this.syncContent();
+  }
+
+  /** Shows which land is the council's (not buildable), e.g. while a build tool is selected. */
+  setPublicLand(visible: boolean): void {
+    this.publicLand.visible = visible;
+  }
+
+  private drawPublicLand(state: SimState): void {
+    const g = this.publicLand.clear();
+    const site = state.site;
+    if (!site) return;
+    const T = TILE_SIZE;
+    const top = site.pavements[0];
+    const bottom = site.pavements[1];
+    const band = { x: top.x, y: top.y, w: top.w, h: bottom.y + bottom.h - top.y };
+    g.rect(band.x * T, band.y * T, band.w * T, band.h * T).fill({ color: GHOST_BAD, alpha: 0.1 });
+    for (const y of [band.y, band.y + band.h]) {
+      for (let x = band.x; x < band.x + band.w; x += 2) {
+        g.rect(x * T, y * T - 1.5, T, 3).fill({ color: GHOST_BAD, alpha: 0.7 });
+      }
+    }
   }
 
   /** Call after a build command changed the layout. */

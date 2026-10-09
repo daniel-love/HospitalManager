@@ -5,17 +5,31 @@
  * so the GPU skips them.
  */
 import { Container, Graphics } from "pixi.js";
-import { roomByCode } from "@data/catalogue";
-import { FloorType, isWallOrDoor, tileIndex, WallType, type FloorGrid } from "@sim/world/grid";
-import type { Rect } from "@sim/world/rect";
+import { roomByCode, roomById } from "@data/catalogue";
+import {
+  FloorType,
+  isPublic,
+  isWallOrDoor,
+  tileIndex,
+  WallType,
+  type FloorGrid,
+} from "@sim/world/grid";
+import { contains, type Rect } from "@sim/world/rect";
+import type { Site } from "@sim/world/site";
 import { CHUNK_TILES, TILE_SIZE } from "./constants";
 import {
   DOOR_COLOUR,
   FLOOR_COLOUR,
   GLASS_COLOUR,
+  BAY_MARKING,
+  BUS_STOP_RED,
+  DROPPED_KERB_COLOUR,
+  FOOTPATH_COLOUR,
   GRASS_SHADES,
+  KERB_COLOUR,
   PATH_COLOUR,
   ROAD_COLOUR,
+  ROAD_MARKING,
   WALL_COLOUR,
   ZONE_ALPHA,
 } from "./palette";
@@ -28,6 +42,43 @@ interface Chunk {
   tiles: Graphics;
   lines: Graphics;
   dirty: boolean;
+}
+
+const SIDES = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
+
+const BAY_CODE = roomById.get("ambulance_bay")!.code;
+
+/**
+ * A bus stop on the back of the pavement: a white flag on a pole with a red
+ * bus on it, and a glazed shelter beside it.
+ */
+function drawBusStop(g: Graphics, x: number, y: number): void {
+  const T = TILE_SIZE;
+  const px = x * T;
+  const py = y * T;
+  // Shelter: two tiles long, against the back of the pavement.
+  g.rect(px + T, py + 2, T * 2, T * 0.4)
+    .fill({ color: GLASS_COLOUR, alpha: 0.85 })
+    .stroke({ width: 1.5, color: 0x3b4048 });
+  // Flag, with a little bus: body, windows, wheels.
+  const fx = px + T * 0.12;
+  const fy = py + T * 0.18;
+  const fw = T * 0.76;
+  const fh = T * 0.64;
+  g.rect(fx, fy, fw, fh).fill(0xffffff).stroke({ width: 1.5, color: 0x3b4048 });
+  const bx = fx + fw * 0.15;
+  const by = fy + fh * 0.2;
+  const bw = fw * 0.7;
+  const bh = fh * 0.5;
+  g.roundRect(bx, by, bw, bh, 2).fill(BUS_STOP_RED);
+  g.rect(bx + bw * 0.12, by + bh * 0.15, bw * 0.76, bh * 0.3).fill(0xffffff);
+  g.circle(bx + bw * 0.25, by + bh, 1.8).fill(0x2b2b2b);
+  g.circle(bx + bw * 0.75, by + bh, 1.8).fill(0x2b2b2b);
 }
 
 /** Cheap stable hash so grass shading varies per tile without touching sim RNG. */
@@ -44,7 +95,11 @@ export class TilemapLayer {
   private readonly chunksY: number;
   visibleChunkCount = 0;
 
-  constructor(private readonly grid: FloorGrid) {
+  constructor(
+    private readonly grid: FloorGrid,
+    /** The public road, for its markings and bus stop; null on a blank map. */
+    private readonly site: Site | null = null,
+  ) {
     this.chunksX = Math.ceil(grid.width / CHUNK_TILES);
     this.chunksY = Math.ceil(grid.height / CHUNK_TILES);
     for (let cy = 0; cy < this.chunksY; cy++) {
@@ -115,15 +170,15 @@ export class TilemapLayer {
           const room = roomByCode.get(grid.zone[i]!);
           if (room) g.rect(px, py, T, T).fill({ color: room.colour, alpha: ZONE_ALPHA });
         } else if (surface === FloorType.Path) {
-          g.rect(px, py, T, T).fill(PATH_COLOUR);
+          g.rect(px, py, T, T).fill(isPublic(grid, i) ? PATH_COLOUR : FOOTPATH_COLOUR);
+          this.drawKerbs(g, x, y);
         } else if (surface === FloorType.Road) {
-          g.rect(px, py, T, T).fill(ROAD_COLOUR);
-          // An Ambulance Bay zoned on the access road.
-          const room = roomByCode.get(grid.zone[i]!);
-          if (room) g.rect(px, py, T, T).fill({ color: room.colour, alpha: ZONE_ALPHA });
+          g.rect(px, py, T, T).fill(this.isDroppedKerb(x, y) ? DROPPED_KERB_COLOUR : ROAD_COLOUR);
+          this.drawCentreLine(g, x, y);
         } else {
           g.rect(px, py, T, T).fill(GRASS_SHADES[tileHash(x, y) % GRASS_SHADES.length]!);
         }
+        if (grid.zone[i] === BAY_CODE) this.drawBayMarkings(g, x, y);
 
         const wall = grid.wall[i];
         if (wall === WallType.Standard) {
@@ -138,6 +193,11 @@ export class TilemapLayer {
       }
     }
 
+    const stop = this.site?.busStop;
+    if (stop && stop.x >= tx0 && stop.x < tx1 && stop.y >= ty0 && stop.y < ty1) {
+      drawBusStop(g, stop.x, stop.y);
+    }
+
     const l = chunk.lines.clear();
     for (let x = tx0; x <= tx1; x++) {
       l.moveTo(x * T, ty0 * T).lineTo(x * T, ty1 * T);
@@ -148,6 +208,58 @@ export class TilemapLayer {
     l.stroke({ width: 1, color: GRID_LINE_COLOUR, pixelLine: true });
 
     chunk.dirty = false;
+  }
+
+  private isDroppedKerb(x: number, y: number): boolean {
+    return this.site?.pavements.some((p) => contains(p, x, y)) ?? false;
+  }
+
+  /** Kerbstones along the edges of paving that meet a carriageway (not a dropped kerb). */
+  private drawKerbs(g: Graphics, x: number, y: number): void {
+    const { grid } = this;
+    const T = TILE_SIZE;
+    const k = 3;
+    for (const [dx, dy] of SIDES) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= grid.width || ny >= grid.height) continue;
+      if (grid.floorType[tileIndex(grid, nx, ny)] !== FloorType.Road) continue;
+      if (this.isDroppedKerb(nx, ny)) continue;
+      const px = x * T + (dx === 1 ? T - k : 0);
+      const py = y * T + (dy === 1 ? T - k : 0);
+      g.rect(px, py, dx === 0 ? T : k, dy === 0 ? T : k).fill(KERB_COLOUR);
+    }
+  }
+
+  /** A dashed white line between the two lanes of the public road. */
+  private drawCentreLine(g: Graphics, x: number, y: number): void {
+    const road = this.site?.road;
+    if (!road || !contains(road, x, y) || y !== road.y + Math.floor(road.h / 2)) return;
+    if (x % 4 >= 2) return;
+    const T = TILE_SIZE;
+    g.rect(x * T, y * T - 1.5, T, 3).fill(ROAD_MARKING);
+  }
+
+  /** Yellow lines round the edge of an Ambulance Bay. */
+  private drawBayMarkings(g: Graphics, x: number, y: number): void {
+    const { grid } = this;
+    const T = TILE_SIZE;
+    const w = 3;
+    const inset = 2;
+    for (const [dx, dy] of SIDES) {
+      const nx = x + dx;
+      const ny = y + dy;
+      const inside =
+        nx >= 0 &&
+        ny >= 0 &&
+        nx < grid.width &&
+        ny < grid.height &&
+        grid.zone[tileIndex(grid, nx, ny)] === BAY_CODE;
+      if (inside) continue;
+      const px = x * T + (dx === 1 ? T - w - inset : dx === -1 ? inset : 0);
+      const py = y * T + (dy === 1 ? T - w - inset : dy === -1 ? inset : 0);
+      g.rect(px, py, dx === 0 ? T : w, dy === 0 ? T : w).fill(BAY_MARKING);
+    }
   }
 
   /** A door is a gap in the wall with a door leaf drawn along the wall's line. */

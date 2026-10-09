@@ -3,8 +3,18 @@ import type { EquipmentDef, StaffRoleId } from "@data/schema";
 
 export const GRASS_SHADES = [0x5a8f3c, 0x5e9440, 0x578b39] as const;
 export const FLOOR_COLOUR = 0xd9d4c7;
+/** The council's pavement: grey concrete slabs. */
 export const PATH_COLOUR = 0xb3b0a8;
+/** The player's footpaths: warmer block paving, so they stand out from the pavement. */
+export const FOOTPATH_COLOUR = 0xc8bca2;
+export const KERB_COLOUR = 0x7f7c75;
 export const ROAD_COLOUR = 0x4a4d52;
+/** A dropped kerb: tarmac across the pavement, a little lighter than the road. */
+export const DROPPED_KERB_COLOUR = 0x63666b;
+export const ROAD_MARKING = 0xe8e8e2;
+/** Yellow box markings on an Ambulance Bay. */
+export const BAY_MARKING = 0xf2c230;
+export const BUS_STOP_RED = 0xd8322e;
 export const WALL_COLOUR = 0x3b4048;
 export const GLASS_COLOUR = 0x9fd3e6;
 export const DOOR_COLOUR = 0x9a6a3a;
