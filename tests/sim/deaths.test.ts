@@ -8,8 +8,10 @@ import { holder, reserve, restPoint, siteEntrance } from "@sim/places";
 import { tick } from "@sim/sim";
 import type { PlacedObject, SimState } from "@sim/state";
 import { spawnPatient } from "@sim/systems/arrivals";
+import { collectionFor, inCollectionHours } from "@sim/systems/collections";
 import { deathStatus, debrief, die, mortuarySpaces } from "@sim/systems/deaths";
-import { TICKS_PER_MINUTE } from "@sim/time";
+import { applyStaffCommand } from "@sim/systems/staffing";
+import { clockFromTick, TICKS_PER_MINUTE } from "@sim/time";
 import { roomOfObject } from "@sim/world/rooms";
 import { describePatient } from "@game/describe";
 import { staffedDeathsWard } from "../fixtures/deathsWard";
@@ -93,8 +95,10 @@ describe("an expected death in a side room", () => {
   it("is reviewed by the Medical Examiner, then released to the funeral director", () => {
     runUntil(state, () => d.meReviewed !== null);
     expect(d.coroner).toBe(false);
-    expect(d.releaseAt! - d.meReviewed!).toBeLessThanOrEqual(36 * HOUR);
-    runUntil(state, () => !state.patients[p.id], 40 * HOUR);
+    // Free to go within 36 hours, then collected in the next weekday's hours.
+    expect(d.releaseAt! - d.meReviewed!).toBeLessThanOrEqual(36 * HOUR + 3 * 24 * HOUR);
+    expect(inCollectionHours(d.releaseAt!)).toBe(true);
+    runUntil(state, () => !state.patients[p.id], 5 * 24 * HOUR);
     expect(mortuarySpaces(state).taken).toBe(0);
   });
 });
@@ -215,7 +219,9 @@ describe("where things stand after a death", () => {
     runUntil(state, () => p.death!.meReviewed !== null);
     expect(deathStatus(state, p)).toMatchObject({
       step: "release",
-      reason: expect.stringMatching(/funeral director collects about Day \d+ \d\d:\d\d$/),
+      reason: expect.stringMatching(
+        /funeral director collects about (Mon|Tue|Wed|Thu|Fri) \d\d:\d\d$/,
+      ),
     });
   });
 
@@ -240,5 +246,84 @@ describe("where things stand after a death", () => {
     expect(deathStatus(state, p)).toMatchObject({ step: "to_mortuary", progress: "blocked" });
     expect(deathStatus(state, p).reason).toMatch(/^No bed-width route/);
     expect(state.events.map((e) => e.text).join("\n")).toMatch(/no bed-width route/);
+  });
+});
+
+describe("the funeral director's collection", () => {
+  /** Dies, is reviewed, and waits in the mortuary for collection. */
+  function awaitingCollection(state: SimState): Patient {
+    const p = inpatient(state, bedIn(state, "ward"));
+    die(state, p, true, true);
+    runUntil(state, () => p.death!.meReviewed !== null, 4 * 24 * HOUR);
+    return p;
+  }
+
+  it("is booked for a weekday, in collection hours", () => {
+    const state = settled(staffedDeathsWard());
+    const p = awaitingCollection(state);
+    const c = clockFromTick(p.death!.releaseAt!);
+    expect(c.weekday).toBeLessThan(5);
+    expect(c.hour).toBeGreaterThanOrEqual(9);
+    expect(c.hour).toBeLessThan(17);
+  });
+
+  it("walks in, is released by a porter, and takes them out", () => {
+    const state = settled(staffedDeathsWard());
+    const p = awaitingCollection(state);
+    const fridge = p.death!.fridge!;
+    runUntil(state, () => collectionFor(state, p.id) !== undefined, 7 * 24 * HOUR);
+    const visit = collectionFor(state, p.id)!;
+    expect(visit.vehicle).toBeNull();
+    runUntil(state, () => visit.phase === "releasing");
+    expect(deathStatus(state, p).reason).toMatch(/porter|Porter/);
+    runUntil(state, () => p.stage === "with_funeral_director");
+    expect(holder(state, fridge.objectId, fridge.slot)).toBeUndefined();
+    expect(deathStatus(state, p).reason).toMatch(/taking them out to their vehicle/);
+    runUntil(state, () => !state.patients[p.id]);
+    expect(state.collections).toEqual({});
+    expect(state.events.map((e) => e.text).join("\n")).toMatch(/funeral director has collected/);
+  });
+
+  it("drives in on a map with a road, and drives away again", () => {
+    const state = settled(staffedDeathsWard(1, undefined, { site: true }));
+    const p = awaitingCollection(state);
+    runUntil(state, () => collectionFor(state, p.id) !== undefined, 7 * 24 * HOUR);
+    const visit = collectionFor(state, p.id)!;
+    expect(visit.vehicle).not.toBeNull();
+    expect(visit.phase).toBe("arriving");
+    runUntil(state, () => visit.phase === "to_mortuary");
+    expect(visit.vehicle!.x).toBe(visit.vehicle!.stop.x);
+    runUntil(state, () => !state.patients[p.id]);
+    expect(visit.phase).toBe("loading");
+    // It pulled in on its own side of the road, and carries on the way it was going.
+    const v = visit.vehicle!;
+    const road = state.site!.road;
+    expect(v.stop.y < road.y + road.h / 2).toBe(v.from === 0);
+    runUntil(state, () => visit.phase === "leaving");
+    const last = { x: v.x };
+    runUntil(state, () => {
+      if (state.collections[visit.id]) last.x = v.x;
+      return !state.collections[visit.id];
+    });
+    // Last seen near the far end (it covers 2 tiles a tick).
+    if (v.from === 0) expect(last.x).toBeGreaterThan(state.floors[0]!.width - 4);
+    else expect(last.x).toBeLessThan(3);
+    expect(mortuarySpaces(state).taken).toBe(0);
+  });
+
+  it("waits for a porter to release them", () => {
+    const state = settled(staffedDeathsWard());
+    const p = awaitingCollection(state);
+    for (const s of Object.values(state.staff)) {
+      if (s.role === "porter") applyStaffCommand(state, { type: "dismiss_staff", id: s.id });
+    }
+    runUntil(state, () => collectionFor(state, p.id)?.phase === "releasing", 7 * 24 * HOUR);
+    for (let i = 0; i < HOUR; i++) tick(state);
+    expect(p.stage).toBe("in_mortuary");
+    expect(deathStatus(state, p)).toMatchObject({
+      step: "release",
+      progress: "blocked",
+      reason: "No Porters on staff",
+    });
   });
 });

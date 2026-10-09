@@ -64,6 +64,8 @@ export type PatientStage =
   | "to_mortuary"
   /** In the mortuary until the Medical Examiner (and coroner) release them. */
   | "in_mortuary"
+  /** Released: the funeral director is wheeling them out to their vehicle. */
+  | "with_funeral_director"
   /** Heading out of the building. */
   | "leaving";
 
@@ -265,6 +267,8 @@ export type JobKind =
   | "last_offices"
   | "to_mortuary"
   | "me_review"
+  /** A porter releases the deceased to the funeral director at the mortuary. */
+  | "release_body"
   | "debrief";
 
 /** A tile rectangle where one ambulance parks. */
@@ -280,6 +284,40 @@ export interface ParkingSpace {
  * an Ambulance Bay it waits outside, crew and patient on board; the handover
  * clock runs from arrival either way.
  */
+/**
+ * A funeral director collecting someone from the mortuary (GAME_DESIGN §5.6,
+ * systems/collections.ts): their private ambulance drives in and pulls up
+ * near the mortuary, two of their staff bring a stretcher in, a porter
+ * releases the deceased to them, and they wheel them out and drive away.
+ *
+ *   arriving: driving in (or, with no road, walking in from the entrance);
+ *   to_mortuary: the crew walking to the mortuary with their stretcher;
+ *   releasing: at the fridge with the porter, checking identity and paperwork;
+ *   to_vehicle: wheeling the deceased out; loading: at the vehicle;
+ *   leaving: driving off the map.
+ */
+export interface Collection {
+  id: number;
+  patientId: number;
+  phase: "arriving" | "to_mortuary" | "releasing" | "to_vehicle" | "loading" | "leaving";
+  /** The private ambulance, or null on a map with no road (they come on foot). */
+  vehicle: {
+    x: number;
+    y: number;
+    prevX: number;
+    prevY: number;
+    route: number[];
+    routeVersion: number;
+    from: 0 | 1;
+    /** Where it pulls up: a drivable tile near the mortuary. */
+    stop: Point;
+  } | null;
+  /** The funeral director's two staff, who walk together (drawn as a pair). */
+  crew: AgentBase;
+  /** Tick they finish loading and drive off. */
+  leaveAt: number | null;
+}
+
 export interface Ambulance {
   id: number;
   /** Tick it reached the hospital (came onto the map, on a map with a road). */

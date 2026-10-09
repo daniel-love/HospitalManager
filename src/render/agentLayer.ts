@@ -9,7 +9,8 @@
  * step after a death (curtains, sheet, trolley, mortuary drawer, family).
  *
  * Ambulances (driving or parked) are drawn beneath everyone, and a paramedic stands
- * beside each patient still waiting to be handed over.
+ * beside each patient still waiting to be handed over. So are funeral
+ * directors' private ambulances, whose crew are drawn while on foot.
  *
  * Views are pooled by agent id: created when an agent appears, destroyed
  * when it leaves.
@@ -20,15 +21,19 @@ import { TRIAGE_CATEGORIES } from "@data/patients";
 import { onSite, type AgentBase, type Ambulance, type Patient, type Staff } from "@sim/agents";
 import type { SimState } from "@sim/state";
 import { SPACE_L, SPACE_W } from "@sim/systems/ambulances";
+import { crewOnFoot } from "@sim/systems/collections";
 import { curtainsDrawn } from "@sim/systems/curtains";
 import { TILE_SIZE } from "./constants";
 import {
   bedCurtainSize,
+  crewSpot,
   deceasedLook,
   drawBedCurtains,
+  drawCrew,
   drawDeceased,
   drawFamilies,
   familiesLook,
+  privateAmbulanceContext,
   pushOffset,
 } from "./deathMarks";
 import {
@@ -64,6 +69,8 @@ export class AgentLayer {
   private readonly views = new Map<number, View>();
   /** Each ambulance's body, and the way it's facing (radians, 0 = along y). */
   private readonly ambulances = new Map<number, { g: Graphics; angle: number }>();
+  /** Funeral directors' private ambulances, by collection id. */
+  private readonly privateAmbulances = new Map<number, { g: Graphics; angle: number }>();
   /** Families in the Relatives' Room, being told of a death. */
   private readonly families = new Graphics();
   private familiesDrawn = "";
@@ -107,6 +114,17 @@ export class AgentLayer {
         pos.set(pos.x + push.x * TILE_SIZE, pos.y + push.y * TILE_SIZE);
       }
     }
+    for (const c of Object.values(state.collections)) {
+      if (!crewOnFoot(c)) continue;
+      live.add(c.crew.id);
+      this.place(c.crew, alpha, "crew", drawCrew);
+      const at = crewSpot(state, c, alpha);
+      if (at)
+        this.views
+          .get(c.crew.id)!
+          .g.position.set((at.x + 0.5) * TILE_SIZE, (at.y + 0.5) * TILE_SIZE);
+    }
+    this.updatePrivateAmbulances(state, alpha);
     const families = familiesLook(state);
     if (families !== this.familiesDrawn) {
       this.families.clear();
@@ -126,8 +144,44 @@ export class AgentLayer {
     this.views.clear();
     for (const v of this.ambulances.values()) v.g.destroy();
     this.ambulances.clear();
+    for (const v of this.privateAmbulances.values()) v.g.destroy();
+    this.privateAmbulances.clear();
     this.families.clear();
     this.familiesDrawn = "";
+  }
+
+  /** Funeral directors' vehicles: driving in, parked near the mortuary, or driving off. */
+  private updatePrivateAmbulances(state: SimState, alpha: number): void {
+    const live = new Set<number>();
+    for (const c of Object.values(state.collections)) {
+      const v = c.vehicle;
+      if (!v) continue;
+      live.add(c.id);
+      let view = this.privateAmbulances.get(c.id);
+      if (!view) {
+        // It comes in along the road: eastbound from the west end, or westbound.
+        view = {
+          g: new Graphics(privateAmbulanceContext()),
+          angle: v.from === 0 ? -Math.PI / 2 : Math.PI / 2,
+        };
+        this.vehicles.addChild(view.g);
+        this.privateAmbulances.set(c.id, view);
+      }
+      const dx = v.x - v.prevX;
+      const dy = v.y - v.prevY;
+      if (Math.hypot(dx, dy) > 1e-6) view.angle = Math.atan2(-dx, dy);
+      view.g.position.set(
+        (v.prevX + dx * alpha + 0.5) * TILE_SIZE,
+        (v.prevY + dy * alpha + 0.5) * TILE_SIZE,
+      );
+      view.g.rotation = view.angle;
+    }
+    for (const [id, view] of this.privateAmbulances) {
+      if (!live.has(id)) {
+        view.g.destroy();
+        this.privateAmbulances.delete(id);
+      }
+    }
   }
 
   private updateAmbulances(all: Ambulance[], alpha: number): void {

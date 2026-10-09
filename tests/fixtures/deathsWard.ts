@@ -17,7 +17,7 @@ import type { Command } from "@sim/commands";
 import { createSimState, type Rotation, type SimState } from "@sim/state";
 import { applyStaffCommand } from "@sim/systems/staffing";
 import { WallType } from "@sim/world/grid";
-import { applyAll, hireTeam, type StaffCounts } from "./smallAE";
+import { addRoad, applyAll, hireTeam, type StaffCounts } from "./smallAE";
 
 const F = 0;
 const rect = (x0: number, y0: number, x1: number, y1: number) => ({
@@ -48,10 +48,12 @@ export interface DeathsOptions {
   mortuary?: boolean;
   /** The mortuary's door: a single door is too narrow for a trolley. */
   mortuaryDoor?: "door_double" | "door_single";
+  /** Put the public road in below the building (default false), so funeral directors drive in. */
+  site?: boolean;
 }
 
 export function buildDeathsWard(seed = 1, opts: DeathsOptions = {}): SimState {
-  const state = createSimState({ seed, width: 30, height: 20 });
+  const state = createSimState({ seed, width: 30, height: opts.site ? 34 : 20 });
   applyAll(state, [
     { type: "build_floor", floor: F, rect: rect(1, 1, 28, 18) },
     wall(1, 1, 28, 18),
@@ -96,6 +98,7 @@ export function buildDeathsWard(seed = 1, opts: DeathsOptions = {}): SimState {
           place("mortuary_fridge", 3, 17, 2),
         ]),
   ]);
+  if (opts.site) addRoad(state);
   return state;
 }
 

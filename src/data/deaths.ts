@@ -35,6 +35,17 @@ export const ME_REVIEW_MINS: [number, number] = [30, 45];
 export const ME_SESSION = { startHour: 9, endHour: 17 };
 
 /**
+ * Funeral directors collect by appointment while the mortuary is staffed:
+ * weekdays, in office hours. A release that falls outside waits for the next
+ * day's collections, which are spread through the day.
+ */
+export const COLLECTION_HOURS = { startHour: 9, endHour: 17 };
+/** Releasing the deceased to the funeral director: checking identity against the paperwork. */
+export const RELEASE_TO_FD_MINS: [number, number] = [15, 25];
+/** Loading the private ambulance before it drives off. */
+export const LOADING_MINS: [number, number] = [5, 10];
+
+/**
  * With no mortuary space, the hospital's contingency arrangement (an external
  * body store, via the funeral director) takes them after this many hours.
  */

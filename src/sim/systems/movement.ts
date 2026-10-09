@@ -130,4 +130,8 @@ export function moveAgents(state: SimState): void {
   };
   for (const p of Object.values(state.patients)) step(p, PATIENT_SPEED);
   for (const s of Object.values(state.staff)) step(s, STAFF_SPEED);
+  // A funeral director's crew walking in to the mortuary (systems/collections.ts).
+  for (const c of Object.values(state.collections)) {
+    if (c.phase === "to_mortuary" || c.phase === "releasing") step(c.crew, STAFF_SPEED);
+  }
 }

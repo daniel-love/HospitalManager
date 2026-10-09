@@ -52,6 +52,13 @@ import {
 } from "../time";
 import { roomAt, roomOfObject } from "../world/rooms";
 import { bedRouteExists } from "./admissions";
+import {
+  bookCollection,
+  collectionFor,
+  inCollectionHours,
+  releasedToFuneralDirector,
+  startCollection,
+} from "./collections";
 import { earn } from "./finance";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo, stop } from "./movement";
@@ -175,7 +182,7 @@ function recordOnIncident(state: SimState, p: Patient): void {
   incident.causes.push("The resuscitation attempt was unsuccessful");
 }
 
-function complain(state: SimState, text: string, at: Point): void {
+export function complain(state: SimState, text: string, at: Point): void {
   state.today.stats.complaints++;
   emit(state, text, "warn", at);
 }
@@ -281,6 +288,13 @@ export function claimDeathPlace(state: SimState, job: Job): Point | null {
     }
     case "to_mortuary":
       return p ? claimMortuarySpace(state, job, p) : null;
+    case "release_body": {
+      const f = p?.death?.fridge;
+      const fridge = f ? state.objects[f.objectId] : undefined;
+      if (!fridge) return p ? tileOf(p) : null;
+      job.objectId = fridge.id;
+      return frontOf(fridge);
+    }
     default:
       return p ? tileOf(p) : null;
   }
@@ -364,7 +378,7 @@ export function runDeathJob(state: SimState, job: Job, staff: Staff, p: Patient 
   const spot =
     job.kind === "me_review" && place
       ? deskStaffSpot(place)
-      : job.kind === "break_news" && place
+      : (job.kind === "break_news" || job.kind === "release_body") && place
         ? frontOf(place)
         : p
           ? beside(state, p)
@@ -408,13 +422,17 @@ export function runDeathJob(state: SimState, job: Job, staff: Staff, p: Patient 
         d.lastOffices = state.tick;
       }
       break;
+    case "release_body":
+      releasedToFuneralDirector(state, p);
+      break;
     case "me_review": {
       d.meReviewed = state.tick;
       const hours = RELEASE_HOURS[0] + (RELEASE_HOURS[1] - RELEASE_HOURS[0]) * nextFloat(state.rng);
       const coronerDays = d.coroner
         ? CORONER_DAYS[0] + (CORONER_DAYS[1] - CORONER_DAYS[0]) * nextFloat(state.rng)
         : 0;
-      d.releaseAt = state.tick + Math.round((hours + coronerDays * 24) * TICKS_PER_HOUR);
+      const free = state.tick + Math.round((hours + coronerDays * 24) * TICKS_PER_HOUR);
+      d.releaseAt = bookCollection(state, free);
       break;
     }
   }
@@ -470,7 +488,7 @@ function runToMortuary(state: SimState, job: Job, porter: Staff, p: Patient): vo
 }
 
 /** Whether a route ([x0, y0, x1, y1, …]) crosses a waiting area or reception. */
-function passesPublicArea(state: SimState, path: number[]): boolean {
+export function passesPublicArea(state: SimState, path: number[]): boolean {
   for (let i = 0; i < path.length; i += 2) {
     const room = roomAt(state, 0, Math.round(path[i]!), Math.round(path[i + 1]!));
     if (room && PUBLIC_ROOMS.has(room.typeId)) return true;
@@ -529,7 +547,11 @@ export function updateDeaths(state: SimState): void {
           durationTicks: ticksFor(state.rng, ME_REVIEW_MINS),
         });
       }
-      if (d.releaseAt !== null && state.tick >= d.releaseAt) releaseBody(state, p);
+      if (d.releaseAt !== null && state.tick >= d.releaseAt && !collectionFor(state, p.id)) {
+        // Booked outside collection hours (an older game): rebook.
+        if (inCollectionHours(state.tick)) startCollection(state, p);
+        else d.releaseAt = bookCollection(state, state.tick);
+      }
     }
   }
   if (state.tick % TICKS_PER_HOUR === 0) {
@@ -588,14 +610,6 @@ function contingency(state: SimState, p: Patient): void {
     "warn",
     tileOf(p),
   );
-  delete state.patients[p.id];
-}
-
-/** The funeral director collects them; their mortuary space is free again. */
-function releaseBody(state: SimState, p: Patient): void {
-  const f = p.death!.fridge;
-  if (f) release(state, f.objectId, f.slot, p.id);
-  emit(state, `The funeral director has collected ${p.name} from the mortuary.`, "info", tileOf(p));
   delete state.patients[p.id];
 }
 
@@ -765,8 +779,30 @@ export function deathStepStatus(state: SimState, p: Patient, step: DeathStep): D
     case "release": {
       if (d.releaseAt === null)
         return status("waiting", "Once the Medical Examiner has reviewed them");
+      const visit = collectionFor(state, p.id);
+      if (visit) {
+        switch (visit.phase) {
+          case "arriving":
+            return status("underway", "The funeral director's private ambulance is on its way");
+          case "to_mortuary":
+            return status("underway", "The funeral director's staff are coming to the mortuary");
+          case "releasing": {
+            const porter = taken(
+              "release_body",
+              (who) => `${who} is releasing them to the funeral director`,
+            );
+            if (porter) return porter;
+            return (
+              unstaffed(["porter"]) ??
+              status("waiting", "The funeral director is waiting for a porter to release them")
+            );
+          }
+          default:
+            return status("underway", "The funeral director is taking them out to their vehicle");
+        }
+      }
       const c = clockFromTick(d.releaseAt);
-      const when = `Day ${c.day} ${String(c.hour).padStart(2, "0")}:${String(c.minute).padStart(2, "0")}`;
+      const when = `${WEEKDAY_NAMES[c.weekday]} ${String(c.hour).padStart(2, "0")}:${String(c.minute).padStart(2, "0")}`;
       return status(
         "underway",
         d.coroner

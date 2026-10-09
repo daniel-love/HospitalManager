@@ -397,6 +397,11 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v20: funeral directors come to collect from the mortuary.
+  19: (save) => ({
+    ...save,
+    state: { ...(save.state as object), collections: [], nextCollectionId: 1 },
+  }),
 };
 
 /** Base64 of n zero bytes, without building them. */

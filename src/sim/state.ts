@@ -9,6 +9,7 @@ import type { SpecialtyId } from "@data/schema";
 import { DEFAULT_CATCHMENT } from "@data/patients";
 import {
   type Ambulance,
+  type Collection,
   emptyLedger,
   emptyStats,
   type DayReport,
@@ -26,7 +27,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 19;
+export const SIM_STATE_VERSION = 20;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -101,6 +102,9 @@ export interface SimState {
   /** Ambulances parked or waiting outside, keyed by id. */
   ambulances: Record<number, Ambulance>;
   nextAmbulanceId: number;
+  /** Funeral directors collecting from the mortuary, keyed by id. */
+  collections: Record<number, Collection>;
+  nextCollectionId: number;
   /**
    * Who has claimed what: "objectId:slot" → agent id. Slots are seats on a
    * bench, 0 for a couch or toilet, "staff" for the staff side of a desk.
@@ -175,6 +179,8 @@ export function createSimState(opts: NewGameOptions): SimState {
     nextJobId: 1,
     ambulances: {},
     nextAmbulanceId: 1,
+    collections: {},
+    nextCollectionId: 1,
     reserved: {},
     dirt: {},
     wardSpecialties: {},

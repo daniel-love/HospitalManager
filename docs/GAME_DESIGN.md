@@ -282,7 +282,8 @@ Deaths follow the real UK hospital process, because that process is where the op
    - A **patient safety incident** record, logged with its contributing factors (e.g. "Bed 7 not visible from the nurse station; observations overdue by 45 minutes; nurse ratio 1:9").
    - Serious cases trigger a **patient safety investigation** (PSIRF-style). That takes admin and senior staff time over the following weeks, and its findings show up at inspections.
    - A **bereavement office** (admin staff) handles family paperwork. Without one, complaints rise.
-8. **Staff impact:** a hot debrief after a resuscitation attempt (a short pause for the team). Then a morale hit for the staff involved, larger after an unexpected or avoidable death, plus a burnout risk if deaths cluster.
+8. **Collection by the funeral director:** once released, the family's funeral director collects by appointment while the mortuary is staffed (weekdays 09:00–17:00, so releases out of hours wait, spread across the next day's collections). Their unmarked private ambulance drives in and pulls up as near the mortuary as it can, off the public road and out of ambulance spaces where possible. Two of their staff wheel a stretcher in, mortuary staff (porters, until mortuary technicians are modelled) release the deceased after checking identity against the paperwork, and they wheel them out (a public route brings complaints) and drive away. Only then is the fridge space free.
+9. **Staff impact:** a hot debrief after a resuscitation attempt (a short pause for the team). Then a morale hit for the staff involved, larger after an unexpected or avoidable death, plus a burnout risk if deaths cluster.
 
 **Reporting to the player:** a sober notification and the incident record, with no "game over" sting. Avoidable deaths feed the mortality figures, the inspection rating, the risk of complaints and litigation (NHS Resolution-style claims, a real financial cost) and media scrutiny.
 

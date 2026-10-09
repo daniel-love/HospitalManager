@@ -4,6 +4,7 @@
  */
 import type { SimState } from "./state";
 import { updateWards } from "./systems/admissions";
+import { updateCollections } from "./systems/collections";
 import { updateDeaths } from "./systems/deaths";
 import { updateAlerts } from "./systems/alerts";
 import { updateAmbulances } from "./systems/ambulances";
@@ -27,6 +28,7 @@ export function tick(state: SimState): void {
   updateDeterioration(state);
   updateWards(state);
   updateDeaths(state);
+  updateCollections(state);
   postObservations(state);
   assignJobs(state);
   moveAgents(state);

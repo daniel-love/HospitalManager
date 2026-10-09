@@ -78,6 +78,7 @@ const STAGE_LABELS: Record<PatientStage, string> = {
   deceased: "Died",
   to_mortuary: "Being taken to the mortuary",
   in_mortuary: "In the mortuary",
+  with_funeral_director: "Being collected by the funeral director",
   leaving: "Leaving",
 };
 
@@ -616,6 +617,9 @@ export function staffState(state: SimState, s: Staff): StaffState {
     case "to_mortuary":
       what = `Taking ${who} to the mortuary`;
       break;
+    case "release_body":
+      what = `Releasing ${who} to the funeral director`;
+      break;
     case "me_review":
       what = `Medical Examiner review: ${who}`;
       break;
@@ -636,6 +640,7 @@ export function staffState(state: SimState, s: Staff): StaffState {
       break;
   }
   const patientId = patient?.id ?? null;
+
   if (job.state === "working") {
     return {
       status: "working",
@@ -821,6 +826,7 @@ const STAGE_GROUPS: Record<PatientStage, PatientRow["group"]> = {
   deceased: "leaving",
   to_mortuary: "leaving",
   in_mortuary: "leaving",
+  with_funeral_director: "leaving",
   leaving: "leaving",
 };
 

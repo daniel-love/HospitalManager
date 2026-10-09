@@ -14,9 +14,12 @@
  *   - In the mortuary: a label on their fridge drawer, coloured by what
  *     they're waiting for: the Medical Examiner, the coroner, or collection.
  *   - While a doctor breaks the news, the family sit on the Relatives' Room sofa.
+ *   - The funeral director's collection: their private ambulance (dark and
+ *     unmarked), their two staff in dark suits, and their stretcher under a
+ *     deep red cover, which the staff push from behind (see crewSpot).
  */
-import type { Graphics } from "pixi.js";
-import type { Patient, Point, Staff } from "@sim/agents";
+import { GraphicsContext, type Graphics } from "pixi.js";
+import type { Collection, Patient, Point, Staff } from "@sim/agents";
 import type { PlacedObject, SimState } from "@sim/state";
 import {
   deathStatus,
@@ -42,6 +45,8 @@ const OUTLINE = 0x8a929c;
 const DARK = 0x1d232b;
 const CORONER = 0x9b7fd4;
 const AWAITING_COLLECTION = 0x6fd08c;
+const FD_COVER = 0x6b2737;
+const FD_SUIT = 0x23262b;
 const FAMILY = 0xb48ad6;
 
 /** Each deceased patient's status, worked out once per tick rather than every frame. */
@@ -88,8 +93,11 @@ interface Shape {
   curtains: { w: number; h: number } | null;
 }
 
+/** On the move: the porter's concealment trolley, or the funeral director's stretcher. */
+const wheeled = (p: Patient) => p.stage === "to_mortuary" || p.stage === "with_funeral_director";
+
 function shapeOf(state: SimState, p: Patient): Shape {
-  if (p.stage === "to_mortuary") {
+  if (wheeled(p)) {
     const { dx, dy } = headingOf(p);
     return Math.abs(dx) > Math.abs(dy)
       ? { w: 32, h: 18, curtains: null }
@@ -130,7 +138,7 @@ export function deceasedLook(state: SimState, p: Patient, selected: boolean): st
   if (p.stage === "in_mortuary")
     return `m|${selected}|${tagColour(state, p)}|${tagSpot(state, p).x}`;
   const s = shapeOf(state, p);
-  const down = p.stage === "to_mortuary" && headingOf(p).dy > 0;
+  const down = wheeled(p) && headingOf(p).dy > 0;
   return `d|${selected}|${p.stage}|${down}|${s.w}|${s.curtains?.w}x${s.curtains?.h}|${p.death!.lastOffices !== null}|${pips(state, p).join(",")}`;
 }
 
@@ -160,12 +168,14 @@ export function drawDeceased(g: Graphics, state: SimState, p: Patient, selected:
     });
   }
   const along = w > h;
-  if (p.stage === "to_mortuary") {
-    // A concealment trolley: a steel frame with a fitted cover.
+  if (wheeled(p)) {
+    // A concealment trolley (a steel frame with a fitted cover), or the
+    // funeral director's own stretcher under a deep red cover.
+    const fd = p.stage === "with_funeral_director";
     g.roundRect(-w / 2, -h / 2, w, h, 4)
       .fill(0x9aa3ad)
       .stroke({ width: 1.5, color: 0x5b636c });
-    g.roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6, 5).fill(0x5d6b7a);
+    g.roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6, 5).fill(fd ? FD_COVER : 0x5d6b7a);
     if (along) g.rect(-w / 2 + 5, -1, w - 10, 2).fill({ color: 0xffffff, alpha: 0.25 });
     else g.rect(-1, -h / 2 + 5, 2, h - 10).fill({ color: 0xffffff, alpha: 0.25 });
   } else if (p.death!.lastOffices === null) {
@@ -189,7 +199,7 @@ export function drawDeceased(g: Graphics, state: SimState, p: Patient, selected:
     else g.rect(-3, h / 2 - 7, 6, 4).fill(0xf2c94c);
   }
   // Above them, or for a trolley heading down the screen, below it (the porter is behind).
-  const pipsBelow = p.stage === "to_mortuary" && !along && headingOf(p).dy > 0;
+  const pipsBelow = wheeled(p) && !along && headingOf(p).dy > 0;
   drawPips(g, state, p, pipsBelow ? h / 2 + 9 : -(curtains ? curtains.h / 2 : h / 2) - 9);
 }
 
@@ -240,7 +250,9 @@ export function tagSpot(state: SimState, p: Patient): Point {
 
 function tagColour(state: SimState, p: Patient): number {
   const s = statusOf(state, p).main;
-  if (s.step === "release") return p.death!.coroner ? CORONER : AWAITING_COLLECTION;
+  if (s.step === "release" && s.progress !== "blocked") {
+    return p.death!.coroner ? CORONER : AWAITING_COLLECTION;
+  }
   return PROGRESS_COLOURS[s.progress];
 }
 
@@ -317,4 +329,65 @@ export function drawFamilies(g: Graphics, state: SimState): void {
         .stroke({ width: 2, color: 0xffffff });
     }
   }
+}
+
+// ---------- The funeral director ----------
+
+/** The funeral director's two staff, side by side, in dark suits. */
+export function drawCrew(g: Graphics): void {
+  for (const x of [-6, 6]) {
+    g.circle(x, 0, 7).fill(FD_SUIT).stroke({ width: 2, color: 0xffffff });
+  }
+}
+
+/**
+ * Where to draw the crew, in tiles: while they wheel the deceased out, just
+ * behind the stretcher (interpolated with it); otherwise null (where they are).
+ */
+export function crewSpot(state: SimState, c: Collection, alpha: number): Point | null {
+  if (c.phase !== "to_vehicle") return null;
+  const p = state.patients[c.patientId];
+  if (!p) return null;
+  const { dx, dy } = headingOf(p);
+  return {
+    x: p.prevX + (p.x - p.prevX) * alpha - dx * 0.95,
+    y: p.prevY + (p.y - p.prevY) * alpha - dy * 0.95,
+  };
+}
+
+let privateAmbulanceShape: GraphicsContext | null = null;
+
+/**
+ * A private ambulance seen from above (funeral directors use a converted
+ * estate or van): dark and unmarked, with tinted rear windows, centred on
+ * the origin and lying along the y axis with its bonnet at +y. Smaller than
+ * an emergency ambulance: about 2 × 5 tiles.
+ */
+export function privateAmbulanceContext(): GraphicsContext {
+  if (privateAmbulanceShape) return privateAmbulanceShape;
+  const W = T * 2.1;
+  const L = T * 5;
+  const left = -W / 2;
+  const top = -L / 2;
+  const outline = { width: 1.5, color: 0x101215 };
+  const g = new GraphicsContext();
+  g.roundRect(left + 3, top + 4, W, L, 10).fill({ color: 0x000000, alpha: 0.25 });
+  g.roundRect(left, top, W, L, 10).fill(0x2a2d33).stroke(outline);
+  // Bonnet and windscreen at the front.
+  const bonnet = L * 0.16;
+  g.rect(left + 6, top + L - bonnet + 2, W - 12, 2).fill({ color: 0xffffff, alpha: 0.08 });
+  g.roundRect(-W * 0.4, top + L - bonnet - L * 0.12, W * 0.8, L * 0.1, 3).fill(0x5d7a94);
+  // Wing mirrors.
+  g.rect(left - 4, top + L - bonnet - L * 0.08, 5, 4).fill(0x101215);
+  g.rect(left + W - 1, top + L - bonnet - L * 0.08, 5, 4).fill(0x101215);
+  // Roof, then the long tinted rear windows down each side, with an etched band.
+  g.roundRect(-W * 0.36, top + L * 0.08, W * 0.72, L * 0.6, 4).fill(0x33373e);
+  g.rect(left + 2, top + L * 0.1, 4, L * 0.55).fill(0x4a5058);
+  g.rect(left + W - 6, top + L * 0.1, 4, L * 0.55).fill(0x4a5058);
+  g.rect(left + 2, top + L * 0.36, 4, 2).fill({ color: 0xffffff, alpha: 0.3 });
+  g.rect(left + W - 6, top + L * 0.36, 4, 2).fill({ color: 0xffffff, alpha: 0.3 });
+  // Tailgate seam.
+  g.rect(-W * 0.3, top + 3, W * 0.6, 1.5).fill({ color: 0x000000, alpha: 0.5 });
+  privateAmbulanceShape = g;
+  return g;
 }

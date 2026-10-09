@@ -274,7 +274,11 @@ function driveAll(state: SimState, site: Site): void {
   }
 }
 
-function planRoute(state: SimState, a: Ambulance, to: Point): boolean {
+/** Anything that drives along the road: an ambulance, or a funeral director's vehicle. */
+export type Driven = Pick<Ambulance, "x" | "y" | "route" | "routeVersion">;
+
+/** Plans a drive to `to` over drivable tiles; false if there's no way. */
+export function planRoute(state: SimState, a: Driven, to: Point): boolean {
   const grid = state.floors[0]!;
   const tiles = findPath(grid, Math.round(a.x), Math.round(a.y), to.x, to.y, {
     vehicle: drivable(state),
@@ -287,7 +291,8 @@ function planRoute(state: SimState, a: Ambulance, to: Point): boolean {
   return true;
 }
 
-function drive(a: Ambulance): void {
+/** Drives one tick's distance along the route. */
+export function drive(a: Driven): void {
   let budget = AMBULANCE_SPEED;
   while (budget > 1e-6 && a.route.length > 0) {
     const dx = a.route[0]! - a.x;

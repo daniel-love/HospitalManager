@@ -62,6 +62,7 @@ const DEATH_JOBS = new Set<Job["kind"]>([
   "last_offices",
   "to_mortuary",
   "me_review",
+  "release_body",
   "debrief",
 ]);
 

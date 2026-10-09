@@ -145,6 +145,7 @@ const patientSchema = z.object({
     "deceased",
     "to_mortuary",
     "in_mortuary",
+    "with_funeral_director",
     "leaving",
   ]),
   step: int.min(0),
@@ -247,6 +248,7 @@ const jobSchema = z.object({
     "last_offices",
     "to_mortuary",
     "me_review",
+    "release_body",
     "debrief",
   ]),
   roles: z.array(z.enum(staffRoleIds)).min(1),
@@ -279,6 +281,26 @@ const ambulanceSchema = z.object({
   from: z.union([z.literal(0), z.literal(1)]),
   patientId: nullableInt,
   handedOver: nullableInt,
+  leaveAt: nullableInt,
+});
+
+const collectionSchema = z.object({
+  id: int.positive(),
+  patientId: int.positive(),
+  phase: z.enum(["arriving", "to_mortuary", "releasing", "to_vehicle", "loading", "leaving"]),
+  vehicle: z
+    .object({
+      x: num,
+      y: num,
+      prevX: num,
+      prevY: num,
+      route: z.array(int),
+      routeVersion: int.min(0),
+      from: z.union([z.literal(0), z.literal(1)]),
+      stop: pointSchema,
+    })
+    .nullable(),
+  crew: z.object(agentFields),
   leaveAt: nullableInt,
 });
 
@@ -348,6 +370,8 @@ const saveSchema = z.object({
     nextJobId: int.positive(),
     ambulances: z.array(ambulanceSchema),
     nextAmbulanceId: int.positive(),
+    collections: z.array(collectionSchema),
+    nextCollectionId: int.positive(),
     reserved: z.record(z.string(), int.positive()),
     dirt: z.record(z.string(), int.min(0)),
     wardSpecialties: z.record(z.string().regex(/^\d+:\d+$/), z.enum(specialtyIds)),
@@ -413,6 +437,8 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       nextJobId: state.nextJobId,
       ambulances: Object.values(state.ambulances),
       nextAmbulanceId: state.nextAmbulanceId,
+      collections: Object.values(state.collections),
+      nextCollectionId: state.nextCollectionId,
       reserved: state.reserved,
       dirt: state.dirt,
       wardSpecialties: state.wardSpecialties,
@@ -469,6 +495,8 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     nextJobId: s.nextJobId,
     ambulances: byId(s.ambulances, "ambulance"),
     nextAmbulanceId: s.nextAmbulanceId,
+    collections: byId(s.collections, "collection"),
+    nextCollectionId: s.nextCollectionId,
     reserved: { ...s.reserved },
     dirt: Object.fromEntries(Object.entries(s.dirt).map(([k, v]) => [Number(k), v])),
     wardSpecialties: { ...s.wardSpecialties },
