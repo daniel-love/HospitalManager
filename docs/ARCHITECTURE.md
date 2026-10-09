@@ -156,7 +156,7 @@ A condition's pathway is an array of steps. For each step the pathways system:
 - One grid per floor. Each floor has a `width × height` array of tiles stored as **typed arrays** (struct-of-arrays) for memory and speed: `floorType: Uint8Array`, `wall: Uint8Array`, `door: Uint8Array`, `zone: Uint8Array`, `roomId: Uint16Array`, `objectId: Int32Array` (floor items and doors) and `mountId: Int32Array` (wall/ceiling fixtures, which share tiles with floor items).
 - Multi-tile objects store their anchor plus footprint, and every covered tile references the object.
 - **Land:** a `land: Uint8Array` per tile. As built (M3.5): 0 = the hospital's own land, 1 = council land (the public road and pavements from `world/site.ts`), which build commands refuse, except an access road across the pavement (a dropped kerb). **Parcels (M7)** extend the same array with parcel codes, plus a parcel table `{ id, price, owned, conditions }`; build commands are rejected on unowned tiles, and buying a parcel is a command.
-- **Patient volume** (the realism slider) is a single multiplier in the sim settings, applied in `arrivals.ts`, so balance data stays at real-world rates.
+- **Demand:** `settings.catchment` (population) times per-person rates in `data/patients.ts`, times the `patientVolume` multiplier, times the share of conditions the hospital can treat (`treatableShare` in `arrivals.ts`, weighted by each condition's arrival channel), so balance data stays at real-world rates.
 
 ### 5.2 Rooms
 
@@ -168,7 +168,7 @@ The player paints zones (a room type per tile, `FloorGrid.zone`). After every bu
 
 - **A\*** on the 8-connected grid with costs: door (slower), grass (double: walked at half speed, so people keep to paths), lift (queue), crowding (soft cost).
 - **Multi-floor:** a small graph of portals (stairs/lifts). Find a portal route first, then A* per floor.
-- **Movement modes:** walking, wheelchair, bed/trolley. Bed mode requires double doors, 2-wide corridors and lifts (no stairs). As built (M3): `findPath(…, bed = true)` only steps on tiles that are part of a clear 2×2 square and aren't single doors; admissions check reachability against bed-passable regions labelled once per layout. Vehicle mode (M3.5): `findPath(…, vehicle)` only uses tiles marked drivable by `world/vehicles.ts` (tarmac and Ambulance Bays, in a clear 3×3 square), and charges extra for driving against the traffic on the public road, so vehicles keep left.
+- **Movement modes:** walking, wheelchair, bed/trolley. Bed mode requires double doors, 2-wide corridors and lifts (no stairs). As built (M3): `findPath(…, bed = true)` only steps on tiles that are part of a clear 2×2 square and aren't single doors; admissions check reachability against bed-passable regions labelled once per layout. Patient mode: patients on foot keep to public routes (`world/access.ts`): they cross a room that isn't a `publicRoute` (corridor, waiting area, A&E reception) only if it's where they start or end, and never use such a room's door straight outside. Vehicle mode (M3.5): `findPath(…, vehicle)` only uses tiles marked drivable by `world/vehicles.ts` (tarmac and Ambulance Bays, in a clear 3×3 square), and charges extra for driving against the traffic on the public road, so vehicles keep left.
 - **Caching:** cache paths keyed by `(from-region, to-room, mode)` and invalidate per chunk on edit. If profiling demands it, move to a **Web Worker** or add flow fields for common destinations (e.g. the A&E entrance).
 
 ### 5.4 Line of sight & coverage

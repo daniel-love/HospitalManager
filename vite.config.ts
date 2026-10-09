@@ -19,5 +19,8 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     environment: "node",
+    // Multi-day headless simulations take a second or two each, and longer
+    // when every test file runs in parallel.
+    testTimeout: 20_000,
   },
 });

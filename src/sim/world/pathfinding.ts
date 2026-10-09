@@ -17,6 +17,7 @@
  * number so they never need clearing.
  */
 import { doorByCode } from "@data/catalogue";
+import { OPEN, PRIVATE } from "./access";
 import { FloorType, tileIndex, type FloorGrid } from "./grid";
 
 /** Extra cost of stepping onto a door tile (opening it, waiting for others). */
@@ -97,6 +98,25 @@ function getBuffers(size: number): Buffers {
   return buffers;
 }
 
+export interface RouteOptions {
+  /**
+   * A bed (see isBedPassable); the goal itself need only be walkable, as
+   * it's the last step beside the destination bed.
+   */
+  bed?: boolean;
+  /**
+   * A vehicle instead, over the tiles marked 1 (see world/vehicles.ts); the
+   * goal must be among them. Driving against the flow of traffic on the
+   * public road costs extra, so vehicles keep left.
+   */
+  vehicle?: { tiles: Uint8Array; lane: Int8Array };
+  /**
+   * A patient on foot (see world/access.ts): PRIVATE tiles only in the room
+   * they start or end in, and never a BACK_DOOR.
+   */
+  patient?: Uint8Array;
+}
+
 const DIRS = [
   [1, 0],
   [-1, 0],
@@ -112,11 +132,6 @@ const DIRS = [
  * Shortest route from (sx, sy) to (gx, gy) as tile indices, excluding the
  * start and including the goal. The start tile may be unwalkable (someone
  * getting up off a couch); the goal must be walkable. Null if unreachable.
- * `bed`: route for a bed (see isBedPassable); the goal itself need only be
- * walkable, as it's the last step beside the destination bed.
- * `vehicle`: route for a vehicle instead, over the tiles marked 1 (see
- * world/vehicles.ts); the goal must be among them. Driving against the
- * flow of traffic on the public road costs extra, so vehicles keep left.
  */
 export function findPath(
   grid: FloorGrid,
@@ -124,9 +139,9 @@ export function findPath(
   sy: number,
   gx: number,
   gy: number,
-  bed = false,
-  vehicle?: { tiles: Uint8Array; lane: Int8Array },
+  opts: RouteOptions = {},
 ): number[] | null {
+  const { bed = false, vehicle, patient } = opts;
   const drivable = vehicle?.tiles;
   const { width, height } = grid;
   const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < width && y < height;
@@ -134,7 +149,17 @@ export function findPath(
   const start = tileIndex(grid, sx, sy);
   const goal = tileIndex(grid, gx, gy);
   if (start === goal) return [];
-  const open = drivable ? (i: number) => drivable[i] === 1 : (i: number) => isWalkable(grid, i);
+  // Rooms a patient may cross although they aren't public routes.
+  const ownRooms = patient ? [grid.roomId[start]!, grid.roomId[goal]!].filter((r) => r !== 0) : [];
+  const allowed = (i: number) => {
+    const a = patient![i]!;
+    return a === OPEN || (a === PRIVATE && ownRooms.includes(grid.roomId[i]!));
+  };
+  const open = drivable
+    ? (i: number) => drivable[i] === 1
+    : patient
+      ? (i: number) => isWalkable(grid, i) && allowed(i)
+      : (i: number) => isWalkable(grid, i);
   if (!open(goal)) return null;
 
   const b = getBuffers(width * height);

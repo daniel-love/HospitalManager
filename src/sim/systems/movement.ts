@@ -8,6 +8,7 @@ import { PATIENT_SPEED, STAFF_SPEED } from "@data/patients";
 import type { AgentBase, Point } from "../agents";
 import type { SimState } from "../state";
 import { FloorType, tileIndex } from "../world/grid";
+import { patientAccess } from "../world/access";
 import { findPath } from "../world/pathfinding";
 
 /** Ticks to wait before retrying a route that couldn't be found. */
@@ -75,7 +76,12 @@ function plan(
   const grid = state.floors[0]!;
   const sx = Math.round(agent.x);
   const sy = Math.round(agent.y);
-  const tiles = findPath(grid, sx, sy, approach.x, approach.y, bed);
+  // Patients on foot keep to public routes; staff, and beds, go anywhere.
+  const onFoot = !bed && !("role" in agent);
+  const tiles = findPath(grid, sx, sy, approach.x, approach.y, {
+    bed,
+    ...(onFoot ? { patient: patientAccess(state) } : {}),
+  });
   if (!tiles) {
     dest.blocked = state.tick;
     agent.path = [];

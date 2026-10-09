@@ -8,7 +8,7 @@
  * same seat or couch. They refer to object ids, which (unlike room ids)
  * survive rebuilding.
  */
-import { equipmentById } from "@data/catalogue";
+import { equipmentById, equipmentNamesFor, roomById } from "@data/catalogue";
 import { TOILET_USES_BEFORE_CLEAN } from "@data/patients";
 import type { Point } from "./agents";
 import type { PlacedObject, SimState } from "./state";
@@ -44,6 +44,36 @@ export function inValidRoom(state: SimState, objectId: number, roomType?: string
 }
 
 /** Objects of these equipment ids in valid rooms of a type, in id order. */
+/** Whether some valid room of this type has all these capabilities. */
+export function hasRoomWith(
+  state: SimState,
+  roomType: string,
+  capabilities: readonly string[],
+): boolean {
+  return state.rooms.some(
+    (r) =>
+      r.valid && r.typeId === roomType && capabilities.every((c) => r.capabilities.includes(c)),
+  );
+}
+
+/**
+ * Why no room can take a step, for messages: "No working Majors Bay", or,
+ * when the rooms exist but lack equipment, "No Majors Bay with an ECG
+ * (12-lead)". Null if a room can.
+ */
+export function missingRoom(
+  state: SimState,
+  roomType: string,
+  capabilities: readonly string[],
+): string | null {
+  if (hasRoomWith(state, roomType, capabilities)) return null;
+  const name = roomById.get(roomType)?.name ?? roomType;
+  if (!hasRoomWith(state, roomType, [])) return `No working ${name}`;
+  const missing = capabilities.filter((c) => !hasRoomWith(state, roomType, [c]));
+  const items = (missing.length > 0 ? missing : capabilities).flatMap(equipmentNamesFor);
+  return `No ${name} with ${items.join(" and ")}`;
+}
+
 function objectsIn(state: SimState, roomType: string, test: (defId: string) => boolean) {
   const out: PlacedObject[] = [];
   for (const room of state.rooms) {

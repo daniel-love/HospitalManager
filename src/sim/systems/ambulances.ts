@@ -276,15 +276,9 @@ function driveAll(state: SimState, site: Site): void {
 
 function planRoute(state: SimState, a: Ambulance, to: Point): boolean {
   const grid = state.floors[0]!;
-  const tiles = findPath(
-    grid,
-    Math.round(a.x),
-    Math.round(a.y),
-    to.x,
-    to.y,
-    false,
-    drivable(state),
-  );
+  const tiles = findPath(grid, Math.round(a.x), Math.round(a.y), to.x, to.y, {
+    vehicle: drivable(state),
+  });
   a.routeVersion = state.layoutVersion;
   if (!tiles) return false;
   a.route = [];

@@ -5,6 +5,7 @@
  * after loading.
  */
 import { STARTING_CASH } from "@data/economy";
+import { DEFAULT_CATCHMENT } from "@data/patients";
 import {
   type Ambulance,
   emptyLedger,
@@ -24,7 +25,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 11;
+export const SIM_STATE_VERSION = 12;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -120,7 +121,9 @@ export interface SimState {
 
 /** Sandbox difficulty knobs (GAME_DESIGN §2.4). */
 export interface SimSettings {
-  /** Multiplies arrival rates: 1 = the default third of real-world volumes. */
+  /** People the hospital serves (see data/patients.ts CATCHMENTS): sets demand. */
+  catchment: number;
+  /** Multiplies arrival rates on top of the catchment's: 1 = real-world per-person rates. */
   patientVolume: number;
 }
 
@@ -162,7 +165,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     dirt: {},
     today: { ledger: emptyLedger(), stats: emptyStats() },
     history: [],
-    settings: { patientVolume: 1 },
+    settings: { catchment: DEFAULT_CATCHMENT, patientVolume: 1 },
     alerts: {},
     incidents: [],
     nextIncidentId: 1,

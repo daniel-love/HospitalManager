@@ -134,6 +134,12 @@ export const roomDefSchema = z.object({
   minSize: z.tuple([z.number().int().min(1), z.number().int().min(1)]),
   /** Must be fully bounded by walls and doors, with at least one door. */
   enclosed: z.boolean(),
+  /**
+   * Patients may walk through it on the way somewhere else (corridors,
+   * waiting areas). Other rooms they only enter as their destination or
+   * leave as their starting point, and never by a door straight outside.
+   */
+  publicRoute: z.boolean().default(false),
   /** Can be zoned on the player's access road as well as on foundations (outdoor hardstanding). */
   onRoad: z.boolean().default(false),
   required: z.array(roomRequirementSchema),

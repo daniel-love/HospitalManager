@@ -241,6 +241,14 @@ function FlowTable({ stats: s }: { stats: FlowStats }) {
           <td>Ambulance arrivals</td>
           <td class="num">{s.ambulances}</td>
         </tr>
+        {s.deflected > 0 && (
+          <tr>
+            <td title="Ambulance control took them to another hospital because crews were already queueing outside">
+              Sent elsewhere by ambulance control
+            </td>
+            <td class="num bad">{s.deflected}</td>
+          </tr>
+        )}
         <tr>
           <td title="Ambulance arrival to handover to A&E staff (target 15 min)">
             Average ambulance handover

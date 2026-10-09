@@ -17,6 +17,7 @@ export const rooms: RoomInput[] = [
     colour: 0x9aa3ad,
     minSize: [1, 1],
     enclosed: false,
+    publicRoute: true,
     required: [],
     description: "Circulation space. 2+ tiles wide is needed for beds and trolleys.",
   },
@@ -28,6 +29,7 @@ export const rooms: RoomInput[] = [
     colour: 0x4f9de0,
     minSize: [3, 3],
     enclosed: false,
+    publicRoute: true,
     required: [{ label: "Reception desk", anyOf: ["reception_desk"] }],
     connectedTo: [{ roomType: "waiting_area", label: "Opens onto a Waiting Area" }],
     // No seating: patients queue at the desk (its front must stay clear), then
@@ -44,6 +46,7 @@ export const rooms: RoomInput[] = [
     colour: 0x6cc0b0,
     minSize: [3, 3],
     enclosed: false,
+    publicRoute: true,
     required: [],
     minSeats: 6,
     description: "Patients and companions wait here. Toilets nearby are recommended.",

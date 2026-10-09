@@ -59,7 +59,7 @@ So there are three modes at game start: **NHS Trust**, **Private Hospital** and 
 
 ### 2.4 Difficulty knobs
 
-**Realism (patient volume)** slider: the default is about 1/3 of real-world volumes (a typical district general hospital sees 200+ A&E attendances a day, so the default is around 70), which keeps the screen readable. The slider goes up to full realism. Other knobs: arrival rate multiplier, budget, staff availability (recruitment pool), event frequency, deterioration speed and target strictness.
+**Catchment** (Settings, saved with the game): the population the hospital serves, at real UK rates per person (about 60 type 1 walk-ins and 22 ambulance conveyances a day per 100,000 people). Presets: rural 40k, small town 80k (the default, around 48 walk-ins and 18 ambulances a day), town 150k and city 300k; a typical district general hospital serves 250k+. Patients with a condition the hospital can't treat (no working room, or the room lacks the equipment the first step needs) go to a neighbouring hospital instead, so a small department gets a share of the demand, and the Settings dialog shows how many come. Ambulance control sends new ambulances elsewhere once 3 crews are queueing outside with nowhere to park (counted in Reports). A **patient volume** multiplier sits on top for difficulty. Other knobs: arrival rate multiplier, budget, staff availability (recruitment pool), event frequency, deterioration speed and target strictness.
 
 ---
 

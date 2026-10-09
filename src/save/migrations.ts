@@ -239,6 +239,26 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v12: demand comes from the catchment population. Older games ran at
+  // about a small town's rates; ambulances deflected elsewhere are counted.
+  11: (save) => {
+    type Stats = Record<string, unknown>;
+    const state = save.state as {
+      settings: Record<string, unknown>;
+      today: { ledger: object; stats: Stats };
+      history: { stats: Stats }[];
+    };
+    const stats = (s: Stats) => ({ ...s, deflected: 0 });
+    return {
+      ...save,
+      state: {
+        ...state,
+        settings: { ...state.settings, catchment: 80_000 },
+        today: { ...state.today, stats: stats(state.today.stats) },
+        history: state.history.map((d) => ({ ...d, stats: stats(d.stats) })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

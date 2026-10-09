@@ -401,6 +401,23 @@ describe("old saves get the road", () => {
   });
 });
 
+describe("catchment in saves", () => {
+  it("upgrades a version-11 save to a small town's catchment, with no deflections", () => {
+    const state = staffedSmallAE(9);
+    for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v11")));
+    save.version = 11;
+    delete save.state.settings.catchment;
+    delete save.state.today.stats.deflected;
+    for (const d of save.state.history) delete d.stats.deflected;
+    const loaded = decodeSave(save).state;
+    expect(loaded.settings.catchment).toBe(80_000);
+    expect(loaded.history[0]!.stats.deflected).toBe(0);
+    // Pending notifications aren't saved.
+    expect(snapshot(loaded)).toEqual(snapshot({ ...state, events: [] }));
+  });
+});
+
 describe("fixtures in saves", () => {
   it("restores a fixture over a bed into the right layers", async () => {
     const { applyAll } = await import("../fixtures/smallAE");

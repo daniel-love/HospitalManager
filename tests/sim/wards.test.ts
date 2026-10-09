@@ -66,11 +66,11 @@ describe("bed movement", () => {
   }
 
   it("fits through a double door", () => {
-    expect(findPath(grid(2), 1, 2, 7, 2, true)).not.toBeNull();
+    expect(findPath(grid(2), 1, 2, 7, 2, { bed: true })).not.toBeNull();
   });
 
   it("can't fit through single doors, though people on foot can", () => {
-    expect(findPath(grid(1), 1, 2, 7, 2, true)).toBeNull();
+    expect(findPath(grid(1), 1, 2, 7, 2, { bed: true })).toBeNull();
     expect(findPath(grid(1), 1, 2, 7, 2)).not.toBeNull();
   });
 
@@ -82,7 +82,7 @@ describe("bed movement", () => {
       g.wall[tileIndex(g, x, 2)] = WallType.Standard;
     }
     expect(findPath(g, 0, 1, 8, 1)).not.toBeNull();
-    expect(findPath(g, 0, 1, 8, 1, true)).toBeNull();
+    expect(findPath(g, 0, 1, 8, 1, { bed: true })).toBeNull();
   });
 });
 

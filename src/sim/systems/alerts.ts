@@ -13,7 +13,7 @@ import {
 import { conditionById, roleNames } from "@data/catalogue";
 import type { StaffRoleId } from "@data/schema";
 import { warn } from "../events";
-import { freeToilet, isCouch, receptionDesks, seatCount } from "../places";
+import { freeToilet, isCouch, missingRoom, receptionDesks, seatCount } from "../places";
 import type { SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
 import { roomOfObject } from "../world/rooms";
@@ -126,13 +126,22 @@ export function updateAlerts(state: SimState): void {
       state.tick - p.times.arrived > HANDOVER_BREACH_MINS * TICKS_PER_MINUTE,
   );
   if (slow.length > 0) {
-    const trolleyWait = slow.filter(needsTrolley).length;
+    // Why: a room missing the right equipment, or simply no free trolley.
+    const why = new Set<string>();
+    for (const p of slow.filter(needsTrolley)) {
+      const first = conditionById.get(p.conditionId)!.pathway[0]!;
+      why.add(
+        missingRoom(state, first.room, first.capabilities) ??
+          "Majors and Resus have no free trolley",
+      );
+    }
+    const reasons = [...why].map((r) => r.charAt(0).toLowerCase() + r.slice(1));
     warn(
       state,
       "handover_delay",
       COOLDOWN / 3,
       `${plural(slow.length, "ambulance crew has", "ambulance crews have")} waited over ${HANDOVER_BREACH_MINS} minutes to hand over${
-        trolleyWait > 0 ? ": Majors and Resus have no free trolley" : ""
+        reasons.length > 0 ? `: ${reasons.join("; ")}` : ""
       }.`,
     );
   }

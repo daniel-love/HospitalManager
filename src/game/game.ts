@@ -334,6 +334,11 @@ export class Game {
     rememberLastSave(null);
   }
 
+  /** Sets the population the hospital serves (a sandbox setting saved with the game). */
+  setCatchment(population: number): void {
+    this.state.settings.catchment = population;
+  }
+
   setSpeed(speed: Speed): void {
     if (speed !== 0) this.resumeSpeed = speed;
     this.loop.setSpeed(speed);

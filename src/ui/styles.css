@@ -364,9 +364,24 @@ button {
 /* ---------- Floating bits ---------- */
 
 #ui > .cursor-info,
-#ui > .paused-hint,
+#ui > .under-topbar,
 #ui > .toasts {
   pointer-events: none;
+}
+
+/* The plan bar and paused hint, stacked in a column under the top bar. */
+.under-topbar {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.under-topbar > .planbar {
+  pointer-events: auto;
 }
 .cursor-info {
   position: fixed;
@@ -383,10 +398,6 @@ button {
 }
 
 .paused-hint {
-  position: absolute;
-  top: 54px;
-  left: 50%;
-  transform: translateX(-50%);
   padding: 3px 10px;
   font-size: 12px;
   white-space: nowrap;
@@ -607,10 +618,6 @@ body.planning #game::after {
 }
 
 .planbar {
-  position: absolute;
-  top: 56px;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 8px;

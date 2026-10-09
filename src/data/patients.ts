@@ -4,22 +4,34 @@
  */
 
 /**
- * Walk-in A&E attendances per day at the default "realism" setting: about a
- * third of a typical district general hospital's 200+ attendances, of which
- * roughly 70% walk in (GAME_DESIGN §2.4).
+ * Walk-in attendances at a major (type 1) A&E per 100,000 people in the
+ * catchment, per day. England sees about 0.3 type 1 attendances a person a
+ * year, roughly three-quarters of them walking in (GAME_DESIGN §2.4).
  */
-export const WALK_INS_PER_DAY = 50;
+export const WALK_INS_PER_100K = 60;
+
+/** Ambulance conveyances to A&E per 100,000 people per day (England: about 0.08 a person a year). */
+export const AMBULANCES_PER_100K = 22;
+
+/** The population the hospital serves (sandbox setting): sets walk-in and ambulance demand. */
+export const CATCHMENTS = [
+  { id: "rural", name: "Rural", population: 40_000 },
+  { id: "small_town", name: "Small town", population: 80_000 },
+  { id: "town", name: "Town", population: 150_000 },
+  { id: "city", name: "City", population: 300_000 },
+] as const;
+export const DEFAULT_CATCHMENT = 80_000;
+
+/**
+ * Ambulance control sends new conveyances to a neighbouring hospital once
+ * this many crews are queueing outside with nowhere to park.
+ */
+export const DEFLECT_AT_QUEUE = 3;
 /**
  * Share of walk-ins who come by bus; the rest walk, are dropped off or park,
  * and arrive along the pavement. Most UK A&E walk-ins come by car.
  */
 export const WALK_IN_BY_BUS = 0.2;
-
-/**
- * Ambulance arrivals per day at the default "realism" setting: about a third
- * of a typical district general hospital's ~65 conveyances a day.
- */
-export const AMBULANCES_PER_DAY = 22;
 
 /**
  * Relative ambulance arrivals per hour, midnight first: flatter than walk-ins,

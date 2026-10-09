@@ -257,6 +257,7 @@ const statsSchema = z.object({
   transferred: int.min(0),
   incidents: int.min(0),
   ambulances: int.min(0),
+  deflected: int.min(0),
   handovers: int.min(0),
   handoverMins: num,
   handoversOver30: int.min(0),
@@ -308,7 +309,10 @@ const saveSchema = z.object({
     dirt: z.record(z.string(), int.min(0)),
     today: z.object({ ledger: ledgerSchema, stats: statsSchema }),
     history: z.array(z.object({ day: int.positive(), ledger: ledgerSchema, stats: statsSchema })),
-    settings: z.object({ patientVolume: num.min(0).max(10) }),
+    settings: z.object({
+      catchment: int.min(1_000).max(10_000_000),
+      patientVolume: num.min(0).max(10),
+    }),
     alerts: z.record(z.string(), int),
     incidents: z.array(
       z.object({

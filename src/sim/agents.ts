@@ -294,6 +294,8 @@ export interface FlowStats {
   /** Patient safety incidents raised. */
   incidents: number;
   ambulances: number;
+  /** Ambulances that ambulance control sent elsewhere because crews were queueing here. */
+  deflected: number;
   handovers: number;
   /** Sum of arrival-to-handover times, for an average. */
   handoverMins: number;
@@ -344,6 +346,7 @@ export function emptyStats(): FlowStats {
     transferred: 0,
     incidents: 0,
     ambulances: 0,
+    deflected: 0,
     handovers: 0,
     handoverMins: 0,
     handoversOver30: 0,

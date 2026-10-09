@@ -22,7 +22,11 @@ export function App({ game }: { game: Game }) {
       <StaffPanel game={game} />
       <ReportsPanel onShow={(at) => game.focus(at)} />
       <Inspector onClose={() => game.select(null)} onMove={(id) => game.startMove(id)} />
-      <PlanBar game={game} />
+      {/* Strips under the top bar stack rather than overlap. */}
+      <div class="under-topbar">
+        <PlanBar game={game} />
+        <PausedHint />
+      </div>
       <BuildBar
         onTogglePlan={() => game.setPlanning(!planning.value)}
         onToggleCoverage={() => game.toggleCoverage()}
@@ -31,14 +35,13 @@ export function App({ game }: { game: Game }) {
       <Notifications game={game} />
       <PeopleDialog game={game} />
       <CoverageLegend />
-      <PausedHint />
       <Toasts />
       <DebugOverlay />
       <CursorInfo />
       <MapHelp />
       <PaletteHelp />
       <SaveDialog game={game} />
-      <SettingsDialog />
+      <SettingsDialog game={game} />
     </>
   );
 }

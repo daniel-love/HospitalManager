@@ -41,6 +41,17 @@ export const staffRoleById = new Map<StaffRoleId, StaffRoleDef>(
   content.staffRoles.map((r) => [r.id, r]),
 );
 
+/**
+ * What to put in a room to give it a capability, for messages: one item per
+ * part of a combination, e.g. ["Defibrillator", "Resus trolley"].
+ */
+export function equipmentNamesFor(capability: string): string[] {
+  const combo = content.capabilityCombos.find((c) => c.capability === capability);
+  if (combo) return combo.requires.flatMap(equipmentNamesFor);
+  const item = content.equipment.find((e) => e.capabilities.includes(capability));
+  return [item?.name ?? capability];
+}
+
 /** "Junior Doctor or Emergency Nurse Practitioner"; plural: "Junior Doctors or …". */
 export function roleNames(roles: readonly StaffRoleId[], plural = false): string {
   const names = roles.map((r) => (staffRoleById.get(r)?.name ?? r) + (plural ? "s" : ""));

@@ -12,7 +12,14 @@ import {
 } from "@data/catalogue";
 import { FOUR_HOUR_MINS, TRIAGE_CATEGORIES, TRIAGE_TARGET_MINS } from "@data/patients";
 import type { Job, Patient, PatientStage, Point, Staff } from "@sim/agents";
-import { couchStatus, freeCouches, receptionDesks, seatCount, staffedDesks } from "@sim/places";
+import {
+  couchStatus,
+  freeCouches,
+  missingRoom,
+  receptionDesks,
+  seatCount,
+  staffedDesks,
+} from "@sim/places";
 import type { SimState } from "@sim/state";
 import { onTrolley, trolleyStop } from "@sim/systems/admissions";
 import { ambulancesWaiting, parkingSpaces } from "@sim/systems/ambulances";
@@ -114,8 +121,9 @@ export function waitReason(state: SimState, p: Patient): string | null {
     const room = roomById.get(job.roomType)?.name ?? job.roomType;
     const c = couchStatus(state, job.roomType, job.capabilities);
     const what = job.kind === "transfer" ? "ward bed" : room;
-    if (c.total === 0) reasons.push(`No working ${room}`);
-    else if (c.free === 0) {
+    if (c.total === 0) {
+      reasons.push(missingRoom(state, job.roomType, job.capabilities) ?? `No working ${room}`);
+    } else if (c.free === 0) {
       const dirty = c.dirty > 0 ? `, ${c.dirty} waiting to be cleaned` : "";
       reasons.push(`No free ${what} (${c.inUse} of ${c.total} in use${dirty})`);
     } else if (job.kind === "transfer" && !hasBedRoute(state, p, job)) {

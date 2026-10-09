@@ -16,6 +16,7 @@ import {
 import { updateArrivals } from "@sim/systems/arrivals";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { drivable, entryPoint } from "@sim/world/vehicles";
+import { MAJORS_TEAM, staffedMajorsAE } from "../fixtures/majorsAE";
 
 const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
 const road = (r: ReturnType<typeof rect>): Command => ({
@@ -82,8 +83,13 @@ describe("getting to the Ambulance Bay", () => {
   });
 
   it("doesn't count a bay reached only by a narrower road, and says why", () => {
-    const state = site(2);
-    expect(baySpaces(state)).toHaveLength(1);
+    expect(baySpaces(site(2))).toHaveLength(1);
+    expect(parkingSpaces(site(2))).toEqual([]);
+    // A working A&E (so ambulances are called) whose access road is narrowed to 2 tiles.
+    const state = staffedMajorsAE(1, MAJORS_TEAM, { ambulance: true, site: true });
+    expect(
+      applyCommand(state, { type: "remove_floor", floor: 0, rect: rect(17, 35, 1, 2) }).ok,
+    ).toBe(true);
     expect(parkingSpaces(state)).toEqual([]);
     state.settings.patientVolume = 1e6; // An ambulance (and a walk-in) every tick.
     updateArrivals(state);
