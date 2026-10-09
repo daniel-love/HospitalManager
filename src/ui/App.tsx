@@ -2,6 +2,7 @@ import type { Game } from "@game/game";
 import { BuildBar, Palette } from "./BuildMenu";
 import { DebugOverlay } from "./DebugOverlay";
 import { MapHelp, PaletteHelp } from "./HelpCard";
+import { HelpPanel } from "./HelpPanel";
 import { Inspector } from "./Inspector";
 import { Notifications } from "./Notifications";
 import { PeopleDialog } from "./PeopleDialog";
@@ -21,6 +22,7 @@ export function App({ game }: { game: Game }) {
       <Palette />
       <StaffPanel game={game} />
       <ReportsPanel onShow={(at) => game.focus(at)} />
+      <HelpPanel />
       <Inspector
         onClose={() => game.select(null)}
         onMove={(id) => game.startMove(id)}

@@ -38,6 +38,7 @@ import { TILE_SIZE } from "@render/constants";
 import { tagSpot } from "@render/deathMarks";
 import type { Renderer } from "@render/renderer";
 import {
+  advice,
   buildTab,
   coverageOverlay,
   debugStats,
@@ -56,10 +57,12 @@ import {
   showToast,
   sidePanel,
   staffTable,
+  tool,
   type InspectorData,
 } from "@ui/store";
 import { tileHelp } from "@ui/help";
 import { autosaveOption, settings, settingsOpen } from "@ui/settings";
+import { describeAdvice } from "./advice";
 import { BuildController } from "./buildController";
 import {
   describePatient,
@@ -539,11 +542,20 @@ export class Game {
     notifications.value = [...added.reverse(), ...notifications.value].slice(0, MAX_NOTIFICATIONS);
   }
 
+  /** Opens or closes the Help panel, in place of the build palette or another panel. */
+  toggleHelp(): void {
+    sidePanel.value = sidePanel.value === "help" ? null : "help";
+    buildTab.value = null;
+    tool.value = null;
+    this.refreshPanels();
+  }
+
   /** Refreshes whichever management panel is open. */
   refreshPanels(): void {
     const panel = sidePanel.value;
     roster.value = panel === "staff" ? describeRoster(this.state) : null;
     report.value = panel === "reports" ? describeReport(this.state) : null;
+    advice.value = panel === "help" ? describeAdvice(this.state) : null;
     const people = peopleDialog.value;
     patientTable.value = people === "patients" ? describePatientTable(this.state) : null;
     staffTable.value = people === "staff" ? describeStaffTable(this.state) : null;
@@ -742,6 +754,8 @@ export class Game {
       this.setPlanning(!planning.value);
     } else if (e.code === "KeyO") {
       this.toggleCoverage();
+    } else if (e.code === "KeyH") {
+      this.toggleHelp();
     } else if (speed !== undefined) {
       this.setSpeed(speed);
     } else if (e.code === "Space") {

@@ -1613,3 +1613,152 @@ body.planning #game::after {
 .chart .hit:hover {
   fill: rgba(255, 255, 255, 0.04);
 }
+
+/* ---------- Help panel ---------- */
+.help-panel {
+  width: min(560px, calc(100vw - 332px));
+  min-width: min(360px, calc(100vw - 16px));
+  background: rgba(18, 24, 32, 0.96);
+}
+.help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 8px 12px;
+  border-bottom: 1px solid var(--panel-border);
+}
+.help-header .tabs {
+  flex-wrap: wrap;
+}
+.help-header .tabs button {
+  font-size: 13px;
+  padding: 5px 10px;
+}
+.help-header .close {
+  position: static;
+  flex: none;
+}
+.help-panel h3 {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 22px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--panel-border);
+}
+.help-panel .dim {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.advice-group {
+  margin-top: 22px;
+}
+.advice-next {
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  background: rgba(59, 130, 196, 0.12);
+}
+.advice-next.done {
+  border-color: var(--ok);
+  background: rgba(111, 208, 140, 0.1);
+}
+.advice-next h3 {
+  margin: 0 0 4px;
+  padding: 0;
+  border: none;
+}
+.advice-next-text {
+  font-weight: 600;
+}
+.advice-count {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.advice-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.advice-item {
+  display: flex;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 13px;
+}
+.advice-mark {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  color: var(--text-dim);
+}
+.advice-item.ok .advice-mark {
+  color: var(--ok);
+}
+.advice-item.todo .advice-text {
+  font-weight: 600;
+}
+.advice-item.ok .advice-text {
+  color: var(--text-dim);
+}
+.capacity-table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.capacity-table th,
+.capacity-table td {
+  padding: 5px 4px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--panel-border);
+}
+.capacity-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.capacity-table tbody th {
+  font-weight: 500;
+}
+.capacity-table td {
+  width: 72px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.capacity-table thead th:not(:first-child) {
+  text-align: right;
+}
+.help-filter {
+  width: 100%;
+  margin: 8px 0 2px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+}
+.guide-entry {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.guide-entry summary {
+  padding: 6px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.guide-title {
+  font-weight: 600;
+}
+.guide-entry[open] {
+  padding-bottom: 8px;
+}
+.guide-entry .help-section ul {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.4;
+}

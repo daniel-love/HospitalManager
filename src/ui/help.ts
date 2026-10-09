@@ -52,7 +52,7 @@ function roomsNeeding(equipmentId: string): string[] {
 }
 
 /** What a room type needs to be valid, as checklist lines. */
-function requirementLines(def: RoomDef): HelpItem[] {
+export function requirementLines(def: RoomDef): HelpItem[] {
   const lines: HelpItem[] = [];
   const [w, h] = def.minSize;
   if (w * h > 1) lines.push({ text: `At least ${w}×${h} tiles` });

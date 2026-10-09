@@ -35,13 +35,18 @@ const PANELS: ({ kind: "side"; id: SidePanel } | { kind: "people"; id: PeopleTab
   { kind: "people", id: "staff" },
   { kind: "people", id: "patients" },
   { kind: "side", id: "reports" },
+  { kind: "side", id: "help" },
 ];
 const PANEL_LABELS = {
-  side: { staff: "Hire", reports: "Reports" },
+  side: { staff: "Hire", reports: "Reports", help: "Help" },
   people: { staff: "Staff", patients: "Patients" },
 } as const;
 const PANEL_HINTS = {
-  side: { staff: "Hire new staff", reports: "Today's money and A&E performance" },
+  side: {
+    staff: "Hire new staff",
+    reports: "Today's money and A&E performance",
+    help: "Help (H): what to build and who to hire next, and how everything works",
+  },
   people: { staff: "What every member of staff is doing", patients: "Every patient's status" },
 } as const;
 

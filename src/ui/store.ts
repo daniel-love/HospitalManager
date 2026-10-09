@@ -5,6 +5,7 @@
  * reads them.
  */
 import { signal } from "@preact/signals";
+import type { AdviceData } from "@game/advice";
 import type { Speed } from "@game/loop";
 import type { Tool } from "@game/tools";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
@@ -168,8 +169,10 @@ export const inspector = signal<InspectorData | null>(null);
 export const saveDialogOpen = signal(false);
 
 /** Management panel open on the left (closes the build palette). */
-export type SidePanel = "staff" | "reports";
+export type SidePanel = "staff" | "reports" | "help";
 export const sidePanel = signal<SidePanel | null>(null);
+/** Help panel recommendations, while it's open. */
+export const advice = signal<AdviceData | null>(null);
 
 export interface Notification {
   id: number;
