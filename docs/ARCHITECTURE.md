@@ -241,6 +241,7 @@ Benefits: balancing without code changes, easy to add conditions, and a path to 
 - **Chunked tilemap:** the static map is built as vector geometry per 32×32-tile chunk, rebuilt only when a chunk changes, with off-screen chunks culled. (Baking chunks to render textures was the original plan, but at 32 px/tile a 200×200 map would need ~200 MB of textures and blur when zoomed in. Revisit if profiling shows the geometry is too heavy.)
 - **Agents:** a sprite pool with position interpolation between sim ticks, and culling outside the viewport.
 - **Camera:** pan (WASD, edge, drag), zoom (wheel, clamped), floor switching (PgUp/PgDn).
+- **Drawing on demand:** Pixi's automatic per-frame render is switched off. `Renderer.render()` draws only when something visible has changed (camera, hovered tile, sim tick or interpolation step, who's on the map, or a setter such as the build ghost or an overlay), capped at 60 fps. A paused game left alone draws nothing, which matters on laptops: drawing every display refresh kept the GPU busy for nothing.
 - **Art pipeline:** start with programmer art (coloured rectangles and simple icons). Sprites are loaded via a texture atlas, so art can be swapped later without code changes.
 
 ## 8. Saving & loading

@@ -4,6 +4,11 @@
  *
  * Layer order (bottom to top): tiles (ground, zones, walls, doors) → objects
  * → room labels → agents → overlays (selection, build ghost, hover box).
+ *
+ * Frames are drawn on demand, not every tick of the display: render() only
+ * draws when something visible has changed (the camera, the hovered tile,
+ * the sim moving on, or one of the setters below), so a paused game sitting
+ * still costs next to nothing. Drawing is capped at 60 fps.
  */
 import { Application, Container, Graphics } from "pixi.js";
 import { objectDef } from "@data/catalogue";
@@ -74,6 +79,10 @@ export class Renderer {
   hoveredTile: { x: number; y: number } | null = null;
   /** Mouse position in screen pixels, or null when it's off the canvas. */
   pointerScreen: { x: number; y: number } | null = null;
+  /** Set when something visible changes outside the frame fingerprint (see render()). */
+  private dirty = true;
+  /** Fingerprint of the last frame drawn. */
+  private lastFrame = "";
 
   private constructor(
     readonly app: Application,
@@ -114,6 +123,8 @@ export class Renderer {
     this.syncContent();
 
     app.renderer.on("resize", (w: number, h: number) => this.camera.setViewport(w, h));
+    // Text is drawn once its font has loaded.
+    void document.fonts?.ready.then(() => (this.dirty = true));
   }
 
   static async create(parent: HTMLElement, state: SimState): Promise<Renderer> {
@@ -126,6 +137,9 @@ export class Renderer {
       resolution: window.devicePixelRatio || 1,
     });
     parent.appendChild(app.canvas);
+    // Draw on demand from render() rather than on every tick of the display.
+    app.ticker.remove(app.render, app);
+    app.ticker.maxFPS = 60;
     return new Renderer(app, state);
   }
 
@@ -139,6 +153,7 @@ export class Renderer {
    * the map size changed.
    */
   setState(state: SimState): void {
+    this.dirty = true;
     const old = this.state.floors[0]!;
     this.state = state;
     const grid = state.floors[0]!;
@@ -158,6 +173,7 @@ export class Renderer {
 
   /** Shows which land is the council's (not buildable), e.g. while a build tool is selected. */
   setPublicLand(visible: boolean): void {
+    this.dirty = true;
     this.publicLand.visible = visible;
   }
 
@@ -179,11 +195,13 @@ export class Renderer {
 
   /** Call after a build command changed the layout. */
   layoutChanged(changed: Rect | null): void {
+    this.dirty = true;
     if (changed) this.tilemap.markDirty(changed);
     this.syncContent();
   }
 
   setGhost(ghost: Ghost | null): void {
+    this.dirty = true;
     const g = this.ghost.clear();
     if (!ghost) return;
     const colour = TONES[ghost.tone];
@@ -244,6 +262,7 @@ export class Renderer {
    * something, red where it removes something. Null clears it.
    */
   setPlanOverlay(diff: { added: number[]; removed: number[] } | null): void {
+    this.dirty = true;
     const g = this.planOverlay.clear();
     if (!diff) return;
     const width = this.state.floors[0]!.width;
@@ -266,6 +285,7 @@ export class Renderer {
    * station is empty) or red (out of sight), and stations ringed. Null hides it.
    */
   setCoverage(view: CoverageView | null): void {
+    this.dirty = true;
     const g = this.coverage.clear();
     if (!view) return;
     const width = this.state.floors[0]!.width;
@@ -295,6 +315,7 @@ export class Renderer {
 
   /** Highlights a set of tiles (the selected room), or clears with null. */
   setSelection(tiles: { x: number; y: number }[] | null): void {
+    this.dirty = true;
     const g = this.selection.clear();
     if (!tiles) return;
     for (const t of tiles) {
@@ -320,6 +341,7 @@ export class Renderer {
 
   /** Highlights a patient or member of staff (null for none). */
   setSelectedAgent(id: number | null): void {
+    this.dirty = true;
     this.agents.selectedId = id;
   }
 
@@ -330,6 +352,13 @@ export class Renderer {
    */
   render(alpha: number, live: SimState): void {
     const { camera } = this;
+    const hovered = this.hoveredTile ? `${this.hoveredTile.x},${this.hoveredTile.y}` : "";
+    // Hiring or dismissing while paused changes who's on the map without a tick.
+    const people = `${Object.keys(live.patients).length},${Object.keys(live.staff).length},${Object.keys(live.ambulances).length}`;
+    const frame = `${camera.x},${camera.y},${camera.zoom},${camera.viewportWidth},${camera.viewportHeight}|${hovered}|${live.tick},${alpha}|${people}`;
+    if (!this.dirty && frame === this.lastFrame) return;
+    this.dirty = false;
+    this.lastFrame = frame;
     this.world.scale.set(camera.zoom);
     this.world.position.set(
       camera.viewportWidth / 2 - camera.x * camera.zoom,
@@ -346,6 +375,7 @@ export class Renderer {
     } else {
       this.hoverBox.visible = false;
     }
+    this.app.render();
   }
 
   private syncContent(): void {
