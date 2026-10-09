@@ -33,7 +33,7 @@
 
 ## M4: Outpatients, theatres & specialty gating
 
-**Delivers:** specialties, consultants (resident and on-call with callout delay), outpatient clinics with GP referrals and scheduled appointments, waiting list and RTT, theatres + recovery + elective surgery scheduling and cancellations, imaging (X-ray/CT) and lab. **Specialty gating** of referrals, plus A&E transfer-out when the hospital can't treat.
+**Delivers:** specialties, consultants (resident and on-call with callout delay), outpatient clinics with GP referrals and scheduled appointments, waiting list and RTT, theatres + recovery + elective surgery scheduling and cancellations, imaging (X-ray/CT) and lab. **Specialty gating** of referrals, plus A&E transfer-out when the hospital can't treat. **Medical Examiner as a consultant duty** (GAME_DESIGN §5.6, §6.1): replaces the interim dedicated Medical Examiner role from M3. The player assigns the duty to consultants, who do reviews in set office-hours sessions and clinical work otherwise, and never review a death of a patient they treated.
 **Done when:** adding a cardiology clinic and consultant causes cardiology referrals to start, and removing them stops them.
 
 ## M5: Administration depth

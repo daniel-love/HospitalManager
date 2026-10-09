@@ -49,7 +49,7 @@ export const staffRoles: StaffRoleDef[] = [
     name: "Medical Examiner",
     annualCost: 42_000,
     description:
-      "A senior doctor's part-time duty: independently reviews every death at a desk before the death certificate is issued and the body can be released. Without one, the mortuary fills up.",
+      "A senior doctor dedicated to reviewing deaths, independently of the team that cared for the patient. Reviews every death at a desk before the death certificate is issued and the body can be released, and does no other work. Without one, the mortuary fills up.",
   },
   {
     id: "cleaner",
