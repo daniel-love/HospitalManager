@@ -4,10 +4,10 @@
 import { describe, expect, it } from "vitest";
 import { conditionById } from "@data/catalogue";
 import type { Patient } from "@sim/agents";
-import { reserve, siteEntrance } from "@sim/places";
+import { freeCouches, reserve, restPoint, siteEntrance } from "@sim/places";
 import { tick } from "@sim/sim";
 import { createSimState, type SimState } from "@sim/state";
-import { decideToAdmit } from "@sim/systems/admissions";
+import { decideToAdmit, trolleyStop } from "@sim/systems/admissions";
 import { spawnPatient } from "@sim/systems/arrivals";
 import { removeJob } from "@sim/systems/jobBoard";
 import { bedCover, observedBeds } from "@sim/systems/monitoring";
@@ -17,7 +17,12 @@ import { findPath } from "@sim/world/pathfinding";
 import { roomOfObject } from "@sim/world/rooms";
 import { waitReason } from "@game/describe";
 import { applyAll, type StaffCounts } from "../fixtures/smallAE";
-import { MAJORS_TEAM, staffedMajorsAE, type MajorsOptions } from "../fixtures/majorsAE";
+import {
+  buildMajorsAE,
+  MAJORS_TEAM,
+  staffedMajorsAE,
+  type MajorsOptions,
+} from "../fixtures/majorsAE";
 import { run } from "./simHelpers";
 
 const MIN = TICKS_PER_MINUTE;
@@ -83,6 +88,26 @@ describe("bed movement", () => {
     }
     expect(findPath(g, 0, 1, 8, 1)).not.toBeNull();
     expect(findPath(g, 0, 1, 8, 1, { bed: true })).toBeNull();
+  });
+
+  it("wheels a trolley out of a snug bay it lies across", () => {
+    // Bay 3 cleared, with a trolley across its back wall: only its foot end is clear.
+    const state = buildMajorsAE(1, { ward: "door_double" });
+    applyAll(state, [
+      { type: "remove_objects", floor: 0, rect: { x: 14, y: 25, w: 4, h: 3 } },
+      { type: "place_object", floor: 0, defId: "trolley", x: 16, y: 26, rotation: 1 },
+    ]);
+    const trolley = Object.values(state.objects).find(
+      (o) => o.defId === "trolley" && o.x === 16 && o.y === 26,
+    )!;
+    const rest = restPoint(trolley);
+    const from = { x: Math.round(rest.x), y: Math.round(rest.y) };
+    const wardBed = freeCouches(state, "ward", ["inpatient_bed"], from)[0]!;
+    const stop = trolleyStop(state, from, wardBed);
+    expect(stop).not.toBeNull();
+    expect(
+      findPath(state.floors[0]!, from.x, from.y, stop!.x, stop!.y, { bed: true }),
+    ).not.toBeNull();
   });
 });
 

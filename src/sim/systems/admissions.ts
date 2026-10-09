@@ -123,16 +123,25 @@ function bedRegions(state: SimState): Int32Array {
   return label;
 }
 
-/** Bed regions touching a tile: its own, or (if a bed can't stand on it) its neighbours'. */
+/**
+ * Bed regions touching a tile: its own, or (if a bed can't stand on it) its
+ * neighbours'. On a trolley, the regions it can be wheeled out into: those
+ * beside any of its tiles, since it can leave head or foot first.
+ */
 function regionsAt(state: SimState, t: Point): Set<number> {
   const grid = state.floors[0]!;
   const label = bedRegions(state);
   const out = new Set<number>();
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const x = t.x + dx;
-      const y = t.y + dy;
+  if (t.x < 0 || t.y < 0 || t.x >= grid.width || t.y >= grid.height) return out;
+  const id = grid.objectId[tileIndex(grid, t.x, t.y)]!;
+  const obj = id === -1 ? undefined : state.objects[id];
+  const r = obj ? objectRect(obj) : { x: t.x, y: t.y, w: 1, h: 1 };
+  for (let y = r.y - 1; y <= r.y + r.h; y++) {
+    for (let x = r.x - 1; x <= r.x + r.w; x++) {
       if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) continue;
+      // Off a trolley's corners only diagonally, which a bed can't do.
+      const corner = (x < r.x || x >= r.x + r.w) && (y < r.y || y >= r.y + r.h);
+      if (obj && corner) continue;
       const l = label[tileIndex(grid, x, y)]!;
       if (l !== 0) out.add(l);
     }

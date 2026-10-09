@@ -161,6 +161,9 @@ export function findPath(
       ? (i: number) => isWalkable(grid, i) && allowed(i)
       : (i: number) => isWalkable(grid, i);
   if (!open(goal)) return null;
+  // A bed wheeled off the trolley it starts on rolls along that trolley's tiles first.
+  const own = bed ? grid.objectId[start]! : -1;
+  const ownTile = (i: number) => own !== -1 && grid.objectId[i] === own;
 
   const b = getBuffers(width * height);
   const gen = b.generation;
@@ -221,8 +224,13 @@ export function findPath(
       const ny = cy + dy;
       if (!inside(nx, ny)) continue;
       const n = tileIndex(grid, nx, ny);
-      if (b.closed[n] === gen || !open(n)) continue;
-      if (bed && n !== goal && !isBedPassable(grid, n)) continue;
+      if (b.closed[n] === gen) continue;
+      if (ownTile(n)) {
+        if (dx !== 0 && dy !== 0) continue;
+      } else {
+        if (!open(n)) continue;
+        if (bed && n !== goal && !isBedPassable(grid, n)) continue;
+      }
       const diagonal = dx !== 0 && dy !== 0;
       if (diagonal) {
         if (curIsDoor || grid.door[n] !== 0) continue;
