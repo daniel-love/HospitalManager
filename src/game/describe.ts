@@ -377,6 +377,10 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
       });
     }
   }
+  if (p.retriaged) {
+    const now = `${p.category} ${TRIAGE_CATEGORIES[p.category]!.name}`;
+    timeline.push({ label: `Re-triaged: ${now}`, at: clockAt(p.retriaged.tick) });
+  }
   if (t.referred !== null && p.specialty) {
     const name = specialtyById.get(p.specialty)!.name;
     timeline.push({ label: `Referred to ${name}`, at: clockAt(t.referred) });
@@ -405,6 +409,9 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
             label: `${p.category} ${cat.name}`,
             colour: hex(cat.colour),
             target: cat.targetMins === 0 ? "immediately" : `within ${formatWait(cat.targetMins)}`,
+            note: p.retriaged
+              ? `re-triaged from ${p.retriaged.from} ${TRIAGE_CATEGORIES[p.retriaged.from]!.name} at ${clockAt(p.retriaged.tick)}`
+              : `to be seen ${cat.targetMins === 0 ? "immediately" : `within ${formatWait(cat.targetMins)}`}`,
           },
         }
       : {}),

@@ -231,7 +231,7 @@ function AgentSection({
           <span class="triage-chip" style={{ background: agent.category.colour }}>
             {agent.category.label}
           </span>{" "}
-          <span class="dim">to be seen {agent.category.target}</span>
+          <span class="dim">{agent.category.note}</span>
         </p>
       ) : (
         <p class="dim">Not yet triaged</p>

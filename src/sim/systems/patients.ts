@@ -418,7 +418,22 @@ export function formatWait(mins: number): string {
  * everything and head out. Inpatients going home from a ward left A&E (and
  * were counted there) when they were admitted; they earn the inpatient tariff.
  */
+/**
+ * Re-triage down to `category` (a higher number: less urgent), recording it.
+ * Never raises priority: escalation is noticing deterioration's job.
+ */
+export function retriage(state: SimState, p: Patient, category: number): void {
+  if (p.category === 0 || category <= p.category) return;
+  p.retriaged = { tick: state.tick, from: p.retriaged?.from ?? p.category };
+  p.category = category;
+}
+
+/** Category of someone well enough to go home: at most Standard. */
+const FIT_FOR_DISCHARGE = 4;
+
 export function leave(state: SimState, p: Patient, outcome: Outcome): void {
+  // Nobody is sent home while still warranting an urgent category.
+  if (outcome === "discharged") retriage(state, p, FIT_FOR_DISCHARGE);
   for (const job of jobsForPatient(state, p.id)) removeJob(state, job);
   releaseSeat(state, p);
   if (p.bed !== null) release(state, p.bed, 0, p.id);

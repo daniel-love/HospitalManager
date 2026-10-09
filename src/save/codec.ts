@@ -207,6 +207,7 @@ const patientSchema = z.object({
     }),
   ),
   homeBed: nullableInt,
+  retriaged: z.object({ tick: int, from: int.min(1).max(5) }).nullable(),
   outcome: z.enum(["discharged", "lwbs", "transferred", "transferred_out", "died"]).nullable(),
 });
 

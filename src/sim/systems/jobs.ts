@@ -35,7 +35,7 @@ import { removeJob, unassignJob } from "./jobBoard";
 import { headTo } from "./movement";
 import { TICKS_PER_MINUTE } from "../time";
 import { canReviewDeath, claimDeathPlace, runDeathJob } from "./deaths";
-import { afterTriage, backToWaiting, callToBed, lift, postTreatment } from "./patients";
+import { afterTriage, backToWaiting, callToBed, lift, postTreatment, retriage } from "./patients";
 import { MOOD_LIFT_SEEN, MOOD_LIFT_STEP } from "@data/patients";
 import { canDo } from "./staffing";
 import { transferArranged } from "./transfers";
@@ -326,9 +326,13 @@ function complete(state: SimState, job: Job, obj: PlacedObject): void {
       break;
     case "treat": {
       const p = patient!;
-      const pathway = conditionById.get(p.conditionId)!.pathway;
+      const condition = conditionById.get(p.conditionId)!;
+      const pathway = condition.pathway;
       const done = pathway[p.step];
       if (done?.stabilises) p.deterioration = null;
+      // Re-triage now treatment has worked; stabilising undoes any escalation.
+      const to = done?.retriageTo ?? (done?.stabilises ? condition.acuity : undefined);
+      if (to !== undefined) retriage(state, p, to);
       if (done?.sample) sendSample(state, p);
       p.step++;
       lift(p, MOOD_LIFT_STEP);

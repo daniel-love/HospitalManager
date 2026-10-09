@@ -6,6 +6,9 @@
  * admissions came later in M3, and X-rays, CT scans and blood tests in M4
  * (systems/diagnostics.ts): a step can take a blood sample, be a scan, or
  * wait for results, and some steps only some patients need (`chance`).
+ * Once treatment works they're re-triaged down (`retriageTo`): pain relief
+ * takes "severe pain" off an Urgent patient, adrenaline makes anaphylaxis
+ * an observation case.
  *
  * Every A&E walk-in books in at reception and is triaged by a nurse first;
  * `pathway` lists what happens after triage. A patient who needs admitting
@@ -97,6 +100,7 @@ export const conditions: ConditionInput[] = [
         room: MINORS,
         mins: [25, 40],
         needsResults: true,
+        retriageTo: 4, // Pain controlled, ankle immobilised.
       },
     ],
     description:
@@ -120,6 +124,7 @@ export const conditions: ConditionInput[] = [
         room: MINORS,
         mins: [15, 25],
         needsResults: true,
+        retriageTo: 4, // Normal neuro obs.
       },
     ],
     description:
@@ -141,6 +146,7 @@ export const conditions: ConditionInput[] = [
         room: MINORS,
         mins: [15, 25],
         sample: true,
+        retriageTo: 4, // Pain relieved.
       },
       {
         name: "Doctor review with results",
@@ -188,6 +194,7 @@ export const conditions: ConditionInput[] = [
         room: MAJORS,
         mins: [25, 40],
         stabilises: true,
+        retriageTo: 3, // Pain-free on treatment, awaiting troponin.
       },
       {
         name: "Bloods (troponin), monitoring and repeat ECG",
@@ -231,6 +238,7 @@ export const conditions: ConditionInput[] = [
         room: MAJORS,
         mins: [25, 35],
         stabilises: true,
+        retriageTo: 3,
         sample: true,
       },
       scan("xray", "Chest X-ray", 0.8),
@@ -263,6 +271,7 @@ export const conditions: ConditionInput[] = [
         room: MAJORS,
         mins: [20, 30],
         stabilises: true,
+        retriageTo: 3,
         sample: true,
       },
       {
@@ -333,10 +342,17 @@ export const conditions: ConditionInput[] = [
         capabilities: ["resuscitation"],
         mins: [20, 30],
         stabilises: true,
+        retriageTo: 3, // Stable; watched in Majors.
       },
       // NICE: watch for a second reaction before going home. They move to
       // Majors once a bay is free, freeing Resus.
-      { name: "Observation after anaphylaxis", roles: [...NURSE], room: MAJORS, mins: [120, 240] },
+      {
+        name: "Observation after anaphylaxis",
+        roles: [...NURSE],
+        room: MAJORS,
+        mins: [120, 240],
+        retriageTo: 4,
+      },
       { name: "Doctor review", roles: [...DOCTOR], room: MAJORS, mins: [10, 15] },
     ],
     description:
@@ -360,6 +376,7 @@ export const conditions: ConditionInput[] = [
         capabilities: ["resuscitation"],
         mins: [30, 45],
         stabilises: true,
+        retriageTo: 2, // Still critically ill, awaiting intensive care.
       },
       {
         name: "Critical care referral",

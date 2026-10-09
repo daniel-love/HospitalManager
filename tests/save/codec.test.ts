@@ -64,6 +64,7 @@ function busyDayBeforeTransfers(): SimState {
     p.times.referred = null;
     p.transfer = null;
     p.curtainUntil = null; // Curtains came later too (v17).
+    p.retriaged = null; // And re-triage (v18).
   }
   return state;
 }
@@ -172,7 +173,7 @@ describe("save upgrades", () => {
 describe("M3 state in saves", () => {
   it("round-trips deterioration, observations and incidents", async () => {
     const { staffedMajorsAE } = await import("../fixtures/majorsAE");
-    const state = staffedMajorsAE(3);
+    const state = staffedMajorsAE(4);
     state.settings.patientVolume = 2;
     let collapsed = false;
     for (let i = 0; i < TICKS_PER_DAY && !collapsed; i++) {

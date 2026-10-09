@@ -65,7 +65,7 @@ export type AgentInfo =
       name: string;
       condition: string;
       /** Triage category name and colour, once triaged. */
-      category?: { label: string; colour: string; target: string };
+      category?: { label: string; colour: string; target: string; note: string };
       status: string;
       /** What's holding them up, if anything (see waitReason). */
       reason: string | null;
@@ -266,7 +266,7 @@ export interface PatientRow {
   name: string;
   condition: string;
   /** Triage category, once triaged. */
-  category?: { n: number; label: string; colour: string; target: string };
+  category?: { n: number; label: string; colour: string; target: string; note: string };
   status: string;
   /** What's holding them up, if anything. */
   reason: string | null;

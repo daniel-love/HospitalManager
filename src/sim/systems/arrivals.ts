@@ -224,6 +224,7 @@ export function spawnPatient(
     pathVersion: state.layoutVersion,
     conditionId: condition.id,
     category: 0,
+    retriaged: null,
     stage: channel === "ambulance" ? "awaiting_handover" : "queueing",
     step: 0,
     seat: null,

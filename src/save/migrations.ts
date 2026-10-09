@@ -375,6 +375,17 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v18: patients are re-triaged down once treatment works.
+  17: (save) => {
+    const state = save.state as { patients: object[] };
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients.map((p) => ({ ...p, retriaged: null })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

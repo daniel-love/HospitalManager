@@ -273,6 +273,13 @@ export const pathwayStepSchema = z.object({
    * (e.g. antibiotics and fluids for sepsis), so they no longer will.
    */
   stabilises: z.boolean().default(false),
+  /**
+   * Re-triage once this step is done: the Manchester Triage category the
+   * patient now warrants (e.g. 3 Urgent once anaphylaxis has had adrenaline).
+   * Only ever lowers priority. A stabilising step without one returns the
+   * patient to the condition's own category, undoing any escalation.
+   */
+  retriageTo: z.number().int().min(1).max(5).optional(),
 });
 export type PathwayStep = z.infer<typeof pathwayStepSchema>;
 
@@ -443,6 +450,13 @@ export function validateContent(raw: Content): ValidContent {
   for (const c of content.conditions) {
     for (const step of c.pathway) {
       if (!roomIds.has(step.room)) issues.push(`condition ${c.id} uses unknown room ${step.room}`);
+      if (step.retriageTo !== undefined && step.retriageTo < c.acuity)
+        issues.push(`condition ${c.id} step "${step.name}" re-triages above its own category`);
+      // Still at risk of deteriorating until stabilised: no downgrade before.
+      const i = c.pathway.indexOf(step);
+      const stabiliser = c.pathway.findIndex((s) => s.stabilises);
+      if (step.retriageTo !== undefined && c.deterioration && i < stabiliser)
+        issues.push(`condition ${c.id} re-triages down before it's stabilised`);
       for (const cap of step.capabilities) {
         if (!granted.has(cap)) issues.push(`condition ${c.id} needs ungranted ${cap}`);
       }

@@ -32,7 +32,8 @@ describe("a staffed small A&E over 24 hours", () => {
     const discharged = departed.filter((p) => p.outcome === "discharged");
     expect(discharged.length).toBeGreaterThan(20);
     for (const p of discharged) {
-      expect(p.category).toBe(conditionById.get(p.conditionId)!.acuity);
+      // Sent home well: re-triaged to Standard if they came in more urgent.
+      expect(p.category).toBe(Math.max(conditionById.get(p.conditionId)!.acuity, 4));
       expect(p.times.booked).not.toBeNull();
       expect(p.times.triaged).not.toBeNull();
       expect(p.times.seen).not.toBeNull();

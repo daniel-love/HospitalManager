@@ -263,6 +263,29 @@ describe("a deteriorating patient", () => {
   });
 });
 
+describe("re-triage", () => {
+  it("steps a chest pain patient down once treated, and home as Standard", () => {
+    const state = staffedMajorsAE(1);
+    state.settings.patientVolume = 0;
+    const p = chestPain(state);
+    runUntil(state, () => p.step >= 2);
+    expect(p.category).toBe(3);
+    expect(p.retriaged).toMatchObject({ from: 2 });
+    runUntil(state, () => p.stage === "leaving" || !state.patients[p.id]);
+    if (p.outcome === "discharged") expect(p.category).toBe(4);
+    expect(p.retriaged!.from).toBe(2);
+  });
+
+  it("makes a cardiac arrest Immediate", () => {
+    const state = quietMajors();
+    const p = chestPain(state);
+    waitInBay(state, p);
+    deteriorate(state, p, 1);
+    runUntil(state, () => p.stage === "collapsed", 5 * MIN);
+    expect(p.category).toBe(1);
+  });
+});
+
 describe("a crash call", () => {
   it("pulls a busy doctor off other work, which goes back on the board", () => {
     const state = staffedMajorsAE(2, { ...MAJORS_TEAM, junior_doctor: 1 });

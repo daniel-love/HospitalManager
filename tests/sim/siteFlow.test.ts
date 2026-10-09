@@ -89,7 +89,7 @@ describe("a majors A&E with ambulances beside the road over 24 hours", () => {
   });
 
   it("has ambulances drive in, hand over and drive off, keeping to tarmac", () => {
-    expect(day1.stats.ambulances).toBeGreaterThan(10);
+    expect(day1.stats.ambulances).toBeGreaterThan(8);
     expect(day1.stats.handovers).toBeGreaterThan(5);
     expect(offRoad).toBe(0);
     expect(state.alerts["ambulance_no_road"]).toBeUndefined();

@@ -175,6 +175,8 @@ function collapse(state: SimState, p: Patient): void {
   }
   stop(p);
   p.stage = "collapsed";
+  p.category = 1; // A cardiac arrest is Immediate.
+  p.retriaged = null;
   d.crash = state.tick;
 
   const where = whereIs(state, p);

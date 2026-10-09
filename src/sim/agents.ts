@@ -139,8 +139,13 @@ export interface Investigation {
 
 export interface Patient extends AgentBase {
   conditionId: string;
-  /** Manchester Triage category once triaged; 0 before. */
+  /**
+   * Manchester Triage category once triaged; 0 before. Re-triaged as things
+   * change: up when they deteriorate, down once treatment works.
+   */
   category: number;
+  /** The last re-triage down: when, and the category before the first one. */
+  retriaged: { tick: number; from: number } | null;
   stage: PatientStage;
   /** Index of the pathway step being done or waited for. */
   step: number;
