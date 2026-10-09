@@ -359,6 +359,48 @@ describe("ambulances in saves", () => {
   });
 });
 
+describe("old saves get the road", () => {
+  it("fits the road in below a version-10 hospital, and moves waiting ambulances onto it", async () => {
+    const { applyAll, SMALL_AE_COMMANDS } = await import("../fixtures/smallAE");
+    const state = createSimState({ seed: 1, width: 60, height: 60, money: 1_000_000 });
+    applyAll(state, SMALL_AE_COMMANDS);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v10")));
+    save.version = 10;
+    save.state.ambulances = [
+      {
+        id: 1,
+        arrived: 0,
+        phase: "arriving",
+        space: null,
+        x: 0,
+        y: 0,
+        prevX: 0,
+        prevY: 0,
+        route: [],
+        routeVersion: 0,
+        from: 0,
+        patientId: null,
+        handedOver: null,
+        leaveAt: null,
+      },
+    ];
+    save.state.nextAmbulanceId = 2;
+    const loaded = decodeSave(save).state;
+    expect(loaded.site?.road.y).toBe(21);
+    const grid = loaded.floors[0]!;
+    expect(grid.land[grid.width * 21]).toBe(1);
+    expect(loaded.ambulances[1]).toMatchObject({ x: 0, y: 22 });
+    expect(loaded.rooms.every((r) => r.valid)).toBe(true);
+  });
+
+  it("leaves a save that already has a road alone", () => {
+    const state = createSimState({ seed: 4, width: 40, height: 40, site: true });
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v10")));
+    save.version = 10;
+    expect(snapshot(decodeSave(save).state)).toEqual(snapshot(state));
+  });
+});
+
 describe("fixtures in saves", () => {
   it("restores a fixture over a bed into the right layers", async () => {
     const { applyAll } = await import("../fixtures/smallAE");

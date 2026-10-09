@@ -4,6 +4,9 @@
  * that transforms a version-N save into a version-N+1 save.
  */
 import { SIM_STATE_VERSION } from "@sim/state";
+import { createFloorGrid } from "@sim/world/grid";
+import { fitSite } from "@sim/world/site";
+import { fromBase64, toBase64 } from "./base64";
 
 type RawSave = Record<string, unknown> & { version: number };
 
@@ -195,6 +198,44 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
             from: 0,
           };
         }),
+      },
+    };
+  },
+  // v11: hospitals built before the road get one, fitted in below the
+  // building with a free footpath to the door (see fitSite). Waiting
+  // ambulances move onto it.
+  10: (save) => {
+    type Floor = { width: number; height: number } & Record<string, string | number>;
+    const state = save.state as {
+      floors: Floor[];
+      site: unknown;
+      ambulances: { phase: string; space: unknown; x: number; y: number }[];
+    };
+    const ground = state.floors[0];
+    if (state.site || !ground) return save;
+    const grid = createFloorGrid(ground.width, ground.height);
+    const read = (key: string) => fromBase64(String(ground[key]));
+    grid.floorType.set(read("floorType"));
+    grid.wall.set(read("wall"));
+    grid.door.set(read("door"));
+    grid.land.set(read("land"));
+    const site = fitSite(grid);
+    if (!site) return save;
+    const enter = { x: 0, y: site.road.y + 1 };
+    return {
+      ...save,
+      state: {
+        ...state,
+        floors: [
+          { ...ground, floorType: toBase64(grid.floorType), land: toBase64(grid.land) },
+          ...state.floors.slice(1),
+        ],
+        site,
+        ambulances: state.ambulances.map((a) =>
+          a.phase === "arriving" && !a.space
+            ? { ...a, ...enter, prevX: enter.x, prevY: enter.y }
+            : a,
+        ),
       },
     };
   },

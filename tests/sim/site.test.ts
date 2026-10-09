@@ -3,7 +3,8 @@ import { whereIs } from "@game/describe";
 import { applyCommand, planCommand, PUBLIC_LAND } from "@sim/commands";
 import { createSimState } from "@sim/state";
 import { FloorType, isPublic, tileIndex, WallType } from "@sim/world/grid";
-import { SITE_BAND } from "@sim/world/site";
+import { fitSite, SITE_BAND } from "@sim/world/site";
+import { applyAll, SMALL_AE_COMMANDS } from "../fixtures/smallAE";
 
 const newSite = () => createSimState({ seed: 1, width: 40, height: 40, site: true });
 
@@ -73,5 +74,48 @@ describe("the public road", () => {
     expect(whereIs(state, { x: 3, y: 24 })).toBe("Pavement");
     expect(whereIs(state, { x: 3, y: 28 })).toBe("Road");
     expect(whereIs(state, { x: 3, y: 10 })).toBe("Outside");
+  });
+});
+
+describe("fitting the road into an old save's map", () => {
+  /** The small A&E (rows 2–16, double front door at x 5–6 on row 16) on a 60×60 map. */
+  const built = () => {
+    const state = createSimState({ seed: 1, width: 60, height: 60, money: 1_000_000 });
+    applyAll(state, SMALL_AE_COMMANDS);
+    return state.floors[0]!;
+  };
+
+  it("lays it just south of the building, with a path from the front door", () => {
+    const grid = built();
+    const site = fitSite(grid)!;
+    expect(site.pavements[0].y).toBe(19);
+    expect(site.road).toEqual({ x: 0, y: 21, w: 60, h: 6 });
+    expect(site.busStop).toEqual({ x: 9, y: 19 });
+    for (const [x, y] of [
+      [5, 17],
+      [6, 17],
+      [5, 18],
+      [6, 18],
+    ] as const) {
+      expect(grid.floorType[tileIndex(grid, x, y)]).toBe(FloorType.Path);
+      expect(isPublic(grid, tileIndex(grid, x, y))).toBe(false);
+    }
+    expect(grid.floorType[tileIndex(grid, 7, 17)]).toBe(FloorType.Grass);
+  });
+
+  it("gives up, changing nothing, when the building is too near the bottom", () => {
+    const state = createSimState({ seed: 1, width: 40, height: 30, money: 1_000_000 });
+    applyAll(state, SMALL_AE_COMMANDS);
+    // An outbuilding near the bottom edge leaves no room for the road below it.
+    applyAll(state, [{ type: "build_floor", floor: 0, rect: { x: 30, y: 25, w: 2, h: 2 } }]);
+    const grid = state.floors[0]!;
+    const before = grid.floorType.slice();
+    expect(fitSite(grid)).toBeNull();
+    expect(grid.floorType).toEqual(before);
+  });
+
+  it("lays it in the usual place on an empty map", () => {
+    const grid = createSimState({ seed: 1, width: 40, height: 40 }).floors[0]!;
+    expect(fitSite(grid)!.road.y).toBe(26);
   });
 });

@@ -17,6 +17,7 @@ import { clockFromTick, formatClock } from "@sim/time";
 import { createFloorGrid, tileIndex, type FloorGrid } from "@sim/world/grid";
 import { layerOf, objectRect } from "@sim/world/objects";
 import { detectRooms } from "@sim/world/rooms";
+import { fromBase64, toBase64 } from "./base64";
 import { migrate } from "./migrations";
 
 export const SAVE_FORMAT = "hospital-save";
@@ -389,11 +390,11 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
   const floors = s.floors.map((f, n) => {
     const grid = createFloorGrid(f.width, f.height);
     const size = f.width * f.height;
-    grid.floorType.set(fromBase64(f.floorType, size, `floor ${n} floorType`));
-    grid.wall.set(fromBase64(f.wall, size, `floor ${n} wall`));
-    grid.door.set(fromBase64(f.door, size, `floor ${n} door`));
-    grid.land.set(fromBase64(f.land, size, `floor ${n} land`));
-    grid.zone.set(fromBase64(f.zone, size, `floor ${n} zone`));
+    grid.floorType.set(layer(f.floorType, size, `floor ${n} floorType`));
+    grid.wall.set(layer(f.wall, size, `floor ${n} wall`));
+    grid.door.set(layer(f.door, size, `floor ${n} door`));
+    grid.land.set(layer(f.land, size, `floor ${n} land`));
+    grid.zone.set(layer(f.zone, size, `floor ${n} zone`));
     return grid;
   });
 
@@ -471,25 +472,14 @@ function restoreObject(state: SimState, floors: FloorGrid[], obj: PlacedObject):
   state.objects[obj.id] = { ...obj };
 }
 
-const CHUNK = 0x8000;
-
-function toBase64(bytes: Uint8Array): string {
-  let s = "";
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    s += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(s);
-}
-
-function fromBase64(b64: string, expectedLength: number, what: string): Uint8Array {
-  let s: string;
+/** Decodes one saved grid layer, checking its size. */
+function layer(b64: string, expectedLength: number, what: string): Uint8Array {
+  let out: Uint8Array;
   try {
-    s = atob(b64);
+    out = fromBase64(b64);
   } catch {
     throw new SaveError(`Corrupt data in ${what}`);
   }
-  if (s.length !== expectedLength) throw new SaveError(`Wrong size for ${what}`);
-  const out = new Uint8Array(s.length);
-  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  if (out.length !== expectedLength) throw new SaveError(`Wrong size for ${what}`);
   return out;
 }
