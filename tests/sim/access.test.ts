@@ -6,6 +6,8 @@ import { createSimState, type SimState } from "@sim/state";
 import { BACK_DOOR, OPEN, PRIVATE, patientAccess } from "@sim/world/access";
 import { tileIndex, WallType } from "@sim/world/grid";
 import { findPath } from "@sim/world/pathfinding";
+import { headTo } from "@sim/systems/movement";
+import type { AgentBase } from "@sim/agents";
 import { roomsPatientsCantReach } from "@sim/places";
 import { buildMajorsAE } from "../fixtures/majorsAE";
 import { applyAll, buildSmallAE } from "../fixtures/smallAE";
@@ -27,6 +29,32 @@ function building(): SimState {
     { type: "place_object", floor: 0, defId: "door_single", x: 1, y: 5, rotation: 1 },
     { type: "place_object", floor: 0, defId: "door_single", x: 8, y: 5, rotation: 1 },
     { type: "place_object", floor: 0, defId: "door_single", x: 16, y: 5, rotation: 1 },
+  ]);
+  return state;
+}
+
+/**
+ * The same building with double doors and room to wheel a bed round
+ * outside: 22×16, everything 2 tiles further in. Resus x 4–9, corridor
+ * x 11–17; doors (2 tiles, y 7–8) at x 3 (Resus's back door), 10 and 18.
+ */
+function wideBuilding(): SimState {
+  const state = createSimState({ seed: 1, width: 22, height: 16, money: 1_000_000 });
+  const r = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+  applyAll(state, [
+    { type: "build_floor", floor: 0, rect: r(4, 4, 14, 8) },
+    { type: "build_walls", floor: 0, rect: r(3, 3, 16, 10), wall: WallType.Standard },
+    { type: "build_walls", floor: 0, rect: r(10, 3, 1, 10), wall: WallType.Standard },
+    { type: "zone", floor: 0, rect: r(4, 4, 6, 8), roomType: "resus_bay" },
+    { type: "zone", floor: 0, rect: r(11, 4, 7, 8), roomType: "corridor" },
+    ...[3, 10, 18].map((x) => ({
+      type: "place_object" as const,
+      floor: 0,
+      defId: "door_double",
+      x,
+      y: 7,
+      rotation: 1 as const,
+    })),
   ]);
   return state;
 }
@@ -67,6 +95,74 @@ describe("patient access", () => {
     const path = route(12, 5, 4, 5, true)!;
     expect(path).toContain(at(8, 5));
     expect(path).not.toContain(at(1, 5));
+  });
+
+  describe("the ambulance crew", () => {
+    const patient = (): AgentBase => ({
+      id: 1,
+      name: "Patient",
+      x: 0,
+      y: 5,
+      prevX: 0,
+      prevY: 5,
+      path: [],
+      dest: null,
+      pathVersion: 0,
+    });
+    const via = (a: AgentBase, x: number, y: number) =>
+      a.path.some((v, k) => k % 2 === 0 && v === x && a.path[k + 1] === y);
+
+    it("bring a patient into Resus by its outside door", () => {
+      const walkIn = patient();
+      headTo(state, walkIn, { x: 4, y: 5 });
+      expect(via(walkIn, 1, 5)).toBe(false);
+      const withCrew = patient();
+      headTo(state, withCrew, { x: 4, y: 5 }, { x: 4, y: 5 }, false, true);
+      expect(via(withCrew, 1, 5)).toBe(true);
+    });
+
+    it("go round to the front door rather than through Resus", () => {
+      const withCrew = patient();
+      headTo(state, withCrew, { x: 12, y: 5 }, { x: 12, y: 5 }, false, true);
+      expect(via(withCrew, 16, 5)).toBe(true);
+      expect(via(withCrew, 4, 5)).toBe(false);
+    });
+
+    it("wheel a stretcher round to the front door rather than through Resus", () => {
+      const wide = wideBuilding();
+      const inResus = (a: AgentBase) =>
+        a.path.some((v, k) => k % 2 === 0 && v >= 3 && v <= 9 && a.path[k + 1]! >= 4);
+      const stretcher = (): AgentBase => ({ ...patient(), x: 1, y: 7, prevX: 1, prevY: 7 });
+      const toCorridor = stretcher();
+      expect(headTo(wide, toCorridor, { x: 14, y: 7 }, { x: 14, y: 7 }, true, true)).toBe("moving");
+      expect(inResus(toCorridor)).toBe(false);
+      expect(via(toCorridor, 18, 7) || via(toCorridor, 18, 8)).toBe(true);
+      // Staff wheeling a bed would take the short cut.
+      const porter = stretcher();
+      headTo(wide, porter, { x: 14, y: 7 }, { x: 14, y: 7 }, true);
+      expect(inResus(porter)).toBe(true);
+      // Into Resus itself, by its own door.
+      const toResus = stretcher();
+      headTo(wide, toResus, { x: 6, y: 7 }, { x: 6, y: 7 }, true, true);
+      expect(via(toResus, 3, 7) || via(toResus, 3, 8)).toBe(true);
+    });
+
+    it("cut through Resus only if there's no other way", () => {
+      const closed = building();
+      applyAll(closed, [
+        { type: "demolish", floor: 0, rect: { x: 16, y: 5, w: 1, h: 1 } },
+        {
+          type: "build_walls",
+          floor: 0,
+          rect: { x: 16, y: 5, w: 1, h: 1 },
+          wall: WallType.Standard,
+        },
+      ]);
+      const withCrew = patient();
+      headTo(closed, withCrew, { x: 12, y: 5 }, { x: 12, y: 5 }, false, true);
+      expect(via(withCrew, 1, 5)).toBe(true);
+      expect(via(withCrew, 8, 5)).toBe(true);
+    });
   });
 });
 

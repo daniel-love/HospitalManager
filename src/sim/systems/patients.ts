@@ -13,7 +13,7 @@
  * when standing or desperate for the toilet), and an unhappy patient may
  * leave without being seen (LWBS).
  */
-import { conditionById } from "@data/catalogue";
+import { conditionById, roomById } from "@data/catalogue";
 import {
   BOOKING_MINS,
   FOUR_HOUR_MINS,
@@ -36,7 +36,7 @@ import {
   TRIAGE_TARGET_MINS,
 } from "@data/patients";
 import type { Outcome, Patient, PatientStage, Point } from "../agents";
-import { emit } from "../events";
+import { emit, warn } from "../events";
 import {
   bedside,
   deskStaffSpot,
@@ -57,9 +57,13 @@ import {
   standingSpot,
 } from "../places";
 import { chance, nextInt } from "../rng";
-import type { SimState } from "../state";
+import type { PlacedObject, SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
+import { crewAccess, privateRoomsCrossed } from "../world/access";
+import { tileIndex } from "../world/grid";
 import { isStandable } from "../world/objects";
+import { findPath } from "../world/pathfinding";
+import { roomOfObject } from "../world/rooms";
 import { earn } from "./finance";
 import {
   dirtyCouch,
@@ -70,9 +74,11 @@ import {
   removeJob,
   ticksFor,
 } from "./jobBoard";
-import { headTo, stop } from "./movement";
+import { type Arrival, headTo, stop } from "./movement";
 import { leaveScanner } from "./diagnostics";
 import { isEscorted } from "./escorts";
+import { trolleyStop } from "./admissions";
+import { withAmbulanceCrew } from "./ambulances";
 import { hasTeam } from "./staffing";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
@@ -282,10 +288,75 @@ function goToBed(state: SimState, p: Patient): void {
   const bed = p.bed === null ? undefined : state.objects[p.bed];
   if (!bed) return; // The job system notices and sends them back to wait.
   if (isEscorted(state, p)) return; // A porter wheels them (systems/escorts.ts).
-  const arrival = headTo(state, p, restPoint(bed), bedside(state, bed));
+  const arrival = withAmbulanceCrew(p)
+    ? wheelInFromAmbulance(state, p, bed)
+    : headTo(state, p, restPoint(bed), bedside(state, bed));
   if (arrival !== "arrived") return;
   if (p.stage === "called_triage") p.stage = "triage";
   else if (p.stage === "called_treatment") p.stage = "in_cubicle";
+}
+
+/**
+ * The ambulance crew wheel the patient in on their stretcher to the trolley
+ * they're handed over at, by a bed-width route: in by the ambulance
+ * entrance (Resus's outside door, say), and otherwise by public routes, not
+ * through other clinical rooms if they can help it (see crewAccess).
+ */
+function wheelInFromAmbulance(state: SimState, p: Patient, bed: PlacedObject): Arrival {
+  const to = restPoint(bed);
+  const side = bedside(state, bed);
+  const from = { x: Math.round(p.x), y: Math.round(p.y) };
+  const planned = p.dest;
+  // Already on the way: keep to the stop they set off for.
+  const onTheWay =
+    planned &&
+    planned.x === to.x &&
+    planned.y === to.y &&
+    planned.blocked < 0 &&
+    (planned.ax !== side.x || planned.ay !== side.y);
+  const grid = state.floors[0]!;
+  const crewRoute = (at: Point) =>
+    findPath(grid, from.x, from.y, at.x, at.y, { bed: true, patient: crewAccess(state) }) !== null;
+  const at = onTheWay
+    ? { x: planned.ax, y: planned.ay }
+    : (trolleyStop(state, from, bed, crewRoute) ?? trolleyStop(state, from, bed));
+  let arrival = at ? headTo(state, p, to, at, true, true) : "no_route";
+  if (arrival === "no_route") arrival = squeezeIn(state, p, to, side);
+  if (p.dest !== planned) warnIfCutThrough(state, p, from, bed);
+  return arrival;
+}
+
+/** No stretcher-width route in: they squeeze through on foot with the crew. */
+function squeezeIn(state: SimState, p: Patient, to: Point, side: Point): Arrival {
+  warn(
+    state,
+    "no_bed_route_ambulance",
+    6 * 60 * TICKS_PER_MINUTE,
+    `An ambulance crew couldn't find a stretcher-width route in for ${p.name}. Stretchers need double doors and corridors at least 2 tiles wide.`,
+    "warn",
+    { x: Math.round(p.x), y: Math.round(p.y) },
+  );
+  // Rather than strand them, they squeeze through on foot with the crew.
+  return headTo(state, p, to, side, false, true);
+}
+
+/** Just set off: the crew had to go through another clinical room to get there. */
+function warnIfCutThrough(state: SimState, p: Patient, from: Point, bed: PlacedObject): void {
+  const grid = state.floors[0]!;
+  const start = grid.roomId[tileIndex(grid, from.x, from.y)]!;
+  const end = roomOfObject(state, bed.id);
+  const crossed = privateRoomsCrossed(state, p.path, [start, end?.id ?? 0]);
+  const room = state.rooms.find((r) => r.id === crossed[0]);
+  if (!room) return;
+  const name = (id: string) => roomById.get(id)?.name ?? "clinical room";
+  warn(
+    state,
+    "ambulance_through_clinical_room",
+    6 * 60 * TICKS_PER_MINUTE,
+    `The ambulance crew had to wheel ${p.name} through the ${name(room.typeId)} to reach the ${name(end?.typeId ?? "")}. Give ambulances a way in that doesn't pass through other clinical rooms.`,
+    "warn",
+    from,
+  );
 }
 
 /**

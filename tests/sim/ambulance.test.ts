@@ -15,9 +15,10 @@ import {
 } from "@sim/systems/ambulances";
 import { observedBeds } from "@sim/systems/monitoring";
 import { TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
+import { WallType } from "@sim/world/grid";
 import { roomOfObject } from "@sim/world/rooms";
 import { MAJORS_TEAM, staffedMajorsAE } from "../fixtures/majorsAE";
-import { staffedSmallAE } from "../fixtures/smallAE";
+import { applyAll, staffedSmallAE } from "../fixtures/smallAE";
 import { run } from "./simHelpers";
 
 const MIN = TICKS_PER_MINUTE;
@@ -163,6 +164,48 @@ describe("Resus", () => {
     runUntil(state, () => !state.patients[p.id], 300 * MIN);
     expect(state.today.stats.transferred).toBe(1);
     expect(state.incidents).toEqual([]);
+  });
+});
+
+describe("the ambulance crew", () => {
+  /** Runs until they're handed over, noting every tile they're moved through. */
+  function wheelIn(state: SimState, p: Patient): Set<string> {
+    // Only this patient's warnings (the one ambulanceWith replaced may have had one).
+    delete state.alerts["no_bed_route_ambulance"];
+    const seen = new Set<string>();
+    runUntil(state, () => {
+      seen.add(`${Math.round(p.x)},${Math.round(p.y)}`);
+      return p.times.triaged !== null;
+    });
+    return seen;
+  }
+
+  it("wheels a Resus patient in on their stretcher by Resus's own door", () => {
+    const state = quiet();
+    const p = ambulanceWith(state, "anaphylaxis");
+    const seen = wheelIn(state, p);
+    expect(roomOfObject(state, p.bed!)!.typeId).toBe("resus_bay");
+    expect(seen.has("14,30") || seen.has("14,31")).toBe(true);
+    expect(state.alerts["no_bed_route_ambulance"]).toBeUndefined();
+  });
+
+  it("squeezes through on foot, with a warning, if the door is too narrow for a stretcher", () => {
+    const state = quiet();
+    applyAll(state, [
+      { type: "demolish", floor: 0, rect: { x: 14, y: 30, w: 1, h: 2 } },
+      {
+        type: "build_walls",
+        floor: 0,
+        rect: { x: 14, y: 30, w: 1, h: 2 },
+        wall: WallType.Standard,
+      },
+      { type: "place_object", floor: 0, defId: "door_single", x: 14, y: 30, rotation: 1 },
+    ]);
+    const p = ambulanceWith(state, "anaphylaxis");
+    const seen = wheelIn(state, p);
+    expect(roomOfObject(state, p.bed!)!.typeId).toBe("resus_bay");
+    expect(seen.has("14,30")).toBe(true);
+    expect(state.alerts["no_bed_route_ambulance"]).toBeDefined();
   });
 });
 

@@ -311,6 +311,14 @@ export function drive(a: Driven): void {
   }
 }
 
+/**
+ * Still with the ambulance crew: not handed over yet (category 0). One
+ * who needs a trolley is wheeled in on the crew's stretcher to hand over there.
+ */
+export function withAmbulanceCrew(p: Patient): boolean {
+  return p.ambulanceId !== null && p.category === 0;
+}
+
 /** Needs a trolley (Majors, Resus) rather than being able to sit and wait. */
 export function needsTrolley(p: Patient): boolean {
   const first = conditionById.get(p.conditionId)!.pathway[0]!;

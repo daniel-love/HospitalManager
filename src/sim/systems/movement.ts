@@ -8,7 +8,7 @@ import { PATIENT_SPEED, STAFF_SPEED } from "@data/patients";
 import type { AgentBase, Point } from "../agents";
 import type { SimState } from "../state";
 import { FloorType, tileIndex } from "../world/grid";
-import { patientAccess } from "../world/access";
+import { crewAccess, patientAccess } from "../world/access";
 import { findPath } from "../world/pathfinding";
 
 /** Ticks to wait before retrying a route that couldn't be found. */
@@ -32,6 +32,12 @@ export function headTo(
   approach: Point = to,
   /** Being wheeled on a bed: double doors and 2-wide corridors only. */
   bed = false,
+  /**
+   * A patient brought in by the ambulance crew, not yet handed over: kept to
+   * public routes, but in by the ambulance entrance (see crewAccess). If
+   * there's no such way, through other clinical rooms rather than not at all.
+   */
+  withCrew = false,
 ): Arrival {
   const d = agent.dest;
   const same =
@@ -39,13 +45,14 @@ export function headTo(
   if (same) {
     if (d.blocked >= 0) {
       if (state.tick - d.blocked < RETRY_TICKS) return "no_route";
-      return plan(state, agent, to, approach, bed);
+      return plan(state, agent, to, approach, bed, withCrew);
     }
     if (agent.path.length === 0) return "arrived";
-    if (agent.pathVersion !== state.layoutVersion) return plan(state, agent, to, approach, bed);
+    if (agent.pathVersion !== state.layoutVersion)
+      return plan(state, agent, to, approach, bed, withCrew);
     return "moving";
   }
-  return plan(state, agent, to, approach, bed);
+  return plan(state, agent, to, approach, bed, withCrew);
 }
 
 /** Stops the agent where it is. */
@@ -65,6 +72,7 @@ function plan(
   to: Point,
   approach: Point,
   bed: boolean,
+  withCrew: boolean,
 ): Arrival {
   const dest = { x: to.x, y: to.y, ax: approach.x, ay: approach.y, blocked: -1 };
   agent.dest = dest;
@@ -76,12 +84,15 @@ function plan(
   const grid = state.floors[0]!;
   const sx = Math.round(agent.x);
   const sy = Math.round(agent.y);
-  // Patients on foot keep to public routes; staff, and beds, go anywhere.
-  const onFoot = !bed && !("role" in agent);
-  const tiles = findPath(grid, sx, sy, approach.x, approach.y, {
+  // Patients on foot keep to public routes, and the ambulance crew mostly
+  // do; staff, and beds, go anywhere.
+  const onFoot = !bed && !withCrew && !("role" in agent);
+  const access = withCrew ? crewAccess(state) : onFoot ? patientAccess(state) : undefined;
+  let tiles = findPath(grid, sx, sy, approach.x, approach.y, {
     bed,
-    ...(onFoot ? { patient: patientAccess(state) } : {}),
+    ...(access ? { patient: access } : {}),
   });
+  if (!tiles && withCrew) tiles = findPath(grid, sx, sy, approach.x, approach.y, { bed });
   if (!tiles) {
     dest.blocked = state.tick;
     agent.path = [];

@@ -30,10 +30,10 @@ import { bedside, freeCouches, release, reserve, restPoint } from "../places";
 import { chance, nextFloat } from "../rng";
 import type { PlacedObject, SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
-import { tileIndex } from "../world/grid";
+import { tileIndex, type FloorGrid } from "../world/grid";
 import { isStandable, objectRect } from "../world/objects";
 import { roomOfObject } from "../world/rooms";
-import { isBedPassable } from "../world/pathfinding";
+import { isBedPassable, isWalkable } from "../world/pathfinding";
 import { earn } from "./finance";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo } from "./movement";
@@ -173,14 +173,22 @@ function regionsAt(state: SimState, t: Point): Set<number> {
   for (let y = r.y - 1; y <= r.y + r.h; y++) {
     for (let x = r.x - 1; x <= r.x + r.w; x++) {
       if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) continue;
-      // Off a trolley's corners only diagonally, which a bed can't do.
+      // Off a trolley's corners only diagonally, which a bed can't do; onto a
+      // tile diagonally only as findPath allows, without cutting a corner.
       const corner = (x < r.x || x >= r.x + r.w) && (y < r.y || y >= r.y + r.h);
-      if (obj && corner) continue;
+      if (corner && (obj || !diagonalStep(grid, x, y, t.x, t.y))) continue;
       const l = label[tileIndex(grid, x, y)]!;
       if (l !== 0) out.add(l);
     }
   }
   return out;
+}
+
+/** Whether a step diagonally between these tiles is allowed: no doors, no cut corners. */
+function diagonalStep(grid: FloorGrid, x0: number, y0: number, x1: number, y1: number): boolean {
+  const at = (x: number, y: number) => tileIndex(grid, x, y);
+  if (grid.door[at(x0, y0)] !== 0 || grid.door[at(x1, y1)] !== 0) return false;
+  return isWalkable(grid, at(x1, y0)) && isWalkable(grid, at(x0, y1));
 }
 
 /** Whether a bed can be wheeled from `from` to beside `to`. */
@@ -207,16 +215,21 @@ export function onTrolley(state: SimState, p: Patient): boolean {
 /**
  * Where a trolley stops beside a ward bed so the patient can be moved
  * across: a tile next to the bed (its side or its foot) that a bed can be
- * wheeled to from `from`. Null if there's none.
+ * wheeled to from `from` (or that passes `canReach`). Null if there's none.
  */
-export function trolleyStop(state: SimState, from: Point, bed: PlacedObject): Point | null {
+export function trolleyStop(
+  state: SimState,
+  from: Point,
+  bed: PlacedObject,
+  canReach = (to: Point) => bedRouteExists(state, from, to),
+): Point | null {
   const grid = state.floors[0]!;
   const r = objectRect(bed);
   for (let y = r.y - 1; y <= r.y + r.h; y++) {
     for (let x = r.x - 1; x <= r.x + r.w; x++) {
       const inside = x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
       if (inside || !isStandable(grid, x, y)) continue;
-      if (bedRouteExists(state, from, { x, y })) return { x, y };
+      if (canReach({ x, y })) return { x, y };
     }
   }
   return null;

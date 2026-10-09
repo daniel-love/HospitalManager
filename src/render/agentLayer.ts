@@ -20,7 +20,7 @@ import { equipmentById, staffRoleById } from "@data/catalogue";
 import { TRIAGE_CATEGORIES } from "@data/patients";
 import { onSite, type AgentBase, type Ambulance, type Patient, type Staff } from "@sim/agents";
 import type { SimState } from "@sim/state";
-import { SPACE_L, SPACE_W } from "@sim/systems/ambulances";
+import { SPACE_L, SPACE_W, withAmbulanceCrew } from "@sim/systems/ambulances";
 import { crewOnFoot } from "@sim/systems/collections";
 import { curtainsDrawn } from "@sim/systems/curtains";
 import { kitsOut } from "@sim/world/sharedKit";
@@ -333,10 +333,14 @@ function patientLook(
   curtains: Curtains,
   moving: boolean,
 ): string {
-  return `${p.category}|${p.mood < UNHAPPY_MOOD}|${selected}|${warning}|${withCrew(p)}|${moving}|${curtains?.w}x${curtains?.h}`;
+  return `${p.category}|${p.mood < UNHAPPY_MOOD}|${selected}|${warning}|${withCrew(p)}|${onStretcher(p)}|${moving}|${curtains?.w}x${curtains?.h}`;
 }
 
-const withCrew = (p: Patient) => p.stage === "awaiting_handover";
+/** The paramedic stays with them until handover. */
+const withCrew = withAmbulanceCrew;
+/** On the crew's stretcher: at the ambulance, or being wheeled in. */
+const onStretcher = (p: Patient) =>
+  p.stage === "awaiting_handover" || (withCrew(p) && p.stage === "called_treatment");
 const onTheMove = (p: Patient) => p.stage === "transferring";
 
 function drawPatient(
@@ -350,9 +354,9 @@ function drawPatient(
   const ring = p.category === 0 ? UNTRIAGED_RING : TRIAGE_CATEGORIES[p.category]!.colour;
   // Screened for care: the bay's privacy curtain drawn round the bed.
   if (curtains) drawBedCurtains(g, curtains);
+  // The stretcher beneath, and the paramedic staying with them.
+  if (onStretcher(p)) g.roundRect(-8, -12, 16, 24, 4).fill({ color: 0xffffff, alpha: 0.8 });
   if (withCrew(p)) {
-    // The paramedic staying with them, and the stretcher beneath.
-    g.roundRect(-8, -12, 16, 24, 4).fill({ color: 0xffffff, alpha: 0.8 });
     g.circle(14, 0, STAFF_RADIUS).fill(PARAMEDIC_COLOUR).stroke({ width: 2.5, color: 0xffffff });
   }
   // Being wheeled to the ward, or to a scan, on their trolley.

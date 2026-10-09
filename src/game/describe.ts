@@ -32,7 +32,7 @@ import {
 } from "@sim/places";
 import type { SimState } from "@sim/state";
 import { onTrolley, trolleyStop } from "@sim/systems/admissions";
-import { ambulancesWaiting, parkingSpaces } from "@sim/systems/ambulances";
+import { ambulancesWaiting, parkingSpaces, withAmbulanceCrew } from "@sim/systems/ambulances";
 import {
   deathStatus,
   deathSteps,
@@ -301,6 +301,9 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
   if ((p.stage === "waiting_treatment" || p.stage === "called_treatment") && step) {
     status = `${p.stage === "waiting_treatment" ? "Waiting for" : `Going to a ${roomName} for`} ${step.name.toLowerCase()}`;
   }
+  if (p.stage === "called_treatment" && withAmbulanceCrew(p)) {
+    status = `Being wheeled in to a ${roomName} by the ambulance crew`;
+  }
   if (p.stage === "in_cubicle") {
     const bedRoom = p.bed === null ? undefined : roomOfObject(state, p.bed);
     const here = bedRoom ? (roomById.get(bedRoom.typeId)?.name ?? roomName) : roomName;
@@ -515,7 +518,7 @@ function monitoringInfo(
   let watch: string;
   const onBed = p.bed !== null && p.stage === "in_cubicle";
   if (p.stage === "collapsed") watch = "Crash call made";
-  else if (p.stage === "awaiting_handover") watch = "The ambulance crew is monitoring them";
+  else if (withAmbulanceCrew(p)) watch = "The ambulance crew is monitoring them";
   else if (!onBed) watch = "Not on a monitored trolley: only checked at observations";
   else {
     const needsWatch = stationsSeeing(state).has(p.bed!);

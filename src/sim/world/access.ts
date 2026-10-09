@@ -20,6 +20,7 @@ export const PRIVATE = 1;
 export const BACK_DOOR = 2;
 
 const cache = new WeakMap<SimState, { version: number; access: Uint8Array }>();
+const crewCache = new WeakMap<SimState, { version: number; access: Uint8Array }>();
 
 /** Patient access for each ground-floor tile (OPEN, PRIVATE or BACK_DOOR), cached per layout. */
 export function patientAccess(state: SimState): Uint8Array {
@@ -59,4 +60,34 @@ export function patientAccess(state: SimState): Uint8Array {
   }
   cache.set(state, { version: state.layoutVersion, access });
   return access;
+}
+
+/**
+ * Where the ambulance crew may wheel a patient they're bringing in: as for
+ * patients, but in by a clinical room's door from outside (the ambulance
+ * entrance to Resus, say) when that room is where they're going.
+ */
+export function crewAccess(state: SimState): Uint8Array {
+  const cached = crewCache.get(state);
+  if (cached && cached.version === state.layoutVersion) return cached.access;
+  const access = patientAccess(state).map((a) => (a === BACK_DOOR ? OPEN : a));
+  crewCache.set(state, { version: state.layoutVersion, access });
+  return access;
+}
+
+/**
+ * The rooms that aren't public routes a route (flattened [x0, y0, ...])
+ * passes through, other than those in `except`, by id.
+ */
+export function privateRoomsCrossed(state: SimState, path: number[], except: number[]): number[] {
+  const grid = state.floors[0]!;
+  const access = patientAccess(state);
+  const out: number[] = [];
+  for (let k = 0; k < path.length; k += 2) {
+    const i = tileIndex(grid, path[k]!, path[k + 1]!);
+    const room = grid.roomId[i]!;
+    if (access[i] !== PRIVATE || except.includes(room) || out.includes(room)) continue;
+    out.push(room);
+  }
+  return out;
 }
