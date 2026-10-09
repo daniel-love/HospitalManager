@@ -3,7 +3,8 @@
  * never modifies it.
  *
  * Layer order (bottom to top): tiles (ground, zones, walls, doors) → objects
- * → room labels → agents → overlays (selection, build ghost, hover box).
+ * → cleaning marks → room labels → agents → overlays (selection, build
+ * ghost, hover box).
  *
  * Frames are drawn on demand, not every tick of the display: render() only
  * draws when something visible has changed (the camera, the hovered tile,
@@ -18,6 +19,7 @@ import { inBounds } from "@sim/world/grid";
 import { accessRequirements, footprintRect, isStandable } from "@sim/world/objects";
 import { outlineTiles, type Rect } from "@sim/world/rect";
 import { AgentLayer } from "./agentLayer";
+import { CleaningLayer } from "./cleaningLayer";
 import { Camera } from "./camera";
 import { TILE_SIZE } from "./constants";
 import { drawBlock, drawFixture, ObjectLayer } from "./objectLayer";
@@ -63,6 +65,7 @@ export class Renderer {
   private readonly world = new Container();
   private tilemap: TilemapLayer;
   private readonly objects = new ObjectLayer();
+  private readonly cleaning = new CleaningLayer();
   private readonly agents = new AgentLayer();
   private readonly labels = new RoomLabelLayer();
   private readonly overlay = new Container();
@@ -115,6 +118,7 @@ export class Renderer {
     this.world.addChild(
       this.tilemap.container,
       this.objects.container,
+      this.cleaning.container,
       this.labels.container,
       this.agents.container,
       this.overlay,
@@ -161,6 +165,7 @@ export class Renderer {
     this.tilemap = new TilemapLayer(grid, state.site);
     this.world.addChildAt(this.tilemap.container, 0);
     this.objects.clear();
+    this.cleaning.clear();
     this.agents.clear();
     if (grid.width !== old.width || grid.height !== old.height) {
       this.camera.setBounds(grid.width * TILE_SIZE, grid.height * TILE_SIZE);
@@ -366,6 +371,7 @@ export class Renderer {
     );
     this.tilemap.update(camera.visibleWorldRect(), camera.zoom);
     this.objects.update(camera.zoom);
+    this.cleaning.update(live);
     this.agents.update(live, alpha);
     this.labels.update(camera.zoom);
 

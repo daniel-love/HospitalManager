@@ -50,7 +50,7 @@
 
 Small fixes and polish from playtesting, to slot in between milestones.
 
-- **Dirty bays and areas:** a visual indicator on the map for couches, trolleys, beds and toilets waiting to be cleaned (and bays closed for a deep clean), so the player can see why a free-looking bay isn't being used.
+- ~~**Dirty bays and areas**~~ (done 2026-10-09): brown smudges and a brown badge on a couch, trolley, bed or toilet waiting to be cleaned (including the deep clean after a death), a blue sparkle while a cleaner works on it, and a red badge on a toilet too dirty to use (render/cleaningLayer.ts). The item's hover card says what it's waiting for, e.g. "no cleaner on staff".
 - **Unreachable rooms for patients:** warn when patients can't reach a room except through a clinical room (since patients keep to public routes).
 
 ## M4: Outpatients, theatres & specialty gating

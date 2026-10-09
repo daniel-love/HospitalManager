@@ -254,6 +254,36 @@ export function freeToilet(state: SimState, from: Point): PlacedObject | undefin
   return nearest(toilets, from);
 }
 
+// ---------- Cleaning ----------
+
+/**
+ * dirty: needs cleaning and nobody's cleaning it yet (a couch, trolley or bed
+ * can't be used; a toilet still can); cleaning: a cleaner is at work on it;
+ * out_of_use: a toilet too dirty to use until it's cleaned.
+ */
+export type CleaningStatus = "dirty" | "cleaning" | "out_of_use";
+
+/** Every item that needs (or is getting) a clean, by object id. */
+export function cleaningStatuses(state: SimState): Map<number, CleaningStatus> {
+  const working = new Set<number>();
+  for (const j of Object.values(state.jobs)) {
+    if ((j.kind === "clean_cubicle" || j.kind === "clean_toilet") && j.state === "working") {
+      working.add(j.objectId!);
+    }
+  }
+  const out = new Map<number, CleaningStatus>();
+  for (const [key, uses] of Object.entries(state.dirt)) {
+    const id = Number(key);
+    const obj = state.objects[id];
+    if (!obj) continue;
+    const toilet = obj.defId === "toilet";
+    if (toilet ? uses < TOILET_USES_BEFORE_CLEAN : uses <= MAX_COUCH_DIRT) continue;
+    if (working.has(id)) out.set(id, "cleaning");
+    else out.set(id, toilet && uses >= MAX_TOILET_DIRT ? "out_of_use" : "dirty");
+  }
+  return out;
+}
+
 /** Where someone stands to use (or clean) an item: in front of it. */
 export function frontOf(obj: PlacedObject): Point {
   const r = objectRect(obj);

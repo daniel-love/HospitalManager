@@ -6,6 +6,7 @@ import { conditionEquipment, content, objectDef, roomById } from "@data/catalogu
 import { EQUIPMENT_CATEGORY_NAMES } from "@data/equipment";
 import type { EquipmentDef, RoomDef } from "@data/schema";
 import { describeAccess, formatMoney } from "@game/tools";
+import { cleaningStatuses, type CleaningStatus } from "@sim/places";
 import type { SimState } from "@sim/state";
 import { itemsAt } from "@sim/world/objects";
 import { roomAt } from "@sim/world/rooms";
@@ -26,6 +27,22 @@ export interface HelpContent {
 }
 
 const nice = (id: string) => id.replace(/_/g, " ");
+
+/** What a dirty item's waiting for, in words. */
+function cleaningText(state: SimState, defId: string, status: CleaningStatus): string {
+  if (status === "cleaning") return "Being cleaned";
+  const toilet = defId === "toilet";
+  const what =
+    status === "out_of_use"
+      ? "Too dirty to use until it's cleaned"
+      : toilet
+        ? "Due a clean (still usable for now)"
+        : "Waiting to be cleaned before the next patient";
+  const cleaners = Object.values(state.staff).filter((s) => s.role === "cleaner");
+  if (cleaners.length === 0) return `${what}: no cleaner on staff`;
+  if (cleaners.every((s) => s.jobId !== null)) return `${what}: cleaners are busy`;
+  return what;
+}
 
 /** Which room types list an item among their requirements. */
 function roomsNeeding(equipmentId: string): string[] {
@@ -106,6 +123,13 @@ export function tileHelp(state: SimState, floor: number, x: number, y: number): 
     const help = equipmentHelp(def.def);
     // On the map, what matters is what it does here, not the shop details.
     help.sections = (help.sections ?? []).filter((s) => s.heading !== "Details");
+    const status = obj && cleaningStatuses(state).get(obj.id);
+    if (status) {
+      help.sections.unshift({
+        heading: "Cleaning",
+        items: [{ text: cleaningText(state, obj.defId, status), ok: status === "cleaning" }],
+      });
+    }
     if (room && roomDef) {
       const missing = room.checks.filter((c) => !c.ok).length;
       help.footer = `In ${roomDef.name}${room.valid ? " ✓" : ` (${missing} to fix)`}`;
