@@ -35,10 +35,11 @@ import {
 import { debrief, die } from "./deaths";
 import type { Incident, Patient, Point, Staff } from "../agents";
 import { emit } from "../events";
-import { couchStatus, release } from "../places";
+import { couchStatus, frontOf, release, seatApproach } from "../places";
 import { chance } from "../rng";
 import type { SimState } from "../state";
 import { clockFromTick, TICKS_PER_MINUTE } from "../time";
+import { isStandable } from "../world/objects";
 import { roomOfObject } from "../world/rooms";
 import {
   dirtyCouch,
@@ -155,11 +156,26 @@ function whereIs(state: SimState, p: Patient): string {
   return room ? (roomById.get(room.typeId)?.name ?? "department") : "department";
 }
 
+/**
+ * Someone who arrests in a chair or on the toilet is lowered to the floor in
+ * front of it for CPR, where the team (and later the porter) can reach them.
+ */
+function lowerToFloor(state: SimState, p: Patient): void {
+  if (p.path.length > 0) return; // Walking: already on the floor.
+  const seat = p.seat && state.objects[p.seat.objectId];
+  const toilet = p.toilet && p.toilet.left >= 0 ? state.objects[p.toilet.objectId] : undefined;
+  const spot = seat ? seatApproach(seat, p.seat!.slot) : toilet ? frontOf(toilet) : null;
+  if (!spot || !isStandable(state.floors[0]!, spot.x, spot.y)) return;
+  p.x = p.prevX = spot.x;
+  p.y = p.prevY = spot.y;
+}
+
 /** Cardiac arrest: crash call, and an incident report. */
 function collapse(state: SimState, p: Patient): void {
   const d = p.deterioration!;
   const causes = incidentCauses(state, p);
   for (const job of jobsForPatient(state, p.id)) removeJob(state, job);
+  lowerToFloor(state, p);
   releaseSeat(state, p);
   if (p.toilet) release(state, p.toilet.objectId, 0, p.id);
   if (p.desk !== null) release(state, p.desk, 0, p.id);

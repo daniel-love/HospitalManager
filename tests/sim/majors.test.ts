@@ -14,6 +14,7 @@ import { spawnPatient } from "@sim/systems/arrivals";
 import { bedCover, coverageView, observedBeds, stationsSeeing } from "@sim/systems/monitoring";
 import { TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 import { tileIndex } from "@sim/world/grid";
+import { isStandable } from "@sim/world/objects";
 import {
   BAY_ROWS,
   buildMajorsAE,
@@ -21,7 +22,7 @@ import {
   STATION_SPOT,
   staffedMajorsAE,
 } from "../fixtures/majorsAE";
-import { applyAll, staffedSmallAE } from "../fixtures/smallAE";
+import { applyAll, SMALL_AE_TEAM, staffedSmallAE } from "../fixtures/smallAE";
 import { invariantProblems, run } from "./simHelpers";
 
 const MIN = TICKS_PER_MINUTE;
@@ -297,6 +298,22 @@ describe("a crash call", () => {
     runUntil(state, () => state.jobs[doctor.jobId ?? -1]?.kind === "resus", 2 * MIN);
     expect(interrupted).toMatchObject({ state: "open", staffId: null, progress: 0 });
     expect(invariantProblems(state)).toEqual([]);
+  });
+  it("reaches someone who arrests in a waiting-room chair, lowered to the floor", () => {
+    // No nurses to triage them, so they sit and wait.
+    const state = staffedSmallAE(3, { ...SMALL_AE_TEAM, nurse: 0 });
+    state.settings.patientVolume = 0;
+    const p = spawnPatient(state, siteEntrance(state)!, "minor_illness");
+    runUntil(state, () => p.stage === "waiting_triage" && p.seat !== null && p.path.length === 0);
+    p.deterioration = { onset: state.tick - 30 * MIN, crash: state.tick, noticed: null };
+    runUntil(state, () => p.stage === "collapsed", 2 * MIN);
+    expect(isStandable(state.floors[0]!, p.x, p.y)).toBe(true);
+    // The A&E doctor gets there, rather than leaving it to the arrest team.
+    runUntil(
+      state,
+      () => Object.values(state.jobs).some((j) => j.kind === "resus" && j.state === "working"),
+      10 * MIN,
+    );
   });
 });
 
