@@ -287,6 +287,30 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v14 (M4): the Medical Examiner is a consultant's duty. Dedicated
+  // Medical Examiners become General Medicine consultants with the duty.
+  13: (save) => {
+    type Staff = { role: string; specialty: unknown };
+    const state = save.state as {
+      patients: object[];
+      staff: Staff[];
+      jobs: { roles: string[] }[];
+    };
+    const me = (r: string) => (r === "medical_examiner" ? "consultant" : r);
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients.map((p) => ({ ...p, consultants: [] })),
+        staff: state.staff.map((s) =>
+          s.role === "medical_examiner"
+            ? { ...s, role: "consultant", specialty: "general_medicine", meDuty: true }
+            : { ...s, meDuty: false },
+        ),
+        jobs: state.jobs.map((j) => ({ ...j, roles: [...new Set(j.roles.map(me))] })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

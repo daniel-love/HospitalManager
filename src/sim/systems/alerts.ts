@@ -170,12 +170,12 @@ export function updateAlerts(state: SimState): void {
 
   // After deaths: the mortuary and Medical Examiner.
   const awaitingReview = count((p) => p.stage === "in_mortuary" && p.death?.meReviewed === null);
-  if (awaitingReview > 0 && !hasStaff("medical_examiner")) {
+  if (awaitingReview > 0 && !Object.values(state.staff).some((s) => s.meDuty)) {
     warn(
       state,
       "no_medical_examiner",
       COOLDOWN,
-      `${plural(awaitingReview, "death is", "deaths are")} waiting for review, but you have no Medical Examiner. Nobody can be released from the mortuary.`,
+      `${plural(awaitingReview, "death is", "deaths are")} waiting for review, but no consultant has the Medical Examiner duty. Nobody can be released from the mortuary: give a resident consultant the duty in their inspector.`,
       "bad",
     );
   }

@@ -34,7 +34,7 @@ import { NEWS_URGENT } from "@data/monitoring";
 import { removeJob, unassignJob } from "./jobBoard";
 import { headTo } from "./movement";
 import { TICKS_PER_MINUTE } from "../time";
-import { claimDeathPlace, runDeathJob } from "./deaths";
+import { canReviewDeath, claimDeathPlace, runDeathJob } from "./deaths";
 import { afterTriage, backToWaiting, callToBed, postTreatment } from "./patients";
 import { canDo } from "./staffing";
 
@@ -69,6 +69,10 @@ export function assignJobs(state: SimState): void {
     .sort((a, b) => a.dueTick - b.dueTick || a.id - b.id);
   for (const job of open) {
     let candidates = idle.filter((s) => canDo(s, job) && s.jobId === null);
+    if (job.kind === "me_review") {
+      const p = job.patientId === null ? undefined : state.patients[job.patientId];
+      candidates = candidates.filter((s) => canReviewDeath(state, s, p));
+    }
     if (candidates.length === 0 && job.kind === "resus") candidates = pullOffWork(state, job);
     if (candidates.length === 0) continue;
     const place = claimPlace(state, job);
@@ -207,6 +211,10 @@ export function runJobs(state: SimState): void {
       job.state = "working";
       if (job.kind === "treat" && patient && patient.times.seen === null) {
         patient.times.seen = state.tick;
+      }
+      // A consultant who treats a patient can't be their Medical Examiner.
+      if (patient && staff.role === "consultant" && !patient.consultants.includes(staff.id)) {
+        patient.consultants.push(staff.id);
       }
     }
     if (++job.progress >= job.durationTicks) complete(state, job, obj);

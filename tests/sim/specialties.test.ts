@@ -172,6 +172,8 @@ describe("on-call consultants", () => {
     expect(state.tick).toBe(arrives);
     expect(hourlySalaries(state)).toBeCloseTo(idle + ON_CALL.hourly);
     runUntil(state, () => p.stage === "awaiting_bed");
+    // Having treated them, they couldn't be this patient's Medical Examiner.
+    expect(p.consultants).toEqual([c.id]);
 
     // Nothing more to do: home after an hour, off the map.
     runUntil(state, () => c.onCall!.state === "home", (ON_CALL.homeAfterIdleMins + 60) * MIN);

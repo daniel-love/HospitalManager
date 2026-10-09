@@ -170,6 +170,7 @@ const patientSchema = z.object({
     admitted: nullableInt,
     left: nullableInt,
   }),
+  consultants: z.array(int.positive()),
   specialty: z.enum(specialtyIds).nullable(),
   stayUntil: nullableInt,
   endOfLife: z.boolean(),
@@ -198,6 +199,7 @@ const staffSchema = z.object({
   onCall: z
     .object({ state: z.enum(["home", "called", "in", "leaving"]), at: int.min(0) })
     .nullable(),
+  meDuty: z.boolean(),
   jobId: nullableInt,
   desk: nullableInt,
   hiredTick: int.min(0),

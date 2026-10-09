@@ -160,6 +160,11 @@ export interface Patient extends AgentBase {
     admitted: number | null;
     left: number | null;
   };
+  /**
+   * Consultants who have treated them (staff ids), who can't then be their
+   * Medical Examiner.
+   */
+  consultants: number[];
   /** The specialty they're referred or admitted to, once decided; null before. */
   specialty: SpecialtyId | null;
   /** Inpatients: the tick they'll be well enough for the discharge review. */
@@ -185,6 +190,8 @@ export interface Staff extends AgentBase {
   specialty: SpecialtyId | null;
   /** On-call consultants; null for staff resident in the hospital. */
   onCall: OnCall | null;
+  /** Resident consultants: does Medical Examiner reviews in office-hours sessions. */
+  meDuty: boolean;
   jobId: number | null;
   /** Receptionists: the desk they staff. Nurses: the nurse station they wait at. */
   desk: number | null;

@@ -25,6 +25,7 @@ export function App({ game }: { game: Game }) {
         onClose={() => game.select(null)}
         onMove={(id) => game.startMove(id)}
         onWardSpecialty={(sp) => game.setWardSpecialty(sp)}
+        onMeDuty={(id, on) => game.applyStaff({ type: "set_me_duty", id, on })}
       />
       {/* Strips under the top bar stack rather than overlap. */}
       <div class="under-topbar">

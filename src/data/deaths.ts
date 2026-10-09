@@ -27,6 +27,12 @@ export const DEEP_CLEAN_MINS: [number, number] = [30, 45];
 export const DEBRIEF_MINS: [number, number] = [5, 10];
 /** The Medical Examiner's review of the notes and the death certificate. */
 export const ME_REVIEW_MINS: [number, number] = [30, 45];
+/**
+ * Medical Examiners are consultants who do it as a part-time duty, in
+ * sessions in office hours, Monday to Friday (hours, 24-hour clock). Out of
+ * hours, deaths wait for the next session, as they do in real hospitals.
+ */
+export const ME_SESSION = { startHour: 9, endHour: 17 };
 
 /**
  * With no mortuary space, the hospital's contingency arrangement (an external

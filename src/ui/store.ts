@@ -97,6 +97,8 @@ export type AgentInfo =
       annualCost: number;
       /** 0–100. */
       morale: number;
+      /** Resident consultants: whether they have the Medical Examiner duty. */
+      meDuty?: boolean;
     };
 
 export interface InspectorData {

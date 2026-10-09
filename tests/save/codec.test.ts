@@ -77,7 +77,7 @@ describe("save codec", () => {
     expect(save.meta).toMatchObject({
       name: "My A&E",
       savedAt: "2026-10-08T12:00:00.000Z",
-      gameTime: "Day 1  08:00",
+      gameTime: "Mon day 1  08:00",
     });
   });
 
@@ -466,6 +466,54 @@ describe("specialties in saves", () => {
     }
     const loaded = decodeSave(save).state;
     expect(loaded.history[0]!.stats.referrals).toBe(0);
+    expect(snapshot(loaded)).toEqual(snapshot({ ...state, events: [] }));
+  });
+});
+
+describe("the Medical Examiner in saves", () => {
+  it("upgrades a version-13 save's dedicated Medical Examiner to a consultant with the duty", () => {
+    const state = buildMajorsAE(4, { ward: "door_double" });
+    const r = applyStaffCommand(state, {
+      type: "hire_staff",
+      role: "consultant",
+      specialty: "general_medicine",
+    });
+    if (!r.ok) throw new Error(r.error);
+    applyStaffCommand(state, { type: "set_me_duty", id: r.staff.id, on: true });
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v13")));
+    save.version = 13;
+    for (const p of save.state.patients) delete p.consultants;
+    for (const s of save.state.staff) {
+      delete s.meDuty;
+      if (s.id === r.staff.id) Object.assign(s, { role: "medical_examiner", specialty: null });
+    }
+    save.state.jobs.push({
+      id: 999,
+      kind: "me_review",
+      roles: ["medical_examiner"],
+      specialty: null,
+      patientId: null,
+      objectId: null,
+      roomType: "",
+      capabilities: [],
+      step: 0,
+      dueTick: 0,
+      durationTicks: 300,
+      progress: 0,
+      staffId: null,
+      state: "open",
+      createdTick: 0,
+    });
+    save.state.nextJobId = 1000;
+    const loaded = decodeSave(save).state;
+    expect(loaded.staff[r.staff.id]).toMatchObject({
+      role: "consultant",
+      specialty: "general_medicine",
+      meDuty: true,
+    });
+    expect(loaded.jobs[999]!.roles).toEqual(["consultant"]);
+    delete loaded.jobs[999];
+    loaded.nextJobId = state.nextJobId;
     expect(snapshot(loaded)).toEqual(snapshot({ ...state, events: [] }));
   });
 });

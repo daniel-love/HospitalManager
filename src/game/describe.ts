@@ -575,6 +575,7 @@ export function describeStaff(state: SimState, s: Staff): AgentInfo {
     activity: staffActivity(state, s),
     annualCost: annualCost(s),
     morale: Math.round(s.morale),
+    ...(s.role === "consultant" && !s.onCall ? { meDuty: s.meDuty } : {}),
   };
 }
 

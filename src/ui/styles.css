@@ -783,6 +783,18 @@ body.planning #game::after {
   border-radius: 4px;
   padding: 2px 4px;
 }
+.duty-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  margin: 6px 0;
+}
+.duty-toggle .dim {
+  flex-basis: 100%;
+  font-size: 12px;
+}
 .ward-specialty {
   display: flex;
   flex-direction: column;

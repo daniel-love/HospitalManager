@@ -179,7 +179,6 @@ export const staffRoleIds = [
   "junior_doctor",
   "porter",
   "cleaner",
-  "medical_examiner",
   "consultant",
   "registrar",
 ] as const;

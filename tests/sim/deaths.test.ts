@@ -185,16 +185,16 @@ describe("when there's nowhere to go", () => {
   });
 
   it("can't release anyone without a Medical Examiner", () => {
-    const state = settled(
-      staffedDeathsWard(1, { nurse: 2, junior_doctor: 1, porter: 1, cleaner: 1 }),
-    );
+    const state = settled(staffedDeathsWard(1, undefined, { medicalExaminer: false }));
     const p = inpatient(state, bedIn(state, "ward"));
     die(state, p, false, true);
     runUntil(state, () => p.stage === "in_mortuary");
     for (let i = 0; i < 12 * HOUR; i++) tick(state);
     expect(p.death!.meReviewed).toBeNull();
     expect(state.patients[p.id]).toBeDefined();
-    expect(state.events.map((e) => e.text).join("\n")).toMatch(/no Medical Examiner/);
+    expect(state.events.map((e) => e.text).join("\n")).toMatch(
+      /no consultant has the Medical Examiner duty/,
+    );
   });
 });
 

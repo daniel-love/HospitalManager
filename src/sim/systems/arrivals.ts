@@ -232,6 +232,7 @@ export function spawnPatient(
       admitted: null,
       left: null,
     },
+    consultants: [],
     specialty: null,
     stayUntil: null,
     endOfLife: false,

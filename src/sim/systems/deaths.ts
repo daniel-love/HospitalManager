@@ -8,7 +8,9 @@
  *     → last offices (two nurses; the bay stays closed)
  *     → a porter takes them to the Mortuary on a covered trolley
  *     → the bay is deep cleaned
- *     → Medical Examiner review (and for some, the coroner: days)
+ *     → Medical Examiner review (and for some, the coroner: days), by a
+ *       consultant with the duty, in an office-hours session, who didn't
+ *       treat them
  *     → released to the funeral director
  *
  * Expected deaths (end-of-life care on a ward) need no crash call, but should
@@ -26,6 +28,7 @@ import {
   DEEP_CLEAN_MINS,
   LAST_OFFICES_MINS,
   ME_REVIEW_MINS,
+  ME_SESSION,
   MORALE_HIT_EXPECTED,
   MORALE_HIT_TEAM,
   MORALE_HIT_UNEXPECTED,
@@ -34,12 +37,19 @@ import {
   RELEASE_HOURS,
   VERIFY_MINS,
 } from "@data/deaths";
-import type { Incident, Job, Patient, Point, Staff } from "../agents";
+import { onSite, type Incident, type Job, type Patient, type Point, type Staff } from "../agents";
 import { emit, warn } from "../events";
 import { bedside, deskStaffSpot, frontOf, holder, release, reserve } from "../places";
 import { chance, nextFloat } from "../rng";
 import type { PlacedObject, SimState } from "../state";
-import { clockFromTick, TICKS_PER_MINUTE } from "../time";
+import {
+  clockFromTick,
+  isWeekday,
+  MINUTES_PER_DAY,
+  TICKS_PER_MINUTE,
+  tickAt,
+  WEEKDAY_NAMES,
+} from "../time";
 import { roomAt, roomOfObject } from "../world/rooms";
 import { bedRouteExists } from "./admissions";
 import { earn } from "./finance";
@@ -207,6 +217,38 @@ export function debrief(state: SimState, team: Staff[], died: boolean): void {
     job.state = "working";
     s.jobId = job.id;
   }
+}
+
+// ---------- The Medical Examiner ----------
+
+/** Whether it's a Medical Examiner session: a weekday, in office hours. */
+export function inMeSession(tick: number): boolean {
+  const c = clockFromTick(tick);
+  return isWeekday(c) && c.hour >= ME_SESSION.startHour && c.hour < ME_SESSION.endHour;
+}
+
+/** When the next Medical Examiner session starts, from `tick` (now, if one's on). */
+export function nextMeSession(tick: number): number {
+  if (inMeSession(tick)) return tick;
+  const c = clockFromTick(tick);
+  for (let day = c.day; day < c.day + 8; day++) {
+    const start = tickAt(day, ME_SESSION.startHour);
+    if (start > tick && isWeekday(clockFromTick(start))) return start;
+  }
+  return tick + MINUTES_PER_DAY * TICKS_PER_MINUTE; // Unreachable.
+}
+
+/** Consultants with the Medical Examiner duty (whether or not they're free). */
+export function medicalExaminers(state: SimState): Staff[] {
+  return Object.values(state.staff).filter((s) => s.meDuty);
+}
+
+/**
+ * Whether a member of staff can be this death's Medical Examiner: a
+ * consultant with the duty, in a session, who didn't treat them.
+ */
+export function canReviewDeath(state: SimState, s: Staff, p: Patient | undefined): boolean {
+  return s.meDuty && onSite(s) && inMeSession(state.tick) && !!p && !p.consultants.includes(s.id);
 }
 
 function lowerMorale(s: Staff, by: number): void {
@@ -477,7 +519,7 @@ export function updateDeaths(state: SimState): void {
       if (d.meReviewed === null && !jobs.some((j) => j.kind === "me_review")) {
         postJob(state, {
           kind: "me_review",
-          roles: ["medical_examiner"],
+          roles: ["consultant"],
           patientId: p.id,
           roomType: "",
           dueTick: d.tick,
@@ -689,10 +731,29 @@ export function deathStepStatus(state: SimState, p: Patient, step: DeathStep): D
       if (d.inMortuary === null) return status("waiting", "Once they're in the mortuary");
       const busy = taken("me_review", (who) => `${who} is reviewing the notes`);
       if (busy) return busy;
-      const blocked = unstaffed(["medical_examiner"]);
-      if (blocked) return blocked;
+      const examiners = medicalExaminers(state);
+      if (examiners.length === 0) {
+        return status("blocked", "No consultant has the Medical Examiner duty");
+      }
+      const independent = examiners.filter((s) => !p.consultants.includes(s.id));
+      if (independent.length === 0) {
+        return status(
+          "blocked",
+          examiners.length === 1
+            ? "The only Medical Examiner treated them, so can't review their death: give another consultant the duty"
+            : "Every Medical Examiner treated them: give another consultant the duty",
+        );
+      }
       if (!Object.values(state.objects).some((o) => o.defId === "desk")) {
         return status("blocked", "No desk for the Medical Examiner to work at");
+      }
+      if (!inMeSession(state.tick)) {
+        const c = clockFromTick(nextMeSession(state.tick));
+        const hh = String(c.hour).padStart(2, "0");
+        return status(
+          "waiting",
+          `Medical Examiner sessions are Monday to Friday, ${String(ME_SESSION.startHour).padStart(2, "0")}:00 to ${ME_SESSION.endHour}:00. Next: ${WEEKDAY_NAMES[c.weekday]} ${hh}:00`,
+        );
       }
       return freeDesk(state)
         ? status("waiting", "Waiting for the Medical Examiner")

@@ -37,7 +37,7 @@ export const staffRoles: StaffRoleInput[] = [
     annualCost: 160_000,
     specialist: true,
     description:
-      "The senior doctor of a specialty. Reviews A&E patients referred to the specialty and decides to admit them, like a registrar. Can be resident (always in the hospital) or on call from home: much cheaper, but called in only when nobody from the specialty is in the hospital, and takes 20 to 40 minutes to arrive.",
+      "The senior doctor of a specialty. Reviews A&E patients referred to the specialty and decides to admit them, like a registrar. Can be resident (always in the hospital) or on call from home: much cheaper, but called in only when nobody from the specialty is in the hospital, and takes 20 to 40 minutes to arrive. A resident consultant can be given the Medical Examiner duty (in their inspector): they review deaths at a desk, Monday to Friday 09:00 to 17:00, but never a death of a patient they treated.",
   },
   {
     id: "registrar",
@@ -57,15 +57,6 @@ export const staffRoles: StaffRoleInput[] = [
     annualCost: 65_000,
     description:
       "FY2/SHO resident doctor. Assesses and treats patients in Minors and Majors, leads resuscitation at a cardiac arrest, and decides when patients can go home.",
-  },
-  {
-    id: "medical_examiner",
-    name: "Medical Examiner",
-    short: "Medical Examiners",
-    group: "medical",
-    annualCost: 42_000,
-    description:
-      "A senior doctor dedicated to reviewing deaths, independently of the team that cared for the patient. Reviews every death at a desk before the death certificate is issued and the body can be released, and does no other work. Without one, the mortuary fills up.",
   },
   {
     id: "nurse",

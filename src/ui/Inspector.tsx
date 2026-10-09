@@ -6,10 +6,12 @@ export function Inspector({
   onClose,
   onMove,
   onWardSpecialty,
+  onMeDuty,
 }: {
   onClose: () => void;
   onMove: (objectId: number) => void;
   onWardSpecialty: (specialty: SpecialtyId | null) => void;
+  onMeDuty: (staffId: number, on: boolean) => void;
 }) {
   const data = inspector.value;
   if (!data) return null;
@@ -19,7 +21,7 @@ export function Inspector({
       <button class="close" title="Close (Esc)" onClick={onClose}>
         ×
       </button>
-      {agent && <AgentSection agent={agent} />}
+      {agent && <AgentSection agent={agent} onMeDuty={onMeDuty} />}
       {object && (
         <section>
           <h2>{object.name}</h2>
@@ -142,7 +144,13 @@ function moodWord(mood: number): string {
   return "Angry: may leave";
 }
 
-function AgentSection({ agent }: { agent: AgentInfo }) {
+function AgentSection({
+  agent,
+  onMeDuty,
+}: {
+  agent: AgentInfo;
+  onMeDuty: (staffId: number, on: boolean) => void;
+}) {
   if (agent.kind === "staff") {
     return (
       <section>
@@ -151,6 +159,20 @@ function AgentSection({ agent }: { agent: AgentInfo }) {
           {agent.role} · {formatMoney(agent.annualCost)}/yr
         </p>
         <p>{agent.activity}</p>
+        {agent.meDuty !== undefined && (
+          <label class="duty-toggle">
+            <input
+              type="checkbox"
+              checked={agent.meDuty}
+              onChange={(e) => onMeDuty(agent.id, (e.currentTarget as HTMLInputElement).checked)}
+            />{" "}
+            Medical Examiner duty
+            <span class="dim">
+              Reviews deaths at a desk, Monday to Friday 09:00 to 17:00, but never a death of a
+              patient they treated. Clinical work the rest of the time.
+            </span>
+          </label>
+        )}
         <h4>Morale</h4>
         <div class="meter" title={`${agent.morale} / 100`}>
           <div

@@ -23,7 +23,7 @@ export function Notifications({ game }: { game: Game }) {
               title={n.at ? "Show on the map" : undefined}
               onClick={() => n.at && game.focus(n.at)}
             >
-              <span class="when">{n.when.replace(/^Day \d+\s+/, "")}</span>
+              <span class="when">{n.when.replace(/^\w{3} day \d+\s+/, "")}</span>
               {n.text}
             </button>
           </li>

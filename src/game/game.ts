@@ -218,6 +218,7 @@ export class Game {
     this.drainEvents();
     this.refreshPanels();
     this.publishHud();
+    if (cmd.type === "set_me_duty") this.publishInspector();
   }
 
   /**

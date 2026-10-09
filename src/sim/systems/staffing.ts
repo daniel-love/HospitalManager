@@ -38,7 +38,9 @@ export type StaffCommand =
       /** Consultants: on call from home rather than resident. */
       onCall?: boolean;
     }
-  | { type: "dismiss_staff"; id: number };
+  | { type: "dismiss_staff"; id: number }
+  /** Gives a resident consultant the Medical Examiner duty, or takes it away. */
+  | { type: "set_me_duty"; id: number; on: boolean };
 
 export type StaffResult = { ok: true; staff: Staff } | { ok: false; error: string };
 
@@ -65,6 +67,7 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
       role: cmd.role,
       specialty: role.specialist ? cmd.specialty! : null,
       onCall: cmd.onCall ? { state: "home", at: state.tick } : null,
+      meDuty: false,
       x: at.x,
       y: at.y,
       prevX: at.x,
@@ -88,6 +91,13 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
   }
   const staff = state.staff[cmd.id];
   if (!staff) return { ok: false, error: "No such member of staff" };
+  if (cmd.type === "set_me_duty") {
+    if (cmd.on && (staff.role !== "consultant" || staff.onCall)) {
+      return { ok: false, error: "Only resident consultants can be Medical Examiners" };
+    }
+    staff.meDuty = cmd.on;
+    return { ok: true, staff };
+  }
   const job = staff.jobId === null ? undefined : state.jobs[staff.jobId];
   if (job) {
     // Back on the board for someone else, keeping its place and patient.
@@ -103,7 +113,7 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
 export function staffTitle(s: Staff): string {
   const role = staffRoleById.get(s.role)!.name;
   const specialty = s.specialty ? `${specialtyById.get(s.specialty)!.name} ` : "";
-  return `${specialty}${role}${s.onCall ? " (on call)" : ""}`;
+  return `${specialty}${role}${s.onCall ? " (on call)" : ""}${s.meDuty ? ", Medical Examiner" : ""}`;
 }
 
 export function updateStaff(state: SimState): void {

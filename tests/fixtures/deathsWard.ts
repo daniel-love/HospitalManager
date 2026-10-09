@@ -15,6 +15,7 @@
  */
 import type { Command } from "@sim/commands";
 import { createSimState, type Rotation, type SimState } from "@sim/state";
+import { applyStaffCommand } from "@sim/systems/staffing";
 import { WallType } from "@sim/world/grid";
 import { applyAll, hireTeam, type StaffCounts } from "./smallAE";
 
@@ -102,17 +103,25 @@ export const DEATHS_TEAM: StaffCounts = {
   nurse: 2,
   junior_doctor: 1,
   porter: 1,
-  medical_examiner: 1,
   cleaner: 1,
 };
 
+/** The deaths ward with a team, and (unless `medicalExaminer` is false) a consultant Medical Examiner. */
 export function staffedDeathsWard(
   seed = 1,
   team: StaffCounts = DEATHS_TEAM,
-  opts: DeathsOptions = {},
+  opts: DeathsOptions & { medicalExaminer?: boolean } = {},
 ): SimState {
   const state = buildDeathsWard(seed, opts);
   hireTeam(state, team);
+  if (opts.medicalExaminer !== false) {
+    const r = applyStaffCommand(state, {
+      type: "hire_staff",
+      role: "consultant",
+      specialty: "general_medicine",
+    });
+    if (r.ok) applyStaffCommand(state, { type: "set_me_duty", id: r.staff.id, on: true });
+  }
   state.settings.patientVolume = 0;
   return state;
 }
