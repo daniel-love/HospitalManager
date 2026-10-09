@@ -63,6 +63,21 @@ describe("a staffed small A&E over 24 hours", () => {
   });
 });
 
+describe("patients' mood", () => {
+  it("picks up as their care moves on, not only falls while they wait", () => {
+    const state = staffedSmallAE(3);
+    const lowest = new Map<number, number>();
+    const departed = run(state, TICKS_PER_DAY / 2, (s) => {
+      for (const p of Object.values(s.patients))
+        lowest.set(p.id, Math.min(p.mood, lowest.get(p.id) ?? 100));
+    });
+    const discharged = departed.filter((p) => p.outcome === "discharged");
+    expect(discharged.length).toBeGreaterThan(5);
+    // Triage, being seen, each step and the decision to go home all lift it.
+    for (const p of discharged) expect(p.mood).toBeGreaterThan(lowest.get(p.id)! + 10);
+  });
+});
+
 describe("draining the department", () => {
   it("lets everyone out once arrivals stop, with nothing left reserved", () => {
     const state = staffedSmallAE(5);

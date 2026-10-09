@@ -139,7 +139,7 @@ describe("admission", () => {
   });
 
   it("stays on the trolley without a porter, and says why", () => {
-    const state = quiet({ ward: "door_double" }, MAJORS_TEAM);
+    const state = quiet({ ward: "door_double" }, { ...MAJORS_TEAM, porter: 0 });
     const p = admitted(state);
     for (let i = 0; i < HOUR; i++) tick(state);
     expect(p.stage).toBe("awaiting_bed");

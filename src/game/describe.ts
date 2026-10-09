@@ -43,6 +43,7 @@ import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { annualCost } from "@sim/systems/finance";
 import { formatWait, inAE } from "@sim/systems/patients";
 import { canDo, staffTitle } from "@sim/systems/staffing";
+import { analysers, pendingResults } from "@sim/systems/diagnostics";
 import { clockFromTick, TICKS_PER_MINUTE } from "@sim/time";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { roomAt, roomOfObject } from "@sim/world/rooms";
@@ -139,6 +140,8 @@ export function waitReason(state: SimState, p: Patient): string | null {
     return s ? `${staffRoleById.get(s.role)!.name} ${s.name} is on the way` : null;
   }
   if (p.toilet) return "At the toilet, so the next patient is called instead";
+  const results = resultsReason(state, p, job);
+  if (results) return results;
 
   const reasons: string[] = [];
   const able = Object.values(state.staff).filter((s) => canDo(s, job));
@@ -199,6 +202,43 @@ export function waitReason(state: SimState, p: Patient): string | null {
     );
   }
   return reasons.length > 0 ? reasons.join(" · ") : "About to be called";
+}
+
+/**
+ * For a step that needs results: what they're waiting for, e.g. "Waiting for
+ * blood results: the sample is on the analyser, back in about 20 min".
+ */
+function resultsReason(state: SimState, p: Patient, job: Job): string | null {
+  if (job.kind !== "treat") return null;
+  const step = conditionById.get(p.conditionId)!.pathway[job.step];
+  if (!step?.needsResults) return null;
+  const pending = pendingResults(state, p);
+  if (pending.length === 0) return null;
+  const parts = pending.map((i) => {
+    if (i.test === "bloods") {
+      if (i.done === null) {
+        const carry = Object.values(state.jobs).find(
+          (j) => j.patientId === p.id && j.kind === "carry_sample",
+        );
+        if (analysers(state).length === 0) return "blood results: there's no working Pathology Lab";
+        if (carry?.state === "open") {
+          return Object.values(state.staff).some((s) => s.role === "porter")
+            ? "blood results: the sample is waiting for a free porter"
+            : "blood results: no porter on staff to take the sample to the lab";
+        }
+        return "blood results: a porter is taking the sample to the lab";
+      }
+      if (i.ready === null) {
+        return Object.values(state.staff).some((s) => s.role === "biomedical_scientist")
+          ? "blood results: the sample is waiting for a biomedical scientist"
+          : "blood results: no biomedical scientist on staff to process the sample";
+      }
+      return `blood results, back in about ${formatWait(Math.max(1, Math.ceil((i.ready - state.tick) / TICKS_PER_MINUTE)))}`;
+    }
+    const mins = Math.max(1, Math.ceil((i.ready! - state.tick) / TICKS_PER_MINUTE));
+    return `the CT report, in about ${formatWait(mins)}`;
+  });
+  return `Waiting for ${parts.join(", and ")}`;
 }
 
 /** Whether any free ward bed can be reached by bed from where the patient is. */
@@ -300,8 +340,12 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
   if (p.stage.startsWith("waiting") && !p.toilet) {
     needs.push(p.seat ? "Has a seat" : "Standing: no free seat");
   }
-  if (p.bladder >= 90 && !p.toilet) needs.push("Desperate for the toilet");
-  else if (p.bladder >= 70 && !p.toilet) needs.push("Needs the toilet");
+  // Ward toilet needs aren't modelled yet (left to the ward team), so a
+  // bladder carried up from A&E isn't shown once they're on the ward.
+  if (p.stage !== "on_ward" && !p.toilet) {
+    if (p.bladder >= 90) needs.push("Desperate for the toilet");
+    else if (p.bladder >= 70) needs.push("Needs the toilet");
+  }
 
   const t = p.times;
   const byAmbulance = p.ambulanceId !== null;
@@ -321,6 +365,17 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
     timeline.push({ label: "Escalated: getting worse", at: clockAt(d.noticed) });
   if (d && p.stage === "collapsed")
     timeline.push({ label: "Cardiac arrest", at: clockAt(d.crash) });
+  for (const i of p.investigations) {
+    const what = i.test === "bloods" ? "Bloods" : i.test === "xray" ? "X-ray" : "CT scan";
+    if (i.test === "bloods") timeline.push({ label: "Bloods sent", at: clockAt(i.requested) });
+    else if (i.done !== null) timeline.push({ label: what, at: clockAt(i.done) });
+    if (i.ready !== null && i.ready <= state.tick && i.test !== "xray") {
+      timeline.push({
+        label: i.test === "ct" ? "CT reported" : "Blood results back",
+        at: clockAt(i.ready),
+      });
+    }
+  }
   if (t.referred !== null && p.specialty) {
     const name = specialtyById.get(p.specialty)!.name;
     timeline.push({ label: `Referred to ${name}`, at: clockAt(t.referred) });
@@ -520,6 +575,12 @@ export function staffState(state: SimState, s: Staff): StaffState {
       break;
     case "arrange_transfer":
       what = `Arranging a transfer to another hospital: ${who}`;
+      break;
+    case "carry_sample":
+      what = `Taking ${who}'s blood sample to the lab`;
+      break;
+    case "lab_test":
+      what = `Processing ${who}'s blood sample`;
       break;
     case "transfer":
       what = `Taking ${who} to the ward`;
@@ -794,8 +855,11 @@ export function describePatientTable(state: SimState): PatientTable {
     const short: string[] = [];
     if (STAGE_GROUPS[p.stage] === "waiting" && !p.seat && !p.toilet) short.push("Standing");
     if (p.toilet) short.push("At the toilet");
-    else if (p.bladder >= 90) short.push("Desperate for the toilet");
-    else if (p.bladder >= 70) short.push("Needs the toilet");
+    else if (p.stage !== "on_ward") {
+      // Ward toilet needs aren't modelled yet.
+      if (p.bladder >= 90) short.push("Desperate for the toilet");
+      else if (p.bladder >= 70) short.push("Needs the toilet");
+    }
     rows.push({
       id: p.id,
       name: p.name,

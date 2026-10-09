@@ -19,6 +19,8 @@ export const WallType = {
   Standard: 1,
   /** Glazed: blocks movement but not line of sight. */
   Glass: 2,
+  /** Lead-lined: shields X-ray and CT rooms (radiation protection). */
+  Lead: 3,
 } as const;
 export type WallType = (typeof WallType)[keyof typeof WallType];
 

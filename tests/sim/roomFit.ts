@@ -62,7 +62,7 @@ export function buildRoom(roomType: string, w: number, h: number, walled = false
     if (!r.ok) throw new Error(`${JSON.stringify(cmd)}: ${r.error}`);
   };
   run({ type: "build_floor", floor: 0, rect: { x: 0, y: 0, w: W, h: H } });
-  const side = WallType.Standard;
+  const side = def.shielded ? WallType.Lead : WallType.Standard;
   run({ type: "build_walls", floor: 0, rect: { x: 0, y: 0, w: W, h: 1 }, wall: side });
   run({ type: "build_walls", floor: 0, rect: { x: 0, y: 1, w: 1, h }, wall: side });
   run({ type: "build_walls", floor: 0, rect: { x: W - 1, y: 1, w: 1, h }, wall: side });

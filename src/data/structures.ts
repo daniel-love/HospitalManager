@@ -49,6 +49,14 @@ export const walls = [
     blocksSight: false,
     description: "Blocks movement but not line of sight. Useful for observation.",
   },
+  {
+    type: WallType.Lead,
+    name: "Lead-lined wall",
+    costPerTile: 1400,
+    blocksSight: true,
+    description:
+      "A wall with lead sheet in it, for radiation protection. X-ray and CT rooms must be enclosed by it (doors are lead-lined too). Draw it over existing walls to upgrade them.",
+  },
 ];
 
 export const doors = [

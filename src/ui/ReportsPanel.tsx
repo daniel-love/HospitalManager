@@ -368,6 +368,39 @@ function FlowSections({ stats: s }: { stats: FlowStats }) {
       </div>
 
       <div class="report-group">
+        <h4>Diagnostics</h4>
+        <table class="report-table">
+          <tbody>
+            <Row label="X-rays" value={s.xrays} />
+            <Row label="CT scans" value={s.ctScans} />
+            {s.ctScans > 0 && (
+              <>
+                <Row
+                  label="Average arrival to CT"
+                  title="From arriving in A&E to the CT scan starting"
+                  value={mins(avg(s.doorToCtMins, s.ctScans))}
+                />
+                <Row
+                  label="CT within an hour of request"
+                  title="NICE: a CT head within an hour for head injuries that need one"
+                  value={`${Math.round((100 * s.ctWithinTarget) / s.ctScans)}%`}
+                  bad={s.ctWithinTarget < s.ctScans}
+                />
+              </>
+            )}
+            <Row label="Blood results" value={s.bloodResults} />
+            {s.bloodResults > 0 && (
+              <Row
+                label="Average blood turnaround"
+                title="From the sample being taken to the results being back"
+                value={mins(avg(s.bloodResultMins, s.bloodResults))}
+              />
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="report-group">
         <h4>Safety</h4>
         <table class="report-table">
           <tbody>

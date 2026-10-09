@@ -21,6 +21,7 @@ import {
   DOOR_COLOUR,
   FLOOR_COLOUR,
   GLASS_COLOUR,
+  LEAD_COLOUR,
   BAY_MARKING,
   BUS_STOP_RED,
   DROPPED_KERB_COLOUR,
@@ -183,6 +184,10 @@ export class TilemapLayer {
         const wall = grid.wall[i];
         if (wall === WallType.Standard) {
           g.rect(px, py, T, T).fill(WALL_COLOUR);
+        } else if (wall === WallType.Lead) {
+          // A standard wall with a lead-grey core.
+          g.rect(px, py, T, T).fill(WALL_COLOUR);
+          g.rect(px + 4, py + 4, T - 8, T - 8).fill(LEAD_COLOUR);
         } else if (wall === WallType.Glass) {
           g.rect(px, py, T, T).fill(FLOOR_COLOUR);
           g.rect(px + 2, py + 2, T - 4, T - 4).fill({ color: GLASS_COLOUR, alpha: 0.9 });

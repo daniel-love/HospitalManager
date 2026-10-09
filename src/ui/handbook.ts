@@ -46,7 +46,10 @@ const ROLE_NEEDS: Partial<Record<StaffRoleId, string[]>> = {
   porter: [
     "A Ward to take patients to",
     "A bed-width route all the way: double doors and corridors 2 tiles wide",
+    "A Pathology Lab to take blood samples to",
   ],
+  radiographer: ["An X-ray Room or CT Room, enclosed by lead-lined walls"],
+  biomedical_scientist: ["A Pathology Lab with a blood analyser"],
   cleaner: ["Nothing extra: they find dirty beds, trolleys and toilets themselves"],
   registrar: [
     "Patients who need their specialty (see Conditions)",
@@ -74,7 +77,12 @@ const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
     "Discharges ward patients when they're ready",
     "Verifies deaths and breaks bad news to families",
   ],
-  porter: ["Wheels admitted patients to the ward", "Takes the deceased to the mortuary"],
+  porter: [
+    "Wheels admitted patients to the ward",
+    "Takes blood samples to the lab",
+    "Takes the deceased to the mortuary",
+  ],
+  biomedical_scientist: ["Books in and processes blood samples on the analyser"],
   cleaner: ["Cleans cubicles, trolleys and beds between patients", "Keeps toilets usable"],
   registrar: ["Reviews referred patients in A&E and decides to admit"],
   consultant: [

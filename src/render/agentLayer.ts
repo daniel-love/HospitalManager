@@ -2,7 +2,9 @@
  * Draws patients and staff as small figures (programmer art: discs), moved
  * smoothly between sim ticks. Staff are coloured by role; patients are white
  * with a ring in their triage colour. Patients in a bad mood show a red dot;
- * one getting worse shows an amber "!", and a cardiac arrest a red cross.
+ * a cardiac arrest a red cross. One getting worse shows an amber "!": it
+ * blinks until staff notice, then holds steady, and gains a ring in the
+ * clinician blue while a doctor or nurse is with them.
  * Someone who has died is never shown graphically: deathMarks.ts draws each
  * step after a death (curtains, sheet, trolley, mortuary drawer, family).
  *
@@ -13,6 +15,7 @@
  * when it leaves.
  */
 import { Container, Graphics, GraphicsContext } from "pixi.js";
+import { staffRoleById } from "@data/catalogue";
 import { TRIAGE_CATEGORIES } from "@data/patients";
 import { onSite, type AgentBase, type Ambulance, type Patient, type Staff } from "@sim/agents";
 import type { SimState } from "@sim/state";
@@ -23,6 +26,7 @@ import {
   AMBULANCE_GREEN,
   AMBULANCE_YELLOW,
   ARREST_MARK,
+  ATTENDED_RING,
   DETERIORATING_MARK,
   PARAMEDIC_COLOUR,
   PATIENT_COLOUR,
@@ -34,6 +38,8 @@ import {
 const PATIENT_RADIUS = 7;
 const STAFF_RADIUS = 8;
 const UNHAPPY_MOOD = 30;
+/** How long each on and off half of the unnoticed-deterioration blink lasts. */
+const BLINK_MS = 400;
 
 interface View {
   g: Graphics;
@@ -61,6 +67,8 @@ export class AgentLayer {
   /** Positions every agent, interpolated `alpha` of the way from last tick to this one. */
   update(state: SimState, alpha: number): void {
     this.updateAmbulances(Object.values(state.ambulances), alpha);
+    const attended = attendedPatients(state);
+    const blinkOn = Math.floor(performance.now() / BLINK_MS) % 2 === 0;
     const live = new Set<number>();
     for (const p of Object.values(state.patients)) {
       live.add(p.id);
@@ -71,7 +79,7 @@ export class AgentLayer {
         );
         continue;
       }
-      const warning = warningOf(p, state.tick);
+      const warning = warningOf(p, state.tick, attended.has(p.id), blinkOn);
       this.place(p, alpha, patientLook(p, p.id === this.selectedId, warning), (g) =>
         drawPatient(g, p, p.id === this.selectedId, warning),
       );
@@ -169,13 +177,33 @@ export class AgentLayer {
   }
 }
 
-type Warning = "none" | "deteriorating" | "arrest";
+/**
+ * How a deterioration looks: `unnoticed` blinks (its off half is `hidden`),
+ * `escalated` is noticed but nobody is with them yet, `attended` has a
+ * clinician (or the ambulance crew) at their side.
+ */
+type Warning = "none" | "unnoticed" | "hidden" | "escalated" | "attended" | "arrest";
+
+/** Patients a doctor or nurse is working with right now. */
+function attendedPatients(state: SimState): Set<number> {
+  const ids = new Set<number>();
+  for (const j of Object.values(state.jobs)) {
+    if (j.state !== "working" || j.patientId === null || j.staffId === null) continue;
+    const s = state.staff[j.staffId];
+    const group = s && staffRoleById.get(s.role)?.group;
+    if (group === "medical" || group === "nursing") ids.add(j.patientId);
+  }
+  return ids;
+}
 
 /** Drawn from the sim's truth, so the player sees trouble staff haven't spotted yet. */
-function warningOf(p: Patient, tick: number): Warning {
+function warningOf(p: Patient, tick: number, attended: boolean, blinkOn: boolean): Warning {
   if (p.stage === "collapsed") return "arrest";
   const d = p.deterioration;
-  return d && tick >= d.onset && p.stage !== "leaving" ? "deteriorating" : "none";
+  if (!d || tick < d.onset || p.stage === "leaving") return "none";
+  if (attended || withCrew(p)) return "attended";
+  if (d.noticed !== null) return "escalated";
+  return blinkOn ? "unnoticed" : "hidden";
 }
 
 function patientLook(p: Patient, selected: boolean, warning: Warning): string {
@@ -201,7 +229,8 @@ function drawPatient(g: Graphics, p: Patient, selected: boolean, warning: Warnin
   if (warning === "arrest") {
     g.rect(-2, -14, 4, 12).fill(ARREST_MARK);
     g.rect(-6, -10, 12, 4).fill(ARREST_MARK);
-  } else if (warning === "deteriorating") {
+  } else if (warning === "unnoticed" || warning === "escalated" || warning === "attended") {
+    if (warning === "attended") g.circle(-6, -8, 7.5).stroke({ width: 2, color: ATTENDED_RING });
     g.circle(-6, -8, 5).fill(DETERIORATING_MARK).stroke({ width: 1, color: 0x1d232b });
     g.rect(-7, -11, 2, 4).fill(0x1d232b);
     g.rect(-7, -6, 2, 1.5).fill(0x1d232b);

@@ -6,7 +6,7 @@ import { createSimState, SIM_STATE_VERSION, type SimState } from "@sim/state";
 import { TICKS_PER_DAY } from "@sim/time";
 import { applyStaffCommand } from "@sim/systems/staffing";
 import { setWardSpecialty } from "@sim/world/rooms";
-import { buildMajorsAE } from "../fixtures/majorsAE";
+import { buildMajorsAE, MAJORS_TEAM, staffedMajorsAE } from "../fixtures/majorsAE";
 import { buildSmallAE, staffedSmallAE } from "../fixtures/smallAE";
 
 /** Comparable snapshot of everything that matters, typed arrays included. */
@@ -49,6 +49,22 @@ const NO_V7_STATS = {
 /** Simulates saving to disk and loading again. */
 function roundTrip(state: SimState): SimState {
   return decodeSave(JSON.parse(JSON.stringify(encodeSave(state, "test")))).state;
+}
+
+/**
+ * A day and a bit of the small A&E, as an older save could hold it: nobody
+ * referred to a specialty (new in version 13) or being transferred out (new
+ * in version 15), which upgrading an older save would rightly leave out.
+ */
+function busyDayBeforeTransfers(): SimState {
+  const state = staffedSmallAE(9);
+  for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+  for (const p of Object.values(state.patients)) {
+    p.specialty = null;
+    p.times.referred = null;
+    p.transfer = null;
+  }
+  return state;
 }
 
 describe("save codec", () => {
@@ -406,8 +422,7 @@ describe("old saves get the road", () => {
 
 describe("catchment in saves", () => {
   it("upgrades a version-11 save to a small town's catchment, with no deflections", () => {
-    const state = staffedSmallAE(9);
-    for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+    const state = busyDayBeforeTransfers();
     const save = JSON.parse(JSON.stringify(encodeSave(state, "v11")));
     save.version = 11;
     delete save.state.settings.catchment;
@@ -442,8 +457,7 @@ describe("specialties in saves", () => {
   });
 
   it("upgrades a version-12 save with no specialties", () => {
-    const state = staffedSmallAE(9);
-    for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+    const state = busyDayBeforeTransfers();
     const save = JSON.parse(JSON.stringify(encodeSave(state, "v12")));
     save.version = 12;
     delete save.state.wardSpecialties;
@@ -520,8 +534,7 @@ describe("the Medical Examiner in saves", () => {
 
 describe("transfers in saves", () => {
   it("round-trips a transfer under way, and upgrades a version-14 save without them", () => {
-    const state = staffedSmallAE(9);
-    for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+    const state = busyDayBeforeTransfers();
     const p = Object.values(state.patients)[0]!;
     p.transfer = { reason: "No working Majors Bay", decided: 5, arranged: 10, ambulanceAt: 900 };
     expect(snapshot(roundTrip(state))).toEqual(snapshot({ ...state, events: [] }));
@@ -543,6 +556,31 @@ describe("transfers in saves", () => {
       d.stats.transferWaitMins = 0;
     }
     expect(snapshot(loaded)).toEqual(snapshot(zeroed));
+  });
+});
+
+describe("diagnostics in saves", () => {
+  it("round-trips tests and scans under way, and upgrades a version-15 save without them", () => {
+    const state = staffedMajorsAE(3, MAJORS_TEAM);
+    const underway = () => Object.values(state.patients).some((p) => p.investigations.length > 0);
+    for (let i = 0; i < TICKS_PER_DAY && !underway(); i++) tick(state);
+    expect(underway()).toBe(true);
+    expect(snapshot(roundTrip(state))).toEqual(snapshot({ ...state, events: [] }));
+
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v15")));
+    save.version = 15;
+    for (const p of save.state.patients) {
+      delete p.investigations;
+      delete p.homeBed;
+    }
+    for (const d of [save.state.today, ...save.state.history]) {
+      for (const k of ["xrays", "ctScans", "doorToCtMins", "ctWithinTarget"]) delete d.stats[k];
+      delete d.stats.bloodResults;
+      delete d.stats.bloodResultMins;
+    }
+    const loaded = decodeSave(save).state;
+    expect(Object.values(loaded.patients).every((p) => p.investigations.length === 0)).toBe(true);
+    expect(loaded.today.stats.xrays).toBe(0);
   });
 });
 

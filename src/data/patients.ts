@@ -136,6 +136,19 @@ export const MOOD_DECAY_STANDING = 12;
 export const MOOD_DECAY_TOILET = 12;
 /** Mood lost per hour waiting in a cubicle between steps (they're being seen). */
 export const MOOD_DECAY_IN_CUBICLE = 3;
+/**
+ * Mood regained in one go when care moves on: being triaged, first seen by a
+ * clinician, each treatment step done, and a decision (admit or go home).
+ * Being acknowledged and kept informed is what lifts patient experience.
+ */
+export const MOOD_LIFT_TRIAGED = 5;
+export const MOOD_LIFT_SEEN = 10;
+export const MOOD_LIFT_STEP = 4;
+export const MOOD_LIFT_DECISION = 10;
+/** Mood regained per hour while a clinician is with them. */
+export const MOOD_RECOVERY_BEING_SEEN = 12;
+/** Mood regained per hour settled in a ward bed. */
+export const MOOD_RECOVERY_ON_WARD = 6;
 
 /** Below this mood, patients start to consider leaving. */
 export const LWBS_MOOD = 25;

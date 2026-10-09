@@ -27,6 +27,7 @@ import { hasRoomWith, missingRoom } from "../places";
 import type { SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
+import { analysers, leaveScanner } from "./diagnostics";
 import { leave } from "./patients";
 
 /** Doctors who can assess a patient and arrange their transfer, most preferred first. */
@@ -50,6 +51,8 @@ export function decideToTransfer(state: SimState, p: Patient, reason: string): v
   for (const job of jobsForPatient(state, p.id)) {
     if (job.kind !== "obs") removeJob(state, job);
   }
+  // Waiting on a scanner: back to their trolley (or to wait) instead.
+  if (p.homeBed !== null) leaveScanner(state, p);
   p.transfer = { reason, decided: state.tick, arranged: null, ambulanceAt: null };
   const target = TRIAGE_CATEGORIES[p.category]?.targetMins ?? 240;
   postJob(state, {
@@ -92,14 +95,30 @@ export function updateTransfers(state: SimState): void {
     }
     const job = jobsForPatient(state, p.id).find((j) => j.kind === "treat" && j.state === "open");
     if (!job || state.tick - job.createdTick < TRANSFER_DECISION_MINS * TICKS_PER_MINUTE) continue;
-    if (hasRoomWith(state, job.roomType, job.capabilities)) continue;
-    const room = roomById.get(job.roomType)?.name ?? job.roomType;
-    decideToTransfer(
-      state,
-      p,
-      missingRoom(state, job.roomType, job.capabilities) ?? `There's no working ${room}`,
-    );
+    const reason = cantDoStep(state, p, job.roomType, job.capabilities);
+    if (reason) decideToTransfer(state, p, reason);
   }
+}
+
+/**
+ * Why a patient's waiting step can never happen here: no room for it, or
+ * their blood tests can't be done without a lab. Null if it can.
+ */
+function cantDoStep(
+  state: SimState,
+  p: Patient,
+  roomType: string,
+  capabilities: readonly string[],
+): string | null {
+  if (!hasRoomWith(state, roomType, capabilities)) {
+    const room = roomById.get(roomType)?.name ?? roomType;
+    return missingRoom(state, roomType, capabilities) ?? `There's no working ${room}`;
+  }
+  const bloodsStuck = p.investigations.some((i) => i.test === "bloods" && i.ready === null);
+  if (bloodsStuck && analysers(state).length === 0) {
+    return "There's no working Pathology Lab to test their bloods";
+  }
+  return null;
 }
 
 /** The transfer crew takes them; the bed or cubicle they leave needs cleaning. */

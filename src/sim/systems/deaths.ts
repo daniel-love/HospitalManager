@@ -84,6 +84,9 @@ export function die(state: SimState, p: Patient, expected: boolean, verified: bo
   p.toilet = null;
   p.desk = null;
   p.standing = null;
+  // A trolley kept for them while they were being scanned is freed.
+  if (p.homeBed !== null) release(state, p.homeBed, 0, p.id);
+  p.homeBed = null;
   // They stay on their bed, if they were on one.
   const onBed = ["in_cubicle", "triage", "collapsed", "awaiting_bed", "on_ward"].includes(p.stage);
   if (p.bed !== null && (!onBed || p.path.length > 0)) {

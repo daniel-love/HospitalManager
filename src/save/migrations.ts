@@ -334,6 +334,36 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v16 (M4): blood tests and scans.
+  15: (save) => {
+    type Day = { stats: Record<string, unknown> };
+    const state = save.state as {
+      patients: { investigations?: unknown; homeBed?: unknown }[];
+      today: Day;
+      history: Day[];
+    };
+    const fields = ["xrays", "ctScans", "doorToCtMins", "ctWithinTarget"];
+    const day = (d: Day) => ({
+      ...d,
+      stats: {
+        ...Object.fromEntries([...fields, "bloodResults", "bloodResultMins"].map((k) => [k, 0])),
+        ...d.stats,
+      },
+    });
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients.map((p) => ({
+          ...p,
+          investigations: p.investigations ?? [],
+          homeBed: p.homeBed ?? null,
+        })),
+        today: day(state.today),
+        history: state.history.map(day),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

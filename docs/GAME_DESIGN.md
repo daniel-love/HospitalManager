@@ -102,7 +102,7 @@ Build mode has three sub-modes: **Construction**, **Cosmetics** and **Equipment*
 **Structural elements**
 
 - **Foundations / floor:** turns exterior tiles into buildable interior.
-- **Walls:** standard, glazed (they block movement but **not line of sight**) and fire walls.
+- **Walls:** standard, glazed (they block movement but **not line of sight**), lead-lined (radiation shielding: X-ray and CT rooms must be enclosed by them; drawing over an existing wall upgrades it) and fire walls.
 - **Doors:** single, double (bed-width, required for bed transfers), automatic (faster flow, more costly), secure (staff only) and fire doors.
 - **Corridors:** not a special object, just floor plus zoning. Corridor width matters: 1 tile is fine for walking, and 2+ tiles are needed for trolleys and beds.
 - **Floors (levels):** multiple storeys, connected by **stairs** (walking only) and **lifts** (beds and wheelchairs; a capacity-limited queue). Ground floor first, with extra floors unlocked by money and planning permission.
@@ -251,6 +251,8 @@ Arrive → Book in (reception) → Wait → Triage → Stream (Minors | Majors |
  → Wait for cubicle → Assessment → Investigations → Decision
  → Discharge │ Admit (referral → specialty review → wait for bed → porter transfer → ward) │ Theatre │ Transfer out
 ```
+
+**Investigations (M4):** a pathway step can take a blood sample, be an X-ray or CT scan, or wait until every result is back, and some steps are only for some patients (an ankle X-ray under the Ottawa rules, about a third; a CT head under NICE rules). A porter takes each sample to the Pathology Lab, a biomedical scientist processes it, and results follow once the analyser has run (about an hour from sample to result in all). Walking patients go to X-ray from their cubicle and back to the waiting area; a patient on a Majors or Resus trolley keeps it while they're scanned. X-rays are read at once; a radiologist reports CT 20–45 minutes later. Reports shows arrival-to-CT time, the share of CT scans within an hour of being asked for, and blood turnaround. Without a lab, patients who need bloods are transferred out.
 
 Every timestamp is logged. The 4-hour clock runs from arrival to departure from A&E, so the wait for a specialty review counts towards it, as it does in a real A&E. A patient who needs admitting is referred to their condition's specialty; its registrar or consultant reviews them on their A&E trolley and decides to admit. Wards can be given to a specialty: patients go to their own specialty's ward first, then one open to any specialty, and only then to another specialty's ward (an "outlier", counted in Reports).
 

@@ -77,13 +77,31 @@ export const staffRoles: StaffRoleInput[] = [
       "Band 7 advanced nurse. Sees and treats minor injuries (cuts, sprains, minor head injuries) from start to finish without a doctor, and can do any nursing step for those patients. Doesn't triage, and illnesses such as abdominal pain still need a doctor.",
   },
   {
+    id: "radiographer",
+    name: "Radiographer",
+    short: "Radiographers",
+    group: "diagnostics",
+    annualCost: 49_500,
+    description:
+      "Band 6. Takes X-rays and does CT scans in the X-ray and CT Rooms. Patients come to them: walking from Minors, or from their Majors trolley, which is kept for them.",
+  },
+  {
+    id: "biomedical_scientist",
+    name: "Biomedical Scientist",
+    short: "Lab scientists",
+    group: "diagnostics",
+    annualCost: 40_500,
+    description:
+      "Band 5, HCPC registered. Processes blood samples in the Pathology Lab once a porter brings them; results follow when the analyser has run. Without one, no blood results.",
+  },
+  {
     id: "porter",
     name: "Porter",
     short: "Porters",
     group: "support",
     annualCost: 31_500,
     description:
-      "Band 2. Wheels admitted patients on their bed from A&E to a ward. Beds need double doors and corridors at least 2 tiles wide. Without porters, admitted patients stay on A&E trolleys.",
+      "Band 2. Wheels admitted patients on their bed from A&E to a ward, and takes blood samples to the Pathology Lab. Beds need double doors and corridors at least 2 tiles wide. Without porters, admitted patients stay on A&E trolleys and samples never reach the lab.",
   },
   {
     id: "cleaner",
@@ -109,6 +127,7 @@ export const staffRoles: StaffRoleInput[] = [
 export const STAFF_GROUP_NAMES: Record<StaffGroup, string> = {
   medical: "Medical",
   nursing: "Nursing",
+  diagnostics: "Diagnostics",
   support: "Support services",
   admin: "Administrative",
 };

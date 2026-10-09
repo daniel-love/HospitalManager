@@ -80,7 +80,7 @@ const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("build_walls"),
     floor: floorIndex,
     rect: rectSchema,
-    wall: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+    wall: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
   }),
   z.object({ type: z.literal("demolish"), floor: floorIndex, rect: rectSchema }),
   z.object({
@@ -197,6 +197,15 @@ const patientSchema = z.object({
       releaseAt: nullableInt,
     })
     .nullable(),
+  investigations: z.array(
+    z.object({
+      test: z.enum(["bloods", "xray", "ct"]),
+      requested: int,
+      done: nullableInt,
+      ready: nullableInt,
+    }),
+  ),
+  homeBed: nullableInt,
   outcome: z.enum(["discharged", "lwbs", "transferred", "transferred_out", "died"]).nullable(),
 });
 
@@ -217,6 +226,8 @@ const staffSchema = z.object({
 const jobSchema = z.object({
   id: int.positive(),
   kind: z.enum([
+    "carry_sample",
+    "lab_test",
     "arrange_transfer",
     "referral",
     "transfer",
@@ -291,6 +302,12 @@ const statsSchema = z.object({
   outliers: int.min(0),
   transfersOut: int.min(0),
   transferWaitMins: num,
+  xrays: int.min(0),
+  ctScans: int.min(0),
+  doorToCtMins: num,
+  ctWithinTarget: int.min(0),
+  bloodResults: int.min(0),
+  bloodResultMins: num,
   deaths: int.min(0),
   unexpectedDeaths: int.min(0),
   complaints: int.min(0),

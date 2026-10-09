@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { STARTING_CASH } from "@data/economy";
 import { isStandable, objectRect, unmetAccess } from "@sim/world/objects";
 import { roomAt } from "@sim/world/rooms";
-import { buildSmallAE } from "../fixtures/smallAE";
+import { buildSmallAE, FIXTURE_MONEY } from "../fixtures/smallAE";
 
 describe("small A&E fixture (M1 done-when layout)", () => {
   const state = buildSmallAE();
@@ -16,11 +15,15 @@ describe("small A&E fixture (M1 done-when layout)", () => {
     expect(summary.map((s) => s.type).sort()).toEqual([
       "ae_reception",
       "corridor",
+      "corridor",
+      "ct_room",
+      "lab",
       "minors_cubicle",
       "minors_cubicle",
       "toilets",
       "triage_room",
       "waiting_area",
+      "xray_room",
     ]);
     for (const s of summary) expect(s, s.type).toMatchObject({ valid: true, failing: [] });
   });
@@ -31,7 +34,7 @@ describe("small A&E fixture (M1 done-when layout)", () => {
   });
 
   it("charged for the build", () => {
-    expect(state.money).toBeLessThan(STARTING_CASH);
+    expect(state.money).toBeLessThan(FIXTURE_MONEY);
     expect(state.money).toBeGreaterThan(0);
   });
 });

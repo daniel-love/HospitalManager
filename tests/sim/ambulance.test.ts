@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Patient } from "@sim/agents";
-import { reserve } from "@sim/places";
+import { release, reserve } from "@sim/places";
 import { tick } from "@sim/sim";
 import type { SimState } from "@sim/state";
 import {
@@ -42,10 +42,20 @@ function ambulanceWith(state: SimState, conditionId: string): Patient {
   const a = ambulanceArrives(state);
   tick(state);
   const p = state.patients[a.patientId!]!;
-  // Swap in the condition under test (and no surprise deterioration).
+  // Swap in the condition under test (and no surprise deterioration), undoing
+  // any start the handover already made: a trolley claimed, a step taken.
   p.conditionId = conditionId;
   p.deterioration = null;
-  for (const j of Object.values(state.jobs)) if (j.patientId === p.id) delete state.jobs[j.id];
+  for (const j of Object.values(state.jobs)) {
+    if (j.patientId !== p.id) continue;
+    if (j.staffId !== null) state.staff[j.staffId]!.jobId = null;
+    delete state.jobs[j.id];
+  }
+  if (p.bed !== null) release(state, p.bed, 0, p.id);
+  p.bed = null;
+  p.stage = "awaiting_handover";
+  const spot = stretcherSpot(a.space!);
+  Object.assign(p, { x: spot.x, y: spot.y, prevX: spot.x, prevY: spot.y, path: [], dest: null });
   postHandover(state, p);
   return p;
 }
@@ -69,9 +79,8 @@ describe("ambulance bays", () => {
 describe("handover", () => {
   it("happens at a free Majors trolley, then the ambulance turns round and leaves", () => {
     const state = quiet();
-    const a = ambulanceArrives(state);
-    tick(state);
-    const p = state.patients[a.patientId!]!;
+    const p = ambulanceWith(state, "chest_pain");
+    const a = state.ambulances[p.ambulanceId!]!;
     expect(p.stage).toBe("awaiting_handover");
     expect({ x: p.x, y: p.y }).toEqual(stretcherSpot(a.space!));
     expect(Object.values(state.jobs).find((j) => j.patientId === p.id)?.kind).toBe("handover");
@@ -165,8 +174,9 @@ describe("an A&E with ambulances over 24 hours", () => {
   it("receives and hands over ambulances, with delays when Majors is full", () => {
     expect(stats.ambulances).toBeGreaterThan(10);
     // No ward: patients who need admitting hold Majors trolleys until their
-    // transfer ambulance comes, so fewer crews can hand over.
-    expect(stats.handovers).toBeGreaterThan(7);
+    // transfer ambulance comes, and others hold them waiting for blood
+    // results, so fewer crews can hand over.
+    expect(stats.handovers).toBeGreaterThan(5);
     expect(stats.handoversOver30).toBeGreaterThan(0);
   });
 

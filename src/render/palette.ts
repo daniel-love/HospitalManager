@@ -17,6 +17,8 @@ export const BAY_MARKING = 0xf2c230;
 export const BUS_STOP_RED = 0xd8322e;
 export const WALL_COLOUR = 0x3b4048;
 export const GLASS_COLOUR = 0x9fd3e6;
+/** The lead core drawn in lead-lined (radiation-shielding) walls. */
+export const LEAD_COLOUR = 0x8c96a3;
 export const DOOR_COLOUR = 0x9a6a3a;
 export const ZONE_ALPHA = 0.32;
 
@@ -54,6 +56,8 @@ export const ROLE_COLOURS: Record<StaffRoleId, number> = {
   registrar: 0xc2452d,
   consultant: 0x5a1426,
   porter: 0x4a5568,
+  radiographer: 0x2a8a9c,
+  biomedical_scientist: 0x7a5cb0,
   cleaner: 0x3f9a6a,
 };
 
@@ -75,6 +79,8 @@ export const COVER_SEEN = 0x5cb8e6;
 /** Patient markers: getting worse (amber) and cardiac arrest (red). */
 export const DETERIORATING_MARK = 0xf0a830;
 export const ARREST_MARK = 0xe0504a;
+/** Ring round the "!" while a clinician is with a deteriorating patient. */
+export const ATTENDED_RING = 0x4aa3ff;
 
 /** UK ambulance livery (Battenburg yellow and green) and paramedic green. */
 export const AMBULANCE_YELLOW = 0xf2d81a;

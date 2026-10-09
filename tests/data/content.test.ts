@@ -51,7 +51,7 @@ describe("room connections", () => {
 
 describe("conditions", () => {
   it("every pathway step happens in a known room with a role that exists", () => {
-    expect(content.conditions.length).toBe(11);
+    expect(content.conditions.length).toBe(12);
     for (const c of content.conditions) expect(c.pathway.length).toBeGreaterThan(0);
   });
 
@@ -104,6 +104,7 @@ describe("list sections (Hire panel and build palettes)", () => {
     expect(staffRoleSections().map((s) => s.name)).toEqual([
       "Medical",
       "Nursing",
+      "Diagnostics",
       "Support services",
       "Administrative",
     ]);

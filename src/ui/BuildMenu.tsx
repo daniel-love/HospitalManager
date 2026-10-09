@@ -51,6 +51,13 @@ const PANEL_HINTS = {
 } as const;
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
+
+/** Build menu swatches for each wall type. */
+const WALL_SWATCHES: Record<number, number> = {
+  [WallType.Standard]: 0x3b4048,
+  [WallType.Glass]: 0x9fd3e6,
+  [WallType.Lead]: 0x8c96a3,
+};
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
 export function BuildBar({
@@ -193,13 +200,13 @@ function ConstructionTools() {
           swatch={{ colour: 0xd9d4c7 }}
           help="Turns grass into buildable floor. Rooms must have floor before you can zone them; walls lay their own."
         />
-        {[WallType.Standard, WallType.Glass].map((type) => (
+        {[WallType.Standard, WallType.Glass, WallType.Lead].map((type) => (
           <Entry
             key={type}
             t={{ kind: "wall", wall: type }}
             name={wall(type).name}
             detail={`${formatMoney(wall(type).costPerTile)}/tile`}
-            swatch={{ colour: type === WallType.Glass ? 0x9fd3e6 : 0x3b4048 }}
+            swatch={{ colour: WALL_SWATCHES[type]! }}
             help={wall(type).description}
           />
         ))}

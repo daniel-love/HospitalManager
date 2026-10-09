@@ -172,7 +172,7 @@ export function seatCount(state: SimState): { total: number; taken: number } {
 
 export function isCouch(defId: string): boolean {
   const caps = equipmentById.get(defId)?.capabilities ?? [];
-  return caps.includes("examination") || caps.includes("patient_space");
+  return caps.includes("examination") || caps.includes("patient_space") || caps.includes("imaging");
 }
 
 /** Centre of an item's footprint, where a patient lies. */

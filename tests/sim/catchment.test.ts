@@ -20,14 +20,17 @@ describe("demand", () => {
 
   it("is shared with neighbouring hospitals by what each can treat", () => {
     // Minors only: most walk-ins (and a quarter of majors walk-ins, who'll be
-    // transferred out), but only minor head injuries by ambulance.
+    // transferred out), but only head injuries and broken ankles by ambulance.
     const minors = buildSmallAE();
     expect(treatableShare(minors, "walk_in")).toBeCloseTo(
-      (100 + 16 * UNTREATABLE_WALK_IN_SHARE) / 116,
+      (101 + 16 * UNTREATABLE_WALK_IN_SHARE) / 117,
     );
-    expect(treatableShare(minors, "ambulance")).toBeCloseTo(2 / 35);
+    expect(treatableShare(minors, "ambulance")).toBeCloseTo(3 / 36);
+    // Without a lab, nothing that needs blood tests.
+    const noLab = buildSmallAE(1, { diagnostics: false });
+    expect(treatableShare(noLab, "walk_in")).toBeLessThan(treatableShare(minors, "walk_in"));
     // Majors without Resus: everything but anaphylaxis and septic shock.
-    expect(treatableShare(buildMajorsAE(1), "ambulance")).toBeCloseTo(31 / 35);
+    expect(treatableShare(buildMajorsAE(1), "ambulance")).toBeCloseTo(32 / 36);
     expect(treatableShare(buildMajorsAE(1, { ambulance: true }), "ambulance")).toBe(1);
   });
 });

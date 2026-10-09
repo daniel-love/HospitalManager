@@ -214,15 +214,62 @@ export const rooms: RoomInput[] = [
     description:
       "Where deceased patients stay until the Medical Examiner (and sometimes the coroner) is done and they're released. Needs a bed-width route from the wards and A&E; best kept away from public areas.",
   },
+  {
+    id: "xray_room",
+    code: 15,
+    name: "X-ray Room",
+    department: "Diagnostics",
+    colour: 0x7bb8c9,
+    minSize: [4, 4],
+    enclosed: true,
+    shielded: true,
+    required: [{ label: "X-ray unit", anyOf: ["xray_unit"] }],
+    description:
+      "Plain X-rays, for suspected fractures and chest X-rays. A radiographer takes them. Must be enclosed by lead-lined walls.",
+  },
+  {
+    id: "ct_room",
+    code: 16,
+    name: "CT Room",
+    department: "Diagnostics",
+    colour: 0x5f9fb5,
+    minSize: [5, 5],
+    enclosed: true,
+    shielded: true,
+    required: [{ label: "CT scanner", anyOf: ["ct_scanner"] }],
+    description:
+      "CT scans, such as of the head after an injury (NICE: within an hour for those who need one). A radiographer does the scan; a radiologist reports it. Must be enclosed by lead-lined walls; best close to A&E.",
+  },
+  {
+    id: "lab",
+    code: 17,
+    name: "Pathology Lab",
+    department: "Diagnostics",
+    colour: 0xb39ddb,
+    minSize: [3, 3],
+    enclosed: true,
+    required: [{ label: "Blood analyser", anyOf: ["blood_analyser"] }],
+    description:
+      "Biomedical scientists process blood samples here; porters bring them from the wards and A&E. Without one, nobody's bloods can be tested.",
+  },
 ];
 
 /** Build palette sections for rooms, in display order. */
-export const roomGroups = ["ae", "wards", "shared", "facilities", "support", "staff"] as const;
+export const roomGroups = [
+  "ae",
+  "wards",
+  "diagnostics",
+  "shared",
+  "facilities",
+  "support",
+  "staff",
+] as const;
 export type RoomGroup = (typeof roomGroups)[number];
 
 export const ROOM_GROUP_NAMES: Record<RoomGroup, string> = {
   ae: "A&E",
   wards: "Wards",
+  diagnostics: "Diagnostics",
   shared: "Shared spaces",
   facilities: "Facilities",
   support: "Support services",
@@ -233,6 +280,7 @@ export const ROOM_GROUP_NAMES: Record<RoomGroup, string> = {
 export const ROOM_GROUP_OF: Record<RoomDepartment, RoomGroup> = {
   "A&E": "ae",
   Inpatient: "wards",
+  Diagnostics: "diagnostics",
   General: "shared",
   Any: "shared",
   Facilities: "facilities",

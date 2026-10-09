@@ -19,7 +19,7 @@ import {
 } from "@data/catalogue";
 import type { RoomDef, SpecialtyId } from "@data/schema";
 import type { Room, RoomCheck, SimState } from "../state";
-import { isWallOrDoor, tileIndex, type FloorGrid } from "./grid";
+import { isWallOrDoor, tileIndex, WallType, type FloorGrid } from "./grid";
 import { isStandable, objectRect, sideTiles } from "./objects";
 
 export function detectRooms(state: SimState): void {
@@ -160,9 +160,11 @@ function evaluateRoom(state: SimState, room: Room, rooms: Room[]): void {
   if (minW * minH > 1) checks.push(sizeCheck(room, minW, minH));
 
   if (def.enclosed) {
-    const { enclosed, hasDoor } = boundary(grid, room);
+    const { enclosed, hasDoor, shielded } = boundary(grid, room);
     checks.push({ label: "Enclosed by walls", ok: enclosed });
     checks.push({ label: "Has a door", ok: hasDoor });
+    if (def.shielded)
+      checks.push({ label: "Lead-lined walls all round", ok: enclosed && shielded });
   }
 
   const defIds = room.objectIds.map((id) => state.objects[id]!.defId);
@@ -261,10 +263,14 @@ function sizeCheck(room: Room, minW: number, minH: number): RoomCheck {
 }
 
 /** Enclosed = every tile's neighbours are in the room, a wall or a door. */
-function boundary(grid: FloorGrid, room: Room): { enclosed: boolean; hasDoor: boolean } {
+function boundary(
+  grid: FloorGrid,
+  room: Room,
+): { enclosed: boolean; hasDoor: boolean; shielded: boolean } {
   const { width, height } = grid;
   let enclosed = true;
   let hasDoor = false;
+  let shielded = true;
   for (const i of room.tiles) {
     const x = i % width;
     const y = (i - x) / width;
@@ -281,9 +287,10 @@ function boundary(grid: FloorGrid, room: Room): { enclosed: boolean; hasDoor: bo
       }
       if (grid.door[n] !== 0) hasDoor = true;
       else if (grid.roomId[n] !== room.id && !isWallOrDoor(grid, n)) enclosed = false;
+      else if (grid.wall[n] !== WallType.None && grid.wall[n] !== WallType.Lead) shielded = false;
     }
   }
-  return { enclosed, hasDoor };
+  return { enclosed, hasDoor, shielded };
 }
 
 /** Union of the items' capabilities, plus any combos they complete. */

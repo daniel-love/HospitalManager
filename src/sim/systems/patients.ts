@@ -24,6 +24,9 @@ import {
   MOOD_DECAY_SEATED,
   MOOD_DECAY_STANDING,
   MOOD_DECAY_TOILET,
+  MOOD_LIFT_TRIAGED,
+  MOOD_RECOVERY_BEING_SEEN,
+  MOOD_RECOVERY_ON_WARD,
   TOILET_MINS,
   TOILET_URGE,
   TOILET_USES_BEFORE_CLEAN,
@@ -68,6 +71,7 @@ import {
   ticksFor,
 } from "./jobBoard";
 import { headTo, stop } from "./movement";
+import { leaveScanner } from "./diagnostics";
 import { hasTeam } from "./staffing";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
@@ -282,10 +286,17 @@ function goToBed(state: SimState, p: Patient): void {
   else if (p.stage === "called_treatment") p.stage = "in_cubicle";
 }
 
-/** Called by a clinician (job system): leave the waiting area for the couch. */
-export function callToBed(state: SimState, p: Patient, bedId: number): void {
+/**
+ * Called by a clinician (job system): leave the waiting area for the couch.
+ * `keep`: they're off for a scan and keep their current trolley (homeBed).
+ */
+export function callToBed(state: SimState, p: Patient, bedId: number, keep = false): void {
   releaseSeat(state, p);
   p.standing = null;
+  if (keep && p.bed !== null) {
+    p.homeBed = p.bed;
+    p.bed = null;
+  }
   // Moving on from another trolley (say Resus to Majors): that one needs cleaning.
   if (p.bed !== null) {
     release(state, p.bed, 0, p.id);
@@ -298,6 +309,10 @@ export function callToBed(state: SimState, p: Patient, bedId: number): void {
 
 /** Back to the waiting area, e.g. when their cubicle was dismantled. */
 export function backToWaiting(state: SimState, p: Patient): void {
+  if (p.homeBed !== null) {
+    leaveScanner(state, p); // Back to the trolley they kept.
+    return;
+  }
   if (p.bed !== null) release(state, p.bed, 0, p.id);
   p.bed = null;
   if (p.category === 0) {
@@ -339,14 +354,25 @@ export function afterTriage(state: SimState, p: Patient): void {
   p.bed = null;
   p.step = 0;
   p.stage = "waiting_treatment";
+  lift(p, MOOD_LIFT_TRIAGED);
   postTreatment(state, p, null);
 }
 
 // ---------- Needs and mood ----------
 
+/** Care has moved on (triaged, seen, a step done, a decision): mood picks up. */
+export function lift(p: Patient, amount: number): void {
+  p.mood = Math.min(100, p.mood + amount);
+}
+
 function updateNeeds(state: SimState, p: Patient, beingSeen: boolean): void {
-  // Ward needs (meals, toilets, washing) are left to the ward team for now.
-  if (p.death || ["leaving", "collapsed", "transferring", "on_ward"].includes(p.stage)) return;
+  if (p.stage === "on_ward" && !p.death) {
+    // Settled in a bed and looked after; ward needs (meals, toilets,
+    // washing) are left to the ward team for now.
+    lift(p, MOOD_RECOVERY_ON_WARD / TICKS_PER_HOUR);
+    return;
+  }
+  if (p.death || ["leaving", "collapsed", "transferring"].includes(p.stage)) return;
   if (!p.toilet || p.toilet.left < 0) p.bladder = Math.min(100, p.bladder + p.bladderRate);
   let decay = 0;
   if (p.stage === "awaiting_handover") {
@@ -362,7 +388,9 @@ function updateNeeds(state: SimState, p: Patient, beingSeen: boolean): void {
     decay = MOOD_DECAY_IN_CUBICLE;
   }
   if (p.bladder >= 90 && !p.toilet) decay += MOOD_DECAY_TOILET;
-  p.mood = Math.max(0, p.mood - decay / TICKS_PER_HOUR);
+  // A clinician with them (triage, treatment, review) reassures them.
+  if (beingSeen) decay -= MOOD_RECOVERY_BEING_SEEN;
+  p.mood = Math.min(100, Math.max(0, p.mood - decay / TICKS_PER_HOUR));
 }
 
 function maybeGiveUp(state: SimState, p: Patient): void {
@@ -396,6 +424,8 @@ export function leave(state: SimState, p: Patient, outcome: Outcome): void {
   if (p.bed !== null) release(state, p.bed, 0, p.id);
   if (p.desk !== null) release(state, p.desk, 0, p.id);
   if (p.toilet) release(state, p.toilet.objectId, 0, p.id);
+  if (p.homeBed !== null) release(state, p.homeBed, 0, p.id);
+  p.homeBed = null;
   p.bed = null;
   p.desk = null;
   p.toilet = null;

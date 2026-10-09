@@ -176,12 +176,13 @@ export function walkInPoint(state: SimState): Point | null {
 
 /**
  * Conditions the hospital can treat: every room type on the pathway has a
- * working room. (Whether it can admit them is another matter: see
- * systems/transfers.ts.)
+ * working room, and there's a Pathology Lab if they need blood tests.
+ * (Whether it can admit them is another matter: see systems/transfers.ts.)
  */
 export function treatableConditions(state: SimState): ConditionDef[] {
+  const lab = hasRoomWith(state, "lab", ["pathology"]);
   return content.conditions.filter((c) =>
-    c.pathway.every((s) => hasRoomWith(state, s.room, s.capabilities)),
+    c.pathway.every((s) => hasRoomWith(state, s.room, s.capabilities) && (lab || !s.sample)),
   );
 }
 
@@ -252,6 +253,8 @@ export function spawnPatient(
     stayUntil: null,
     endOfLife: false,
     transfer: null,
+    investigations: [],
+    homeBed: null,
     death: null,
     outcome: null,
   };

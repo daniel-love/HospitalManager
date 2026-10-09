@@ -18,7 +18,12 @@
  * specialty's ward (an "outlier").
  */
 import { conditionById, equipmentById } from "@data/catalogue";
-import { FOUR_HOUR_MINS, REFERRAL_MINS, WARD_DISCHARGE_MINS } from "@data/patients";
+import {
+  FOUR_HOUR_MINS,
+  MOOD_LIFT_DECISION,
+  REFERRAL_MINS,
+  WARD_DISCHARGE_MINS,
+} from "@data/patients";
 import type { Job, Patient, Point, Staff } from "../agents";
 import { emit, warn } from "../events";
 import { bedside, freeCouches, release, reserve, restPoint } from "../places";
@@ -33,7 +38,7 @@ import { earn } from "./finance";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo } from "./movement";
 import { die } from "./deaths";
-import { leave } from "./patients";
+import { leave, lift } from "./patients";
 import { cantAdmit, decideToTransfer } from "./transfers";
 
 const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
@@ -55,6 +60,7 @@ export function finishPathway(state: SimState, p: Patient, trolley: PlacedObject
     else refer(state, p, trolley);
     return;
   }
+  lift(p, MOOD_LIFT_DECISION);
   leave(state, p, "discharged");
   dirtyCouch(state, trolley.id);
 }
@@ -92,6 +98,7 @@ export function decideToAdmit(state: SimState, p: Patient): void {
   if (endOfLife > 0 && chance(state.rng, endOfLife)) p.endOfLife = true;
   p.times.decided = state.tick;
   p.stage = "awaiting_bed";
+  lift(p, MOOD_LIFT_DECISION);
   postJob(state, {
     kind: "transfer",
     roles: ["porter"],

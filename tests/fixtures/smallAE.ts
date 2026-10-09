@@ -88,6 +88,48 @@ function cubicle(y: number): Command[] {
   ];
 }
 
+/**
+ * A diagnostics block east of the building (M4): an annex corridor with an
+ * outside door, an X-ray Room and a CT Room (lead-lined), and a Pathology
+ * Lab. Patients reach it through a door in the waiting area's north wall and
+ * a short walk outside.
+ *
+ *   x=20      29
+ *   ##########   y=1
+ *   #cc#xxxxx#   X-ray Room (y 2–6), door at (23, 4); unit at (26, 3)
+ *   Dcc#xxxxx#   door from outside at (20, 3)
+ *   #cc#######   y=7 (lead)
+ *   #cc#ttttt#   CT Room (y 8–12), door at (23, 10); scanner at (25, 8)
+ *   #cc#######   y=13
+ *   #cc#lllll#   Pathology Lab (y 14–18), door at (23, 16); analyser at (25, 15)
+ *   ##########   y=19
+ */
+export const DIAGNOSTICS_COMMANDS: Command[] = [
+  { type: "place_object", floor: F, defId: "door_single", x: 8, y: 2, rotation: 0 },
+  { type: "build_floor", floor: F, rect: rect(20, 1, 29, 19) },
+  { type: "build_walls", floor: F, rect: rect(20, 1, 29, 19), wall: WallType.Standard },
+  { type: "build_walls", floor: F, rect: rect(23, 1, 23, 19), wall: WallType.Standard },
+  { type: "build_walls", floor: F, rect: rect(23, 13, 29, 13), wall: WallType.Standard },
+  { type: "build_walls", floor: F, rect: rect(23, 1, 29, 7), wall: WallType.Lead },
+  { type: "build_walls", floor: F, rect: rect(23, 7, 29, 13), wall: WallType.Lead },
+  { type: "place_object", floor: F, defId: "door_single", x: 20, y: 3, rotation: 1 },
+  { type: "place_object", floor: F, defId: "door_double", x: 23, y: 3, rotation: 1 },
+  { type: "place_object", floor: F, defId: "door_double", x: 23, y: 9, rotation: 1 },
+  { type: "place_object", floor: F, defId: "door_single", x: 23, y: 16, rotation: 1 },
+  { type: "zone", floor: F, rect: rect(21, 2, 22, 18), roomType: "corridor" },
+  { type: "zone", floor: F, rect: rect(24, 2, 28, 6), roomType: "xray_room" },
+  { type: "zone", floor: F, rect: rect(24, 8, 28, 12), roomType: "ct_room" },
+  { type: "zone", floor: F, rect: rect(24, 14, 28, 18), roomType: "lab" },
+  ...place("xray_unit", 26, 3),
+  ...place("ct_scanner", 25, 8),
+  ...place("blood_analyser", 25, 15),
+];
+
+/** Width that fits the diagnostics block. */
+export const MAP_WIDTH = 32;
+/** Enough to build everything, CT scanner included, with plenty left to run on. */
+export const FIXTURE_MONEY = 5_000_000;
+
 /** Applies the commands, throwing on the first that fails. */
 export function applyAll(state: SimState, commands: Command[]): void {
   for (const cmd of commands) {
@@ -97,6 +139,8 @@ export function applyAll(state: SimState, commands: Command[]): void {
 }
 
 export interface SiteOptions {
+  /** The diagnostics block: X-ray, CT and a lab (default true). */
+  diagnostics?: boolean;
   /**
    * Put the public road in below the building (default false), with a
    * footpath from the front door: walk-ins then arrive along the pavement
@@ -106,8 +150,16 @@ export interface SiteOptions {
 }
 
 export function buildSmallAE(seed = 1, opts: SiteOptions = {}): SimState {
-  const state = createSimState({ seed, width: 24, height: opts.site ? 30 : 20 });
-  applyAll(state, SMALL_AE_COMMANDS);
+  const state = createSimState({
+    seed,
+    width: MAP_WIDTH,
+    height: opts.site ? 34 : 20,
+    money: FIXTURE_MONEY,
+  });
+  applyAll(state, [
+    ...SMALL_AE_COMMANDS,
+    ...(opts.diagnostics === false ? [] : DIAGNOSTICS_COMMANDS),
+  ]);
   if (opts.site) addRoad(state);
   return state;
 }
@@ -118,6 +170,13 @@ export function addRoad(state: SimState): void {
   if (!site) throw new Error("No room for the road below the building");
   state.site = site;
   state.layoutVersion++;
+  // A footpath from the waiting area's north door round to the diagnostics block.
+  if (state.rooms.some((r) => r.typeId === "lab")) {
+    applyAll(state, [
+      { type: "pave", floor: F, rect: rect(8, 1, 19, 1), surface: "path" },
+      { type: "pave", floor: F, rect: rect(19, 2, 19, 3), surface: "path" },
+    ]);
+  }
 }
 
 export type StaffCounts = Partial<Record<StaffRoleId, number>>;
@@ -128,6 +187,10 @@ export const SMALL_AE_TEAM: StaffCounts = {
   nurse: 2,
   junior_doctor: 2,
   cleaner: 1,
+  // M4: X-rays, CT and blood tests.
+  radiographer: 1,
+  biomedical_scientist: 1,
+  porter: 1,
 };
 
 export function hireTeam(state: SimState, team: StaffCounts): void {

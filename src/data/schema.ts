@@ -114,6 +114,7 @@ export type RoomRequirement = z.infer<typeof roomRequirementSchema>;
 export const roomDepartments = [
   "A&E",
   "Inpatient",
+  "Diagnostics",
   "General",
   "Any",
   "Facilities",
@@ -134,6 +135,8 @@ export const roomDefSchema = z.object({
   minSize: z.tuple([z.number().int().min(1), z.number().int().min(1)]),
   /** Must be fully bounded by walls and doors, with at least one door. */
   enclosed: z.boolean(),
+  /** Its walls must all be lead-lined (X-ray and CT: radiation protection). */
+  shielded: z.boolean().default(false),
   /**
    * Patients may walk through it on the way somewhere else (corridors,
    * waiting areas). Other rooms they only enter as their destination or
@@ -181,6 +184,8 @@ export const staffRoleIds = [
   "cleaner",
   "consultant",
   "registrar",
+  "radiographer",
+  "biomedical_scientist",
 ] as const;
 export type StaffRoleId = (typeof staffRoleIds)[number];
 
@@ -205,7 +210,7 @@ export type SpecialtyDef = z.infer<typeof specialtySchema>;
 export type SpecialtyInput = z.input<typeof specialtySchema>;
 
 /** How staff are grouped when hiring and listing them, in display order. */
-export const staffGroups = ["medical", "nursing", "support", "admin"] as const;
+export const staffGroups = ["medical", "nursing", "diagnostics", "support", "admin"] as const;
 export type StaffGroup = (typeof staffGroups)[number];
 
 export const staffRoleSchema = z.object({
@@ -247,6 +252,17 @@ export const pathwayStepSchema = z.object({
    * by `roles`: A&E's own doctors refer them on to another hospital's team.
    */
   specialty: z.enum(specialtyIds).optional(),
+  /**
+   * Share of patients who need this step (e.g. an X-ray, under the Ottawa
+   * ankle rules), decided when they reach it. Not allowed on the first step.
+   */
+  chance: z.number().gt(0).max(1).default(1),
+  /** Completing this step sends a blood sample to the lab (systems/diagnostics.ts). */
+  sample: z.boolean().default(false),
+  /** An X-ray or CT scan: the patient goes to the scanner (keeping a Majors or Resus trolley). */
+  imaging: z.enum(["xray", "ct"]).optional(),
+  /** Can't start until every test and scan sent so far has its result back. */
+  needsResults: z.boolean().default(false),
   /**
    * Completing this step treats whatever was making the patient deteriorate
    * (e.g. antibiotics and fluids for sepsis), so they no longer will.
@@ -427,6 +443,13 @@ export function validateContent(raw: Content): ValidContent {
       }
     }
     if (c.admission && !c.specialty) issues.push(`condition ${c.id} admits but has no specialty`);
+    if (c.pathway[0]!.chance < 1)
+      issues.push(`condition ${c.id}: the first step can't be optional`);
+    c.pathway.forEach((s, i) => {
+      if (s.imaging && !(c.pathway[i + 1]?.chance === 1)) {
+        issues.push(`condition ${c.id}: a scan must be followed by a step everyone has`);
+      }
+    });
     if (c.deterioration && !c.pathway.some((s) => s.stabilises)) {
       issues.push(`condition ${c.id} can deteriorate but no step stabilises it`);
     }

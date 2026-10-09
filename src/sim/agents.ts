@@ -126,6 +126,17 @@ export interface Transfer {
   ambulanceAt: number | null;
 }
 
+/**
+ * A blood test or scan: when it was asked for, done (the sample reached the
+ * lab, or the scan was taken), and when the result is back (null until known).
+ */
+export interface Investigation {
+  test: "bloods" | "xray" | "ct";
+  requested: number;
+  done: number | null;
+  ready: number | null;
+}
+
 export interface Patient extends AgentBase {
   conditionId: string;
   /** Manchester Triage category once triaged; 0 before. */
@@ -184,6 +195,10 @@ export interface Patient extends AgentBase {
   endOfLife: boolean;
   /** Being transferred to another hospital, or null. */
   transfer: Transfer | null;
+  /** Blood tests and scans sent so far. */
+  investigations: Investigation[];
+  /** Their Majors or Resus trolley, kept for them while they're away being scanned. */
+  homeBed: number | null;
   death: Death | null;
   outcome: Outcome | null;
 }
@@ -223,6 +238,8 @@ export interface Staff extends AgentBase {
  * doctor) and support (a nurse) each have a job.
  */
 export type JobKind =
+  | "carry_sample"
+  | "lab_test"
   | "arrange_transfer"
   | "referral"
   | "transfer"
@@ -360,6 +377,15 @@ export interface FlowStats {
   referralMins: number;
   /** Admitted to another specialty's ward because theirs was full ("outliers"). */
   outliers: number;
+  /** X-rays and CT scans taken. */
+  xrays: number;
+  ctScans: number;
+  /** Sum of arrival-to-CT times, and CT scans started within an hour of being asked for. */
+  doorToCtMins: number;
+  ctWithinTarget: number;
+  /** Blood results back, and the sum of sample-sent-to-result times. */
+  bloodResults: number;
+  bloodResultMins: number;
   /** Transferred to another hospital that could treat or admit them. */
   transfersOut: number;
   /** Sum of decision-to-transfer to leaving times, for an average. */
@@ -412,6 +438,12 @@ export function emptyStats(): FlowStats {
     outliers: 0,
     transfersOut: 0,
     transferWaitMins: 0,
+    xrays: 0,
+    ctScans: 0,
+    doorToCtMins: 0,
+    ctWithinTarget: 0,
+    bloodResults: 0,
+    bloodResultMins: 0,
     deaths: 0,
     unexpectedDeaths: 0,
     complaints: 0,

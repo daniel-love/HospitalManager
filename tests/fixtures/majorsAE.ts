@@ -28,7 +28,10 @@ import { WallType } from "@sim/world/grid";
 import {
   addRoad,
   applyAll,
+  DIAGNOSTICS_COMMANDS,
+  FIXTURE_MONEY,
   hireTeam,
+  MAP_WIDTH,
   SMALL_AE_COMMANDS,
   type SiteOptions,
   type StaffCounts,
@@ -149,9 +152,10 @@ export interface MajorsOptions extends SiteOptions {
 
 export function buildMajorsAE(seed = 1, opts: MajorsOptions = {}): SimState {
   const height = (opts.ambulance ? 36 : 32) + (opts.site ? 12 : 0);
-  const state = createSimState({ seed, width: 24, height });
+  const state = createSimState({ seed, width: MAP_WIDTH, height, money: FIXTURE_MONEY });
   applyAll(state, [
     ...SMALL_AE_COMMANDS,
+    ...(opts.diagnostics === false ? [] : DIAGNOSTICS_COMMANDS),
     ...MAJORS_WING_COMMANDS,
     ...(opts.centralMonitor
       ? place("central_monitor", 10, 21)
@@ -185,6 +189,9 @@ export const MAJORS_TEAM: StaffCounts = {
   nurse: 4,
   junior_doctor: 3,
   cleaner: 1,
+  radiographer: 1,
+  biomedical_scientist: 1,
+  porter: 1,
 };
 
 export function staffedMajorsAE(

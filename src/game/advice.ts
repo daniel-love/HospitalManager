@@ -232,6 +232,41 @@ export function describeAdvice(state: SimState): AdviceData {
     ],
   };
 
+  const diagnostics: AdviceGroup = {
+    heading: "Diagnostics",
+    intro:
+      "Most patients need blood tests or an X-ray before a decision. Without them, they're transferred to another hospital.",
+    items: [
+      item(
+        hasRoom("lab"),
+        "A Pathology Lab with a blood analyser",
+        "Chest pain, abdominal pain, sepsis, breathlessness and falls all need blood results.",
+      ),
+      item(
+        has("biomedical_scientist"),
+        "A biomedical scientist",
+        "Processes the samples; results follow when the analyser has run.",
+      ),
+      item(
+        has("porter"),
+        "Porters to take samples to the lab",
+        "Without one, samples never reach the lab.",
+      ),
+      item(
+        hasRoom("xray_room"),
+        "An X-ray Room (lead-lined walls)",
+        "For suspected fractures and chest X-rays.",
+      ),
+      item(has("radiographer"), "A radiographer", "Takes X-rays and does CT scans."),
+      item(
+        hasRoom("ct_room"),
+        "A CT Room near A&E (lead-lined walls)",
+        "For head injuries and falls that need a CT head (NICE: within an hour). Expensive, but without one those patients are transferred.",
+        true,
+      ),
+    ],
+  };
+
   const examiners = Object.values(state.staff).filter((s) => s.meDuty).length;
   const afterDeath: AdviceGroup = {
     heading: "When a patient dies",
@@ -255,7 +290,7 @@ export function describeAdvice(state: SimState): AdviceData {
     ],
   };
 
-  const groups = [essentials, majors, admissions, afterDeath];
+  const groups = [essentials, diagnostics, majors, admissions, afterDeath];
   const next = groups.flatMap((g) => g.items).find((i) => i.status === "todo") ?? null;
   const demand = dailyDemand(state);
   return {

@@ -35,9 +35,21 @@ import { removeJob, unassignJob } from "./jobBoard";
 import { headTo } from "./movement";
 import { TICKS_PER_MINUTE } from "../time";
 import { canReviewDeath, claimDeathPlace, runDeathJob } from "./deaths";
-import { afterTriage, backToWaiting, callToBed, postTreatment } from "./patients";
+import { afterTriage, backToWaiting, callToBed, lift, postTreatment } from "./patients";
+import { MOOD_LIFT_SEEN, MOOD_LIFT_STEP } from "@data/patients";
 import { canDo } from "./staffing";
 import { transferArranged } from "./transfers";
+import {
+  claimDiagnosticPlace,
+  DIAGNOSTIC_JOBS,
+  keepsTrolley,
+  pendingResults,
+  runDiagnosticJob,
+  scanned,
+  sendSample,
+} from "./diagnostics";
+import { chance } from "../rng";
+import { roomOfObject } from "../world/rooms";
 
 /**
  * Jobs done wherever the patient is, rather than at a particular couch:
@@ -118,6 +130,11 @@ function pullOffWork(state: SimState, job: Job): Staff[] {
 function claimPlace(state: SimState, job: Job): Point | null {
   if (job.kind === "transfer") return claimWardBed(state, job);
   if (DEATH_JOBS.has(job.kind)) return claimDeathPlace(state, job);
+  if (DIAGNOSTIC_JOBS.has(job.kind)) return claimDiagnosticPlace(state, job);
+  const step = treatStep(state, job);
+  if (step?.needsResults && pendingResults(state, state.patients[job.patientId!]!).length > 0) {
+    return null; // Waiting for results.
+  }
   if (atPatient(job)) {
     const p = job.patientId === null ? undefined : state.patients[job.patientId];
     // Obs wait until they're back from the toilet.
@@ -144,8 +161,15 @@ function claimPlace(state: SimState, job: Job): Point | null {
   const couch = freeCouch(state, job.roomType, job.capabilities, p);
   if (!couch) return null;
   job.objectId = couch.id;
-  callToBed(state, p, couch.id);
+  callToBed(state, p, couch.id, keepsTrolley(state, p, !!step?.imaging));
   return couch;
+}
+
+/** The pathway step a treatment job is for. */
+function treatStep(state: SimState, job: Job) {
+  if (job.kind !== "treat" || job.patientId === null) return undefined;
+  const p = state.patients[job.patientId];
+  return p && conditionById.get(p.conditionId)!.pathway[job.step];
 }
 
 function isBeingSeen(state: SimState, patientId: number): boolean {
@@ -200,6 +224,10 @@ export function runJobs(state: SimState): void {
       runDeathJob(state, job, staff, patient);
       continue;
     }
+    if (DIAGNOSTIC_JOBS.has(job.kind)) {
+      runDiagnosticJob(state, job, staff, patient!);
+      continue;
+    }
     const obj = job.objectId === null ? undefined : state.objects[job.objectId];
     // Cleaning still makes sense in a room that's temporarily invalid.
     if (!obj || (job.patientId !== null && !inValidRoom(state, obj.id, job.roomType))) {
@@ -215,6 +243,7 @@ export function runJobs(state: SimState): void {
       job.state = "working";
       if (job.kind === "treat" && patient && patient.times.seen === null) {
         patient.times.seen = state.tick;
+        lift(patient, MOOD_LIFT_SEEN);
       }
       // A consultant who treats a patient can't be their Medical Examiner.
       if (patient && staff.role === "consultant" && !patient.consultants.includes(staff.id)) {
@@ -298,9 +327,24 @@ function complete(state: SimState, job: Job, obj: PlacedObject): void {
     case "treat": {
       const p = patient!;
       const pathway = conditionById.get(p.conditionId)!.pathway;
-      if (pathway[p.step]?.stabilises) p.deterioration = null;
+      const done = pathway[p.step];
+      if (done?.stabilises) p.deterioration = null;
+      if (done?.sample) sendSample(state, p);
       p.step++;
+      lift(p, MOOD_LIFT_STEP);
+      // Optional steps (an X-ray under the Ottawa rules, say) only for some.
+      while (pathway[p.step] && pathway[p.step]!.chance < 1) {
+        if (chance(state.rng, pathway[p.step]!.chance)) break;
+        p.step++;
+      }
       const next = pathway[p.step];
+      if (done?.imaging) {
+        // Off the scanner: back to their trolley, or to wait.
+        scanned(state, p, done.imaging, job);
+        const home = p.bed === null ? undefined : roomOfObject(state, p.bed);
+        postTreatment(state, p, home && next!.room === home.typeId ? p.bed : null);
+        break;
+      }
       if (next) {
         // Stay on the couch: the next step happens here, or they wait on it
         // until there's room where it does (Resus to Majors, say).
