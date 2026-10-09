@@ -4,14 +4,16 @@
  * its own department. Doctors and nurse practitioners wait at the A&E Staff
  * Base, specialty doctors on their ward, radiographers in X-ray or CT, lab
  * scientists in the lab, porters in the Porters' Lodge and cleaners in the
- * Domestic Services Room. Nurses wait at a nurse station (systems/staffing.ts)
+ * Domestic Services Room. They sit behind a free desk or on a free seat if
+ * there is one, otherwise stand. Nurses wait at a nurse station (systems/staffing.ts)
  * and use the Staff Base only when every station is taken. With no base
  * built, staff wait in the Staff Room; with no Staff Room either, they stay
  * where they are.
  */
 import type { StaffRoleId } from "@data/schema";
 import type { Point, Staff } from "../agents";
-import { deskStaffSpot } from "../places";
+import { equipmentById } from "@data/catalogue";
+import { deskStaffSpot, seatApproach, seatTile } from "../places";
 import type { Room, SimState } from "../state";
 import { tileIndex } from "../world/grid";
 import { isStandable } from "../world/objects";
@@ -78,13 +80,21 @@ export function waitAtBase(state: SimState, s: Staff): void {
     // Already there (or on the way), on a spot of their own: stay.
     const here = currentRoom && rooms.includes(currentRoom) ? currentRoom : undefined;
     const key = tileIndex(grid, current.x, current.y);
-    if (here && !taken.has(key) && reachableTiles(state, here).has(key)) {
-      if (s.dest) headTo(state, s, s.dest);
+    const sitting =
+      here !== undefined &&
+      (isDeskSpot(state, here, current) ||
+        seats(state, here).some((t) => t.seat.x === current.x && t.seat.y === current.y));
+    const standing = here !== undefined && reachableTiles(state, here).has(key);
+    // Standing, they take a desk or seat once one comes free.
+    const better = standing && !sitting ? freeSpot(state, [here!], s, taken) : null;
+    if (here && !taken.has(key) && (sitting || standing) && !better?.seated) {
+      const d = s.dest;
+      if (d) headTo(state, s, d, { x: d.ax, y: d.ay });
       return;
     }
-    const spot = freeSpot(state, rooms, s, taken);
+    const spot = better?.seated ? better : freeSpot(state, rooms, s, taken);
     if (!spot) continue; // Full: try the next kind of base.
-    headTo(state, s, spot);
+    headTo(state, s, spot.to, spot.approach);
     return;
   }
 }
@@ -101,12 +111,46 @@ function takenSpots(state: SimState, self: Staff): Set<number> {
   return out;
 }
 
+/** Where to wait, and the tile to walk to first (in front of a seat, say). */
+interface Spot {
+  to: Point;
+  approach: Point;
+  /** Behind a desk or on a seat. */
+  seated: boolean;
+}
+
+function isDeskSpot(state: SimState, room: Room, p: Point): boolean {
+  return room.objectIds.some((id) => {
+    const obj = state.objects[id]!;
+    if (obj.defId !== "desk") return false;
+    const spot = deskStaffSpot(obj);
+    return spot.x === p.x && spot.y === p.y;
+  });
+}
+
+/** Every seat in a room that can be reached: the seat itself, and where to stand to sit down. */
+function seats(state: SimState, room: Room): { seat: Point; approach: Point }[] {
+  const grid = state.floors[room.floor]!;
+  const open = reachableTiles(state, room);
+  const out: { seat: Point; approach: Point }[] = [];
+  for (const id of room.objectIds) {
+    const obj = state.objects[id]!;
+    const n = equipmentById.get(obj.defId)?.seats ?? 0;
+    for (let slot = 0; slot < n; slot++) {
+      const approach = seatApproach(obj, slot);
+      if (!open.has(tileIndex(grid, approach.x, approach.y))) continue;
+      out.push({ seat: seatTile(obj, slot), approach });
+    }
+  }
+  return out;
+}
+
 /**
- * A free spot in the nearest of the rooms with one: behind a desk if one is
- * free, otherwise the free tile nearest the middle of the room. Only tiles
+ * A free spot in the nearest of the rooms with one: behind a desk, then on
+ * a seat, otherwise the free tile nearest the middle of the room. Only spots
  * that can be walked to from the room's way in count.
  */
-function freeSpot(state: SimState, rooms: Room[], s: Staff, taken: Set<number>): Point | null {
+function freeSpot(state: SimState, rooms: Room[], s: Staff, taken: Set<number>): Spot | null {
   const grid = state.floors[0]!;
   const centre = (r: Room) => ({ x: r.bounds.x + r.bounds.w / 2, y: r.bounds.y + r.bounds.h / 2 });
   const dist = (a: Point, b: Point) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
@@ -124,9 +168,13 @@ function freeSpot(state: SimState, rooms: Room[], s: Staff, taken: Set<number>):
       const obj = state.objects[id]!;
       if (obj.defId !== "desk") continue;
       const spot = deskStaffSpot(obj);
-      if (free(spot)) return spot;
+      if (free(spot)) return { to: spot, approach: spot, seated: true };
     }
     const c = centre(room);
+    const seat = seats(state, room)
+      .filter((t) => !taken.has(tileIndex(grid, t.seat.x, t.seat.y)))
+      .sort((a, b) => dist(a.seat, c) - dist(b.seat, c))[0];
+    if (seat) return { to: seat.seat, approach: seat.approach, seated: true };
     let best: Point | null = null;
     let bestD = Infinity;
     for (const i of open) {
@@ -138,7 +186,7 @@ function freeSpot(state: SimState, rooms: Room[], s: Staff, taken: Set<number>):
         bestD = d;
       }
     }
-    if (best) return best;
+    if (best) return { to: best, approach: best, seated: false };
   }
   return null;
 }

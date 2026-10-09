@@ -113,6 +113,18 @@ describe("idle staff", () => {
     expect(roomAt(state, scientist!)).toBe("staff_room");
   });
 
+  it("sit on the Staff Room chairs, and stand once they're all taken", () => {
+    const state = bases();
+    const staff = hire(state, "radiographer", 5);
+    settle(state);
+    // The chairs are along the room's east wall, at x = 20.
+    const seated = staff.filter((s) => s.x === 20);
+    expect(seated.map((s) => s.y).sort()).toEqual([1, 2, 3, 4]);
+    const standing = staff.filter((s) => s.x !== 20);
+    expect(standing).toHaveLength(1);
+    expect(roomAt(state, standing[0]!)).toBe("staff_room");
+  });
+
   it("with nowhere at all, stay where they are", () => {
     const state = bases({ staffRoom: false });
     const [radiographer] = hire(state, "radiographer");
