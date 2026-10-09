@@ -8,10 +8,11 @@ export const MINUTES_PER_DAY = 24 * 60;
 export const TICKS_PER_DAY = TICKS_PER_MINUTE * MINUTES_PER_DAY;
 
 /**
- * Ticks per real second at 1× speed. 14,400 ticks per day / 50 = 288 s, so an
- * in-game day takes about 4.8 real minutes (design target: 4–6).
+ * Ticks per real second at 1× speed: one in-game minute per real second, so
+ * a day takes 24 real minutes at 1× and 90 seconds at 16×. (A day once took
+ * 4.8 minutes at 1×, which made everyone dart about too fast to follow.)
  */
-export const TICKS_PER_SECOND_1X = 50;
+export const TICKS_PER_SECOND_1X = 10;
 
 /** The game starts at 08:00 on day 1. */
 export const START_MINUTE_OF_DAY = 8 * 60;

@@ -46,7 +46,7 @@ describe("palette help", () => {
   it("says where an item is needed", () => {
     const help = equipmentHelp(equipmentById.get("sink")!);
     expect(help.sections!.find((s) => s.heading === "Needed in")!.items[0]!.text).toBe(
-      "Triage Room, Toilets",
+      "Triage Room, Toilets, Ward, Side Room",
     );
   });
 });

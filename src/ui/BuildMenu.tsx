@@ -10,7 +10,18 @@ import { WallType } from "@sim/world/grid";
 import { CATEGORY_COLOURS } from "@render/palette";
 import { useEffect } from "preact/hooks";
 import { CATEGORY_NAMES, equipmentHelp, roomTypeHelp, simpleHelp, type HelpContent } from "./help";
-import { buildTab, paletteHelp, planning, tool, type BuildTab } from "./store";
+import {
+  buildTab,
+  coverageOverlay,
+  paletteHelp,
+  peopleDialog,
+  planning,
+  sidePanel,
+  tool,
+  type BuildTab,
+  type PeopleTab,
+  type SidePanel,
+} from "./store";
 
 const TABS: { id: BuildTab; label: string }[] = [
   { id: "construction", label: "Construction" },
@@ -18,10 +29,35 @@ const TABS: { id: BuildTab; label: string }[] = [
   { id: "equipment", label: "Equipment" },
 ];
 
+/** Management buttons: side panels on the left, or tabs of the People dialog. */
+const PANELS: ({ kind: "side"; id: SidePanel } | { kind: "people"; id: PeopleTab })[] = [
+  { kind: "side", id: "staff" },
+  { kind: "people", id: "staff" },
+  { kind: "people", id: "patients" },
+  { kind: "side", id: "reports" },
+];
+const PANEL_LABELS = {
+  side: { staff: "Hire", reports: "Reports" },
+  people: { staff: "Staff", patients: "Patients" },
+} as const;
+const PANEL_HINTS = {
+  side: { staff: "Hire new staff", reports: "Today's money and A&E performance" },
+  people: { staff: "What every member of staff is doing", patients: "Every patient's status" },
+} as const;
+
 const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
-export function BuildBar({ onTogglePlan }: { onTogglePlan: () => void }) {
+export function BuildBar({
+  onTogglePlan,
+  onToggleCoverage,
+  onPanel,
+}: {
+  onTogglePlan: () => void;
+  onToggleCoverage: () => void;
+  /** A management panel was opened or closed, so its data needs refreshing. */
+  onPanel: () => void;
+}) {
   const open = buildTab.value;
   return (
     <nav class="buildbar" aria-label="Build">
@@ -34,6 +70,15 @@ export function BuildBar({ onTogglePlan }: { onTogglePlan: () => void }) {
       >
         Plan
       </button>
+      <button
+        class={coverageOverlay.value ? "active" : ""}
+        aria-pressed={coverageOverlay.value}
+        title="Coverage (O): which beds can be seen from a nurse station"
+        onMouseDown={noFocus}
+        onClick={onToggleCoverage}
+      >
+        Coverage
+      </button>
       <span class="buildbar-divider" aria-hidden="true" />
       {TABS.map((t) => (
         <button
@@ -43,12 +88,38 @@ export function BuildBar({ onTogglePlan }: { onTogglePlan: () => void }) {
           onMouseDown={noFocus}
           onClick={() => {
             buildTab.value = open === t.id ? null : t.id;
+            sidePanel.value = null;
             tool.value = null;
           }}
         >
           {t.label}
         </button>
       ))}
+      <span class="buildbar-divider" aria-hidden="true" />
+      {PANELS.map((p) => {
+        const active = p.kind === "side" ? sidePanel.value === p.id : peopleDialog.value === p.id;
+        return (
+          <button
+            key={`${p.kind}-${p.id}`}
+            class={active ? "active" : ""}
+            aria-pressed={active}
+            title={p.kind === "side" ? PANEL_HINTS.side[p.id] : PANEL_HINTS.people[p.id]}
+            onMouseDown={noFocus}
+            onClick={() => {
+              if (p.kind === "side") {
+                sidePanel.value = active ? null : p.id;
+                buildTab.value = null;
+                tool.value = null;
+              } else {
+                peopleDialog.value = active ? null : p.id;
+              }
+              onPanel();
+            }}
+          >
+            {p.kind === "side" ? PANEL_LABELS.side[p.id] : PANEL_LABELS.people[p.id]}
+          </button>
+        );
+      })}
     </nav>
   );
 }

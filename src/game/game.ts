@@ -12,33 +12,67 @@ import { applyCommand, type Command, type CommandResult } from "@sim/commands";
 import { addToPlan, buildPreview, commitPlan, planDiff, type PlanPreview } from "@sim/plan";
 import { tick } from "@sim/sim";
 import { createSimState, type SimState } from "@sim/state";
+import { coverageView, stationsSeeing, bedCover } from "@sim/systems/monitoring";
+import { applyStaffCommand, type StaffCommand } from "@sim/systems/staffing";
 import { clockFromTick, formatClock, TICKS_PER_SECOND_1X } from "@sim/time";
 import { itemsAt } from "@sim/world/objects";
 import { roomAt } from "@sim/world/rooms";
 import { CameraControls, isPanModifier } from "@render/cameraControls";
+import { TILE_SIZE } from "@render/constants";
 import type { Renderer } from "@render/renderer";
 import {
   buildTab,
+  coverageOverlay,
   debugStats,
   debugVisible,
   hud,
   inspector,
   mapHelp,
+  notifications,
+  patientTable,
+  peopleDialog,
   planning,
   planSummary,
+  report,
+  roster,
   saveDialogOpen,
   showToast,
+  sidePanel,
+  staffTable,
   type InspectorData,
 } from "@ui/store";
 import { tileHelp } from "@ui/help";
 import { BuildController } from "./buildController";
+import {
+  describePatient,
+  describePatientTable,
+  describeReport,
+  describeRoster,
+  describeStaff,
+  describeStaffTable,
+  fourHourShare,
+  patientsInDept,
+} from "./describe";
 import { FixedStepLoop, type Speed } from "./loop";
 import { describeAccess, formatMoney } from "./tools";
 
 const HUD_INTERVAL_MS = 100;
+/** Panels with lots of detail (inspector, staff, reports) refresh less often. */
+const PANEL_INTERVAL_MS = 250;
+/** Notifications kept in the feed. */
+const MAX_NOTIFICATIONS = 40;
+/** How close (in tiles) a click must be to a patient or staff member to select them. */
+const AGENT_PICK_RADIUS = 0.6;
 /** How long the mouse must rest on something before its help card appears. */
 const HOVER_HELP_DELAY_MS = 350;
 const FLOOR = 0;
+
+const COVER_TEXT = {
+  watched: { text: "Watched from a staffed nurse station", ok: true },
+  remote: { text: "Covered by a staffed central monitor", ok: true },
+  unstaffed: { text: "In sight of a nurse station, but nobody is at it", ok: false },
+  blind: { text: "Not visible from any nurse station", ok: false },
+} as const;
 
 /** Number keys map to speeds, as in the design doc (GAME_DESIGN §4). */
 const SPEED_KEYS: Record<string, Speed> = {
@@ -46,6 +80,7 @@ const SPEED_KEYS: Record<string, Speed> = {
   Digit2: 2,
   Digit3: 4,
   Digit4: 8,
+  Digit5: 16,
 };
 
 export class Game {
@@ -55,6 +90,10 @@ export class Game {
   /** Speed to resume to when unpausing with Space. */
   private resumeSpeed: Exclude<Speed, 0> = 1;
   private selectedTile: { x: number; y: number } | null = null;
+  /** Selected patient or member of staff (takes priority over the tile). */
+  private selectedAgent: number | null = null;
+  private nextNotification = 1;
+  private lastPanels = 0;
   private lastHovered = "";
   private hoverSince = 0;
   private lastDay: number;
@@ -111,12 +150,65 @@ export class Game {
       // Real building can get in the way of planned steps (or shift item ids).
       if (!planning.value && this.state.plan.length > 0) this.rebuildPreview();
       this.refreshPlanView();
+      this.refreshCoverage();
       this.publishInspector();
       this.publishHud();
     } else if (!quiet) {
       showToast(result.error ?? "Can't do that", "error");
     }
     return result;
+  }
+
+  /**
+   * Hires or dismisses staff. Always acts on the real hospital, even in
+   * plan mode: plans are for building.
+   */
+  applyStaff(cmd: StaffCommand): void {
+    const result = applyStaffCommand(this.state, cmd);
+    if (!result.ok) {
+      showToast(result.error, "error");
+      return;
+    }
+    if (cmd.type === "dismiss_staff") {
+      showToast(`${result.staff.name} has left`);
+      if (this.selectedAgent === cmd.id) this.select(null);
+    }
+    this.drainEvents();
+    this.refreshPanels();
+    this.publishHud();
+  }
+
+  /** Centres the camera on a tile (e.g. from a notification). */
+  focus(at: { x: number; y: number }): void {
+    this.renderer.camera.centreOn((at.x + 0.5) * TILE_SIZE, (at.y + 0.5) * TILE_SIZE);
+  }
+
+  /** Selects someone and moves the camera to them (e.g. from the People dialog). */
+  showAgent(id: number): void {
+    const a = this.state.patients[id] ?? this.state.staff[id];
+    if (!a) return;
+    this.selectAgent(id);
+    this.focus({ x: Math.round(a.x), y: Math.round(a.y) });
+  }
+
+  /** Selects a patient or member of staff and shows them in the inspector. */
+  selectAgent(id: number | null): void {
+    this.selectedAgent = id;
+    this.selectedTile = null;
+    this.renderer.setSelectedAgent(id);
+    mapHelp.value = null;
+    this.publishInspector();
+  }
+
+  /** Shows or hides the coverage overlay (which beds nurse stations can see). */
+  toggleCoverage(): void {
+    coverageOverlay.value = !coverageOverlay.value;
+    this.refreshCoverage();
+  }
+
+  /** Redraws the coverage overlay from what the map shows (or hides it). */
+  private refreshCoverage(): void {
+    this.renderer.setCoverage(coverageOverlay.value ? coverageView(this.viewState) : null);
   }
 
   /** Enters or leaves plan mode. The plan itself is kept either way. */
@@ -127,6 +219,7 @@ export class Game {
     document.body.classList.toggle("planning", on);
     this.renderer.setState(this.viewState);
     this.refreshPlanView();
+    this.refreshCoverage();
     this.build.refresh();
     this.publishInspector();
   }
@@ -170,12 +263,16 @@ export class Game {
     this.state = state;
     this.lastDay = clockFromTick(state.tick).day;
     this.selectedTile = null;
+    this.selectedAgent = null;
+    this.renderer.setSelectedAgent(null);
     this.preview = null;
+    notifications.value = [];
     planning.value = false;
     document.body.classList.remove("planning");
     if (state.plan.length > 0) this.rebuildPreview();
     this.refreshPlanView();
     this.renderer.setState(state);
+    this.refreshCoverage();
     this.build.refresh();
     this.setSpeed(0);
     this.publishInspector();
@@ -211,6 +308,8 @@ export class Game {
 
   select(tile: { x: number; y: number } | null): void {
     this.selectedTile = tile;
+    this.selectedAgent = null;
+    this.renderer.setSelectedAgent(null);
     mapHelp.value = null;
     this.publishInspector();
   }
@@ -264,7 +363,8 @@ export class Game {
       this.build.refresh();
     }
     this.updateHoverHelp();
-    this.renderer.render(this.loop.alpha);
+    this.renderer.render(this.loop.alpha, this.state);
+    this.drainEvents();
 
     const day = clockFromTick(this.state.tick).day;
     if (day !== this.lastDay) {
@@ -292,6 +392,57 @@ export class Game {
       this.lastHud = now;
       this.publishHud();
     }
+    if (now - this.lastPanels >= PANEL_INTERVAL_MS) {
+      this.lastPanels = now;
+      this.refreshPanels();
+      // Stations empty and fill as nurses come and go.
+      if (coverageOverlay.value) this.refreshCoverage();
+      if (this.selectedAgent !== null) this.publishInspector();
+    }
+  }
+
+  /** Moves new sim events into the notifications feed. */
+  private drainEvents(): void {
+    const events = this.state.events;
+    if (events.length === 0) return;
+    const added = events.map((e) => ({
+      id: this.nextNotification++,
+      when: formatClock(clockFromTick(e.tick)),
+      text: e.text,
+      severity: e.severity,
+      ...(e.at ? { at: e.at } : {}),
+    }));
+    this.state.events = [];
+    notifications.value = [...added.reverse(), ...notifications.value].slice(0, MAX_NOTIFICATIONS);
+  }
+
+  /** Refreshes whichever management panel is open. */
+  refreshPanels(): void {
+    const panel = sidePanel.value;
+    roster.value = panel === "staff" ? describeRoster(this.state) : null;
+    report.value = panel === "reports" ? describeReport(this.state) : null;
+    const people = peopleDialog.value;
+    patientTable.value = people === "patients" ? describePatientTable(this.state) : null;
+    staffTable.value = people === "staff" ? describeStaffTable(this.state) : null;
+  }
+
+  /** The patient or member of staff nearest the mouse pointer, if close enough. */
+  private agentUnderPointer(): number | null {
+    const at = this.renderer.pointerScreen;
+    if (!at) return null;
+    const w = this.renderer.camera.screenToWorld(at.x, at.y);
+    const x = w.x / TILE_SIZE - 0.5;
+    const y = w.y / TILE_SIZE - 0.5;
+    let best: number | null = null;
+    let bestD = AGENT_PICK_RADIUS;
+    for (const a of [...Object.values(this.state.staff), ...Object.values(this.state.patients)]) {
+      const d = Math.hypot(a.x - x, a.y - y);
+      if (d < bestD) {
+        best = a.id;
+        bestD = d;
+      }
+    }
+    return best;
   }
 
   /** Shows a help card once the mouse has rested on a room, item or door. */
@@ -312,6 +463,8 @@ export class Game {
       clock: formatClock(clockFromTick(this.state.tick)),
       speed: this.loop.speed,
       money: this.state.money,
+      patients: patientsInDept(this.state),
+      fourHour: fourHourShare(this.state.today.stats),
     };
     if (!debugVisible.value) return;
     const { camera } = this.renderer;
@@ -331,11 +484,32 @@ export class Game {
       mapSize: { width: grid.width, height: grid.height },
       rooms: this.viewState.rooms.length,
       objects: Object.keys(this.viewState.objects).length,
+      patients: Object.keys(this.state.patients).length,
+      staff: Object.keys(this.state.staff).length,
+      jobs: Object.keys(this.state.jobs).length,
     };
   }
 
   /** Rebuilds the inspector panel for the selected tile. */
   private publishInspector(): void {
+    if (this.selectedAgent !== null) {
+      const id = this.selectedAgent;
+      const patient = this.state.patients[id];
+      const staff = this.state.staff[id];
+      if (patient || staff) {
+        inspector.value = {
+          tile: { x: Math.round((patient ?? staff)!.x), y: Math.round((patient ?? staff)!.y) },
+          agent: patient ? describePatient(this.state, patient) : describeStaff(this.state, staff!),
+        };
+        this.renderer.setSelection(null);
+        return;
+      }
+      // They've left the hospital.
+      this.selectedAgent = null;
+      this.renderer.setSelectedAgent(null);
+      inspector.value = null;
+      return;
+    }
     const tile = this.selectedTile;
     if (!tile) {
       inspector.value = null;
@@ -359,6 +533,9 @@ export class Game {
           ? { upkeep: def.def.upkeep, access: describeAccess(def.def.access) }
           : {}),
       };
+      if (stationsSeeing(this.viewState).has(obj.id)) {
+        data.object.cover = COVER_TEXT[bedCover(this.viewState, obj.id)];
+      }
     }
 
     const room = roomAt(this.viewState, FLOOR, tile.x, tile.y);
@@ -399,7 +576,9 @@ export class Game {
     if (button === 2) {
       if (!this.build.cancel()) this.select(null);
     } else if (button === 0 && !this.build.active) {
-      this.select(this.renderer.hoveredTile);
+      const agent = this.agentUnderPointer();
+      if (agent !== null) this.selectAgent(agent);
+      else this.select(this.renderer.hoveredTile);
     }
   }
 
@@ -415,6 +594,8 @@ export class Game {
     const speed = SPEED_KEYS[e.code];
     if (e.code === "KeyP") {
       this.setPlanning(!planning.value);
+    } else if (e.code === "KeyO") {
+      this.toggleCoverage();
     } else if (speed !== undefined) {
       this.setSpeed(speed);
     } else if (e.code === "Space") {
@@ -425,7 +606,10 @@ export class Game {
     } else if (e.code === "KeyR") {
       this.build.rotate();
     } else if (e.code === "Escape") {
-      if (!this.build.cancel()) this.select(null);
+      if (this.build.cancel()) return;
+      if (peopleDialog.value) peopleDialog.value = null;
+      else if (inspector.value) this.select(null);
+      else sidePanel.value = null;
     } else if (e.code === "F3" || e.code === "Backquote") {
       e.preventDefault();
       debugVisible.value = !debugVisible.value;

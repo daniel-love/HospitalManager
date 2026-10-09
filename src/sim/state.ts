@@ -5,12 +5,25 @@
  * after loading.
  */
 import { STARTING_CASH } from "@data/economy";
+import {
+  type Ambulance,
+  emptyLedger,
+  emptyStats,
+  type DayReport,
+  type FlowStats,
+  type Incident,
+  type Job,
+  type Ledger,
+  type Patient,
+  type SimEvent,
+  type Staff,
+} from "./agents";
 import type { PlanEntry } from "./plan";
 import { createRng, type RngState } from "./rng";
 import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 
-export const SIM_STATE_VERSION = 2;
+export const SIM_STATE_VERSION = 8;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -64,8 +77,48 @@ export interface SimState {
   nextObjectId: number;
   /** Build plan (blueprint) not yet built or paid for. See plan.ts. */
   plan: PlanEntry[];
+  /** Bumped by every layout change, so agents know to re-plan their routes. */
+  layoutVersion: number;
+
+  patients: Record<number, Patient>;
+  staff: Record<number, Staff>;
+  /** Shared id sequence for patients and staff. */
+  nextAgentId: number;
+  jobs: Record<number, Job>;
+  nextJobId: number;
+  /** Ambulances parked or waiting outside, keyed by id. */
+  ambulances: Record<number, Ambulance>;
+  nextAmbulanceId: number;
+  /**
+   * Who has claimed what: "objectId:slot" → agent id. Slots are seats on a
+   * bench, 0 for a couch or toilet, "staff" for the staff side of a desk.
+   */
+  reserved: Record<string, number>;
+  /** Uses since last cleaned, by object id (couches and toilets). */
+  dirt: Record<number, number>;
+
+  /** Money and patient flow so far today, and reports for past days (newest last). */
+  today: { ledger: Ledger; stats: FlowStats };
+  history: DayReport[];
+  settings: SimSettings;
+  /** Tick each kind of warning was last raised, so they aren't repeated constantly. */
+  alerts: Record<string, number>;
+  /** Patient safety incidents, oldest first (capped; see MAX_INCIDENTS). */
+  incidents: Incident[];
+  nextIncidentId: number;
+
+  /** Not saved: messages for the notifications feed, drained by the game each frame. */
+  events: SimEvent[];
   /** Derived (not saved): rebuilt by detectRooms() after every layout change. */
   rooms: Room[];
+  /** Derived (not saved): room id holding each object wholly inside a room. */
+  objectRoom: Record<number, number>;
+}
+
+/** Sandbox difficulty knobs (GAME_DESIGN §2.4). */
+export interface SimSettings {
+  /** Multiplies arrival rates: 1 = the default third of real-world volumes. */
+  patientVolume: number;
 }
 
 export interface NewGameOptions {
@@ -90,6 +143,24 @@ export function createSimState(opts: NewGameOptions): SimState {
     objects: {},
     nextObjectId: 1,
     plan: [],
+    layoutVersion: 0,
+    patients: {},
+    staff: {},
+    nextAgentId: 1,
+    jobs: {},
+    nextJobId: 1,
+    ambulances: {},
+    nextAmbulanceId: 1,
+    reserved: {},
+    dirt: {},
+    today: { ledger: emptyLedger(), stats: emptyStats() },
+    history: [],
+    settings: { patientVolume: 1 },
+    alerts: {},
+    incidents: [],
+    nextIncidentId: 1,
+    events: [],
     rooms: [],
+    objectRoom: {},
   };
 }

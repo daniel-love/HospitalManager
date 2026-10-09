@@ -1,5 +1,5 @@
 /**
- * Room types the player can zone. A room is valid (and, from M2, functional)
+ * Room types the player can zone. A room is valid (and functional)
  * only when every requirement is met. See GAME_DESIGN §4.2.
  */
 
@@ -92,7 +92,9 @@ export const rooms = [
       { label: "Privacy curtain", anyOf: ["privacy_curtain"] },
     ],
     bothBedSides: true,
-    description: "For seriously unwell patients who need a trolley and monitoring.",
+    observed: true,
+    description:
+      "For seriously unwell patients who need a trolley and monitoring. Every trolley should be in sight of a nurse station.",
   },
   {
     id: "resus_bay",
@@ -112,6 +114,7 @@ export const rooms = [
       { label: "Suction unit", anyOf: ["suction_unit"] },
     ],
     bothBedSides: true,
+    observed: true,
     description: "Life-threatening emergencies. Best placed next to the ambulance entrance.",
   },
   {
@@ -139,5 +142,71 @@ export const rooms = [
     required: [{ label: "Kitchenette", anyOf: ["kitchenette"] }],
     minSeats: 4,
     description: "Staff rest here between jobs to recover from fatigue (M5).",
+  },
+  {
+    id: "ambulance_bay",
+    code: 10,
+    name: "Ambulance Bay",
+    department: "A&E",
+    colour: 0xe8c547,
+    minSize: [3, 6],
+    enclosed: false,
+    required: [],
+    description:
+      "Hardstanding outside A&E where an ambulance parks while its crew hands the patient over. Zone it on foundations; each clear 3×6 space holds one ambulance. Without one, no ambulances come.",
+  },
+  {
+    id: "ward",
+    code: 11,
+    name: "Ward",
+    department: "Inpatient",
+    colour: 0x7fa6d9,
+    minSize: [4, 4],
+    enclosed: true,
+    required: [
+      { label: "Hospital bed", anyOf: ["hospital_bed", "profiling_bed"] },
+      { label: "Hand-wash sink", anyOf: ["sink"] },
+    ],
+    description:
+      "Admitted patients stay here for days. Each bed needs a bed-width route (double doors, 2-wide corridors) from A&E for the porters.",
+  },
+  {
+    id: "side_room",
+    code: 12,
+    name: "Side Room",
+    department: "Inpatient",
+    colour: 0x9cb8e0,
+    minSize: [3, 4],
+    enclosed: true,
+    required: [
+      { label: "Hospital bed", anyOf: ["hospital_bed", "profiling_bed"] },
+      { label: "Hand-wash sink", anyOf: ["sink"] },
+    ],
+    description:
+      "A single room off a ward, for privacy. Patients at the end of their life are given one when it's free; dying in an open bay brings complaints.",
+  },
+  {
+    id: "relatives_room",
+    code: 13,
+    name: "Relatives' Room",
+    department: "Facilities",
+    colour: 0xc9a3c9,
+    minSize: [3, 3],
+    enclosed: true,
+    required: [{ label: "Sofa", anyOf: ["sofa"] }],
+    description:
+      "A quiet room where a doctor breaks bad news to a family. Without one, it happens in a corridor or cubicle, which brings complaints.",
+  },
+  {
+    id: "mortuary",
+    code: 14,
+    name: "Mortuary",
+    department: "Support",
+    colour: 0x8a8f99,
+    minSize: [3, 3],
+    enclosed: true,
+    required: [{ label: "Mortuary fridge unit", anyOf: ["mortuary_fridge"] }],
+    description:
+      "Where deceased patients stay until the Medical Examiner (and sometimes the coroner) is done and they're released. Needs a bed-width route from the wards and A&E; best kept away from public areas.",
   },
 ];

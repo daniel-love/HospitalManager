@@ -12,7 +12,7 @@
  * the game slows down rather than freezing.
  */
 
-export const SPEEDS = [0, 1, 2, 4, 8] as const;
+export const SPEEDS = [0, 1, 2, 4, 8, 16] as const;
 export type Speed = (typeof SPEEDS)[number];
 
 export interface LoopOptions {

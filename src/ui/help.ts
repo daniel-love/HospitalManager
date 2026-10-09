@@ -55,6 +55,7 @@ function requirementLines(def: RoomDef): HelpItem[] {
   }
   if (def.minSeats !== undefined) lines.push({ text: `Seating for ${def.minSeats}` });
   if (def.bothBedSides) lines.push({ text: "Clear space both sides of each bed" });
+  if (def.observed) lines.push({ text: "Recommended: beds in sight of a nurse station" });
   for (const c of def.connectedTo) lines.push({ text: c.label });
   return lines;
 }

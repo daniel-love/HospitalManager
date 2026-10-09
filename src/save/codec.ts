@@ -2,13 +2,16 @@
  * Save file encoding (ARCHITECTURE §8).
  *
  * A save is plain JSON: { format, version, meta, state }. Typed arrays are
- * stored as base64. Derived data (rooms, the roomId, objectId and mountId grids) is
- * not saved; it is rebuilt on load so it can never disagree with the layout.
+ * stored as base64, and id-keyed records (objects, patients, staff, jobs,
+ * ambulances) as
+ * arrays. Derived data (rooms, the roomId, objectId and mountId grids) is not
+ * saved, nor are pending notifications; it is rebuilt on load so it can never disagree with the layout.
  * Loading runs migrations for older versions and then validates with Zod, so
  * a corrupt or hand-edited file fails with a readable message.
  */
 import { z } from "zod";
-import { objectDef } from "@data/catalogue";
+import { conditionById, objectDef } from "@data/catalogue";
+import { staffRoleIds } from "@data/schema";
 import { SIM_STATE_VERSION, type PlacedObject, type SimState } from "@sim/state";
 import { clockFromTick, formatClock } from "@sim/time";
 import { createFloorGrid, tileIndex, type FloorGrid } from "@sim/world/grid";
@@ -91,6 +94,166 @@ const commandSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
+const num = z.number().finite();
+const nullableInt = int.nullable();
+
+const agentFields = {
+  id: int.positive(),
+  name: z.string(),
+  x: num,
+  y: num,
+  prevX: num,
+  prevY: num,
+  path: z.array(num).refine((p) => p.length % 2 === 0, "path must be x, y pairs"),
+  dest: z.object({ x: num, y: num, ax: int, ay: int, blocked: int }).nullable(),
+  pathVersion: int.min(0),
+};
+
+const patientSchema = z.object({
+  ...agentFields,
+  conditionId: z.string().refine((id) => conditionById.has(id), "unknown condition"),
+  category: int.min(0).max(5),
+  stage: z.enum([
+    "awaiting_handover",
+    "queueing",
+    "booking",
+    "waiting_triage",
+    "called_triage",
+    "triage",
+    "waiting_treatment",
+    "called_treatment",
+    "in_cubicle",
+    "collapsed",
+    "awaiting_bed",
+    "transferring",
+    "on_ward",
+    "deceased",
+    "to_mortuary",
+    "in_mortuary",
+    "leaving",
+  ]),
+  step: int.min(0),
+  seat: z.object({ objectId: int.positive(), slot: int.min(0) }).nullable(),
+  standing: z.object({ x: num, y: num }).nullable(),
+  bed: nullableInt,
+  desk: nullableInt,
+  bookingLeft: int,
+  toilet: z.object({ objectId: int.positive(), left: int }).nullable(),
+  ambulanceId: nullableInt,
+  deterioration: z.object({ onset: int, crash: int, noticed: nullableInt }).nullable(),
+  obs: z.object({ tick: int, news: int.min(0) }).nullable(),
+  mood: num,
+  bladder: num,
+  bladderRate: num,
+  times: z.object({
+    arrived: int,
+    booked: nullableInt,
+    triaged: nullableInt,
+    seen: nullableInt,
+    decided: nullableInt,
+    admitted: nullableInt,
+    left: nullableInt,
+  }),
+  stayUntil: nullableInt,
+  endOfLife: z.boolean(),
+  death: z
+    .object({
+      tick: int,
+      expected: z.boolean(),
+      where: z.string(),
+      verified: nullableInt,
+      familyTold: nullableInt,
+      lastOffices: nullableInt,
+      inMortuary: nullableInt,
+      fridge: z.object({ objectId: int.positive(), slot: int.min(0) }).nullable(),
+      meReviewed: nullableInt,
+      coroner: z.boolean(),
+      releaseAt: nullableInt,
+    })
+    .nullable(),
+  outcome: z.enum(["discharged", "lwbs", "transferred", "transferred_out", "died"]).nullable(),
+});
+
+const staffSchema = z.object({
+  ...agentFields,
+  role: z.enum(staffRoleIds),
+  jobId: nullableInt,
+  desk: nullableInt,
+  hiredTick: int.min(0),
+  morale: num.min(0).max(100),
+});
+
+const jobSchema = z.object({
+  id: int.positive(),
+  kind: z.enum([
+    "transfer",
+    "ward_discharge",
+    "handover",
+    "triage",
+    "treat",
+    "obs",
+    "resus",
+    "clean_cubicle",
+    "clean_toilet",
+    "verify_death",
+    "break_news",
+    "last_offices",
+    "to_mortuary",
+    "me_review",
+    "debrief",
+  ]),
+  roles: z.array(z.enum(staffRoleIds)).min(1),
+  patientId: nullableInt,
+  objectId: nullableInt,
+  roomType: z.string(),
+  capabilities: z.array(z.string()),
+  step: int.min(0),
+  dueTick: int,
+  durationTicks: int.positive(),
+  progress: int.min(0),
+  staffId: nullableInt,
+  state: z.enum(["open", "assigned", "working"]),
+  createdTick: int.min(0),
+});
+
+const spaceSchema = z.object({ x: int, y: int, w: int.positive(), h: int.positive() });
+const ambulanceSchema = z.object({
+  id: int.positive(),
+  arrived: int.min(0),
+  space: spaceSchema.nullable(),
+  patientId: nullableInt,
+  handedOver: nullableInt,
+  leaveAt: nullableInt,
+});
+
+const ledgerSchema = z.object({ tariff: num, salaries: num, upkeep: num });
+const statsSchema = z.object({
+  arrivals: int.min(0),
+  discharged: int.min(0),
+  lwbs: int.min(0),
+  transferred: int.min(0),
+  incidents: int.min(0),
+  ambulances: int.min(0),
+  handovers: int.min(0),
+  handoverMins: num,
+  handoversOver30: int.min(0),
+  handoversOver60: int.min(0),
+  admissions: int.min(0),
+  bedWaitMins: num,
+  bedWaitsOver4h: int.min(0),
+  bedWaitsOver12h: int.min(0),
+  wardDischarges: int.min(0),
+  transfersOut: int.min(0),
+  deaths: int.min(0),
+  unexpectedDeaths: int.min(0),
+  complaints: int.min(0),
+  within4h: int.min(0),
+  departures: int.min(0),
+  triaged: int.min(0),
+  triageWaitMins: num,
+  timeInDeptMins: num,
+});
+
 const saveSchema = z.object({
   format: z.literal(SAVE_FORMAT),
   version: z.literal(SIM_STATE_VERSION),
@@ -109,6 +272,34 @@ const saveSchema = z.object({
     objects: z.array(objectSchema),
     nextObjectId: z.number().int().positive(),
     plan: z.array(z.object({ cmd: commandSchema, createdId: int.positive().optional() })),
+    layoutVersion: int.min(0),
+    patients: z.array(patientSchema),
+    staff: z.array(staffSchema),
+    nextAgentId: int.positive(),
+    jobs: z.array(jobSchema),
+    nextJobId: int.positive(),
+    ambulances: z.array(ambulanceSchema),
+    nextAmbulanceId: int.positive(),
+    reserved: z.record(z.string(), int.positive()),
+    dirt: z.record(z.string(), int.min(0)),
+    today: z.object({ ledger: ledgerSchema, stats: statsSchema }),
+    history: z.array(z.object({ day: int.positive(), ledger: ledgerSchema, stats: statsSchema })),
+    settings: z.object({ patientVolume: num.min(0).max(10) }),
+    alerts: z.record(z.string(), int),
+    incidents: z.array(
+      z.object({
+        id: int.positive(),
+        tick: int.min(0),
+        patientId: int.positive(),
+        patientName: z.string(),
+        conditionId: z.string(),
+        summary: z.string(),
+        where: z.string(),
+        at: z.object({ x: int, y: int }),
+        causes: z.array(z.string()),
+      }),
+    ),
+    nextIncidentId: int.positive(),
   }),
 });
 
@@ -140,6 +331,22 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       objects: Object.values(state.objects),
       nextObjectId: state.nextObjectId,
       plan: state.plan,
+      layoutVersion: state.layoutVersion,
+      patients: Object.values(state.patients),
+      staff: Object.values(state.staff),
+      nextAgentId: state.nextAgentId,
+      jobs: Object.values(state.jobs),
+      nextJobId: state.nextJobId,
+      ambulances: Object.values(state.ambulances),
+      nextAmbulanceId: state.nextAmbulanceId,
+      reserved: state.reserved,
+      dirt: state.dirt,
+      today: state.today,
+      history: state.history,
+      settings: state.settings,
+      alerts: state.alerts,
+      incidents: state.incidents,
+      nextIncidentId: state.nextIncidentId,
     },
   };
 }
@@ -177,11 +384,45 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     plan: s.plan.map(({ cmd, createdId }) =>
       createdId === undefined ? { cmd } : { cmd, createdId },
     ),
+    layoutVersion: s.layoutVersion,
+    patients: byId(s.patients, "patient"),
+    staff: byId(s.staff, "staff member"),
+    nextAgentId: s.nextAgentId,
+    jobs: byId(s.jobs, "job"),
+    nextJobId: s.nextJobId,
+    ambulances: byId(s.ambulances, "ambulance"),
+    nextAmbulanceId: s.nextAmbulanceId,
+    reserved: { ...s.reserved },
+    dirt: Object.fromEntries(Object.entries(s.dirt).map(([k, v]) => [Number(k), v])),
+    today: s.today,
+    history: s.history,
+    settings: { ...s.settings },
+    alerts: { ...s.alerts },
+    incidents: s.incidents,
+    nextIncidentId: s.nextIncidentId,
+    events: [],
     rooms: [],
+    objectRoom: {},
   };
+  for (const p of Object.values(state.patients)) {
+    if (p.id >= state.nextAgentId) throw new SaveError(`Patient id ${p.id} out of range`);
+  }
+  for (const st of Object.values(state.staff)) {
+    if (st.id >= state.nextAgentId) throw new SaveError(`Staff id ${st.id} out of range`);
+  }
   for (const obj of s.objects) restoreObject(state, floors, obj);
   detectRooms(state);
   return { meta, state };
+}
+
+/** Rebuilds an id-keyed record, rejecting duplicate ids. */
+function byId<T extends { id: number }>(items: T[], what: string): Record<number, T> {
+  const out: Record<number, T> = {};
+  for (const item of items) {
+    if (out[item.id]) throw new SaveError(`Duplicate ${what} id ${item.id}`);
+    out[item.id] = item;
+  }
+  return out;
 }
 
 function restoreObject(state: SimState, floors: FloorGrid[], obj: PlacedObject): void {

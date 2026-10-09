@@ -3,18 +3,22 @@
  * never modifies it.
  *
  * Layer order (bottom to top): tiles (ground, zones, walls, doors) → objects
- * → room labels → overlays (selection, build ghost, hover box).
+ * → room labels → agents → overlays (selection, build ghost, hover box).
  */
 import { Application, Container, Graphics } from "pixi.js";
 import { objectDef } from "@data/catalogue";
 import type { Rotation, SimState } from "@sim/state";
+import type { CoverageView } from "@sim/systems/monitoring";
 import { inBounds } from "@sim/world/grid";
 import { accessRequirements, footprintRect, isStandable } from "@sim/world/objects";
 import { outlineTiles, type Rect } from "@sim/world/rect";
+import { AgentLayer } from "./agentLayer";
 import { Camera } from "./camera";
 import { TILE_SIZE } from "./constants";
 import { drawBlock, drawFixture, ObjectLayer } from "./objectLayer";
 import {
+  COVER_COLOURS,
+  COVER_SEEN,
   GHOST_BAD,
   GHOST_OK,
   GHOST_REMOVE,
@@ -54,11 +58,14 @@ export class Renderer {
   private readonly world = new Container();
   private tilemap: TilemapLayer;
   private readonly objects = new ObjectLayer();
+  private readonly agents = new AgentLayer();
   private readonly labels = new RoomLabelLayer();
   private readonly overlay = new Container();
   private readonly selection = new Graphics();
   /** Blueprint tint over tiles a plan changes (plan mode only). */
   private readonly planOverlay = new Graphics();
+  /** What nurse stations can see, and how well each bed is watched. */
+  private readonly coverage = new Graphics();
   private readonly ghost = new Graphics();
   private readonly hoverBox = new Graphics();
   /** Tile under the mouse pointer, or null when off-map. */
@@ -84,11 +91,18 @@ export class Renderer {
       .rect(0, 0, TILE_SIZE, TILE_SIZE)
       .stroke({ width: 2, color: 0xffffff, alpha: 0.9, alignment: 1 });
     this.hoverBox.visible = false;
-    this.overlay.addChild(this.planOverlay, this.selection, this.ghost, this.hoverBox);
+    this.overlay.addChild(
+      this.coverage,
+      this.planOverlay,
+      this.selection,
+      this.ghost,
+      this.hoverBox,
+    );
     this.world.addChild(
       this.tilemap.container,
       this.objects.container,
       this.labels.container,
+      this.agents.container,
       this.overlay,
     );
     app.stage.addChild(this.world);
@@ -127,6 +141,7 @@ export class Renderer {
     this.tilemap = new TilemapLayer(grid);
     this.world.addChildAt(this.tilemap.container, 0);
     this.objects.clear();
+    this.agents.clear();
     if (grid.width !== old.width || grid.height !== old.height) {
       this.camera.setBounds(grid.width * TILE_SIZE, grid.height * TILE_SIZE);
     }
@@ -218,6 +233,39 @@ export class Renderer {
     draw(diff.removed, PLAN_REMOVED);
   }
 
+  /**
+   * The coverage overlay: floor in sight of a nurse station tinted blue,
+   * each bed that should be watched green (watched), amber (in sight, but the
+   * station is empty) or red (out of sight), and stations ringed. Null hides it.
+   */
+  setCoverage(view: CoverageView | null): void {
+    const g = this.coverage.clear();
+    if (!view) return;
+    const width = this.state.floors[0]!.width;
+    const T = TILE_SIZE;
+    for (const i of view.seen) {
+      const x = i % width;
+      g.rect(x * T, ((i - x) / width) * T, T, T);
+    }
+    g.fill({ color: COVER_SEEN, alpha: 0.16 });
+    for (const b of view.beds) {
+      const c = COVER_COLOURS[b.cover];
+      g.rect(b.x * T + 1, b.y * T + 1, b.w * T - 2, b.h * T - 2)
+        .fill({ color: c, alpha: 0.45 })
+        .stroke({ width: 3, color: c, alpha: 0.95, alignment: 1 });
+    }
+    for (const s of view.stations) {
+      const cx = (s.at.x + 0.5) * T;
+      const cy = (s.at.y + 0.5) * T;
+      g.circle(cx, cy, T * 0.38).stroke({ width: 3, color: COVER_SEEN, alpha: 0.95 });
+      // Central monitors: a second ring, in the remote-coverage colour.
+      if (s.central) {
+        g.circle(cx, cy, T * 0.5).stroke({ width: 2, color: COVER_COLOURS.remote, alpha: 0.95 });
+      }
+      if (s.staffed) g.circle(cx, cy, T * 0.18).fill({ color: COVER_SEEN, alpha: 0.95 });
+    }
+  }
+
   /** Highlights a set of tiles (the selected room), or clears with null. */
   setSelection(tiles: { x: number; y: number }[] | null): void {
     const g = this.selection.clear();
@@ -243,11 +291,17 @@ export class Renderer {
     this.hoveredTile = inBounds(this.state.floors[0]!, tx, ty) ? { x: tx, y: ty } : null;
   }
 
+  /** Highlights a patient or member of staff (null for none). */
+  setSelectedAgent(id: number | null): void {
+    this.agents.selectedId = id;
+  }
+
   /**
-   * Draws a frame. `_alpha` is the fraction between sim ticks, used for agent
-   * interpolation once agents exist.
+   * Draws a frame. Agents come from `live` (the real hospital, even while the
+   * map shows a plan preview) and are drawn `alpha` of the way between the
+   * last two sim ticks.
    */
-  render(_alpha: number): void {
+  render(alpha: number, live: SimState): void {
     const { camera } = this;
     this.world.scale.set(camera.zoom);
     this.world.position.set(
@@ -256,6 +310,7 @@ export class Renderer {
     );
     this.tilemap.update(camera.visibleWorldRect(), camera.zoom);
     this.objects.update(camera.zoom);
+    this.agents.update(live, alpha);
     this.labels.update(camera.zoom);
 
     if (this.hoveredTile) {

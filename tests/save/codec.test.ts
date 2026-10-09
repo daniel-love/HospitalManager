@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { decodeSave, encodeSave, SaveError } from "@save/codec";
 import { tick } from "@sim/sim";
 import { nextU32 } from "@sim/rng";
-import type { SimState } from "@sim/state";
-import { buildSmallAE } from "../fixtures/smallAE";
+import { SIM_STATE_VERSION, type SimState } from "@sim/state";
+import { TICKS_PER_DAY } from "@sim/time";
+import { buildSmallAE, staffedSmallAE } from "../fixtures/smallAE";
 
 /** Comparable snapshot of everything that matters, typed arrays included. */
 function snapshot(state: SimState) {
@@ -13,6 +14,34 @@ function snapshot(state: SimState) {
     ),
   ) as unknown;
 }
+
+/** State added in save version 3 (M2: patients, staff, jobs, finance). */
+const M2_FIELDS = [
+  "layoutVersion",
+  "patients",
+  "staff",
+  "nextAgentId",
+  "jobs",
+  "nextJobId",
+  "reserved",
+  "dirt",
+  "today",
+  "history",
+  "settings",
+  "alerts",
+];
+
+/** Stats added in save versions 7 and 8, which older saves upgrade to zero. */
+const NO_V8_STATS = { deaths: 0, unexpectedDeaths: 0, complaints: 0 };
+const NO_V7_STATS = {
+  admissions: 0,
+  bedWaitMins: 0,
+  bedWaitsOver4h: 0,
+  bedWaitsOver12h: 0,
+  wardDischarges: 0,
+  transfersOut: 0,
+  ...NO_V8_STATS,
+};
 
 /** Simulates saving to disk and loading again. */
 function roundTrip(state: SimState): SimState {
@@ -76,6 +105,221 @@ describe("save codec", () => {
   });
 });
 
+describe("agents in saves", () => {
+  it("saves mid-shift and carries on exactly as if it never stopped", () => {
+    const a = staffedSmallAE(9);
+    for (let i = 0; i < TICKS_PER_DAY / 2; i++) tick(a);
+    expect(Object.keys(a.patients).length).toBeGreaterThan(0);
+    expect(Object.keys(a.jobs).length).toBeGreaterThan(0);
+    a.events = [];
+    const b = roundTrip(a);
+    expect(snapshot(b)).toEqual(snapshot(a));
+    for (let i = 0; i < TICKS_PER_DAY / 2; i++) {
+      tick(a);
+      tick(b);
+    }
+    a.events = [];
+    b.events = [];
+    expect(snapshot(b)).toEqual(snapshot(a));
+  });
+
+  it("rejects a patient with an unknown condition", () => {
+    const state = staffedSmallAE(9);
+    for (let i = 0; i < TICKS_PER_DAY / 3; i++) tick(state);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "bad")));
+    save.state.patients[0].conditionId = "dragon_pox";
+    expect(() => decodeSave(save)).toThrow(SaveError);
+  });
+});
+
+describe("save upgrades", () => {
+  it("turns a version-3 job's single role into a list", () => {
+    const state = staffedSmallAE(9);
+    for (let i = 0; i < TICKS_PER_DAY / 2; i++) tick(state);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v3")));
+    save.version = 3;
+    for (const job of save.state.jobs) {
+      job.role = job.roles[0];
+      delete job.roles;
+    }
+    const loaded = decodeSave(save).state;
+    expect(Object.values(loaded.jobs).map((j) => j.roles)).toEqual(
+      Object.values(state.jobs).map((j) => [j.roles[0]]),
+    );
+  });
+});
+
+describe("M3 state in saves", () => {
+  it("round-trips deterioration, observations and incidents", async () => {
+    const { staffedMajorsAE } = await import("../fixtures/majorsAE");
+    const state = staffedMajorsAE(3);
+    state.settings.patientVolume = 2;
+    let collapsed = false;
+    for (let i = 0; i < TICKS_PER_DAY && !collapsed; i++) {
+      tick(state);
+      collapsed = Object.values(state.patients).some((p) => p.stage === "collapsed");
+    }
+    expect(collapsed).toBe(true);
+    expect(state.incidents.length).toBeGreaterThan(0);
+    state.events = []; // Notifications aren't saved.
+    const loaded = roundTrip(state);
+    expect(snapshot(loaded)).toEqual(snapshot(state));
+    for (let i = 0; i < 600; i++) {
+      tick(state);
+      tick(loaded);
+    }
+    expect(loaded.incidents).toEqual(state.incidents);
+    expect(nextU32(loaded.rng)).toBe(nextU32(state.rng));
+  });
+
+  it("upgrades a version-4 save with no monitoring state", () => {
+    const state = staffedSmallAE(9);
+    for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v4")));
+    save.version = 4;
+    delete save.state.incidents;
+    delete save.state.nextIncidentId;
+    for (const p of save.state.patients) {
+      delete p.deterioration;
+      delete p.obs;
+    }
+    for (const stats of [
+      save.state.today.stats,
+      ...save.state.history.map((d: { stats: object }) => d.stats),
+    ]) {
+      delete stats.transferred;
+      delete stats.incidents;
+    }
+    const loaded = decodeSave(save).state;
+    expect(loaded.incidents).toEqual([]);
+    expect(loaded.history[0]!.stats).toEqual({ ...state.history[0]!.stats, ...NO_V7_STATS });
+    expect(Object.values(loaded.patients).every((p) => p.deterioration === null)).toBe(true);
+  });
+});
+
+describe("ambulances in saves", () => {
+  it("round-trips ambulances parked and waiting, and keeps running identically", async () => {
+    const { staffedMajorsAE, MAJORS_TEAM } = await import("../fixtures/majorsAE");
+    const state = staffedMajorsAE(2, MAJORS_TEAM, { ambulance: true });
+    let both = false;
+    for (let i = 0; i < TICKS_PER_DAY && !both; i++) {
+      tick(state);
+      const all = Object.values(state.ambulances);
+      both = all.some((a) => a.space) && all.some((a) => !a.space);
+    }
+    expect(both).toBe(true);
+    state.events = [];
+    const loaded = roundTrip(state);
+    expect(snapshot(loaded)).toEqual(snapshot(state));
+    for (let i = 0; i < 600; i++) {
+      tick(state);
+      tick(loaded);
+    }
+    expect(loaded.ambulances).toEqual(state.ambulances);
+    expect(nextU32(loaded.rng)).toBe(nextU32(state.rng));
+  });
+
+  it("upgrades a version-5 save with no ambulances", () => {
+    const state = staffedSmallAE(9);
+    for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v5")));
+    save.version = 5;
+    delete save.state.ambulances;
+    delete save.state.nextAmbulanceId;
+    for (const p of save.state.patients) delete p.ambulanceId;
+    for (const stats of [
+      save.state.today.stats,
+      ...save.state.history.map((d: { stats: object }) => d.stats),
+    ]) {
+      for (const k of [
+        "ambulances",
+        "handovers",
+        "handoverMins",
+        "handoversOver30",
+        "handoversOver60",
+      ])
+        delete stats[k];
+    }
+    const loaded = decodeSave(save).state;
+    expect(loaded.ambulances).toEqual({});
+    expect(loaded.history[0]!.stats).toEqual({ ...state.history[0]!.stats, ...NO_V7_STATS });
+  });
+});
+
+describe("admissions in saves", () => {
+  it("upgrades a version-6 save with no admission state", () => {
+    const state = staffedSmallAE(9);
+    for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v6")));
+    save.version = 6;
+    for (const p of save.state.patients) {
+      delete p.times.decided;
+      delete p.times.admitted;
+      delete p.stayUntil;
+    }
+    for (const stats of [
+      save.state.today.stats,
+      ...save.state.history.map((d: { stats: object }) => d.stats),
+    ]) {
+      for (const k of Object.keys(NO_V7_STATS)) delete stats[k];
+    }
+    const loaded = decodeSave(save).state;
+    expect(loaded.history[0]!.stats).toEqual({ ...state.history[0]!.stats, ...NO_V7_STATS });
+    expect(Object.values(loaded.patients).every((p) => p.stayUntil === null)).toBe(true);
+  });
+});
+
+describe("deaths in saves", () => {
+  it("round-trips a death part-way through the process", async () => {
+    const { staffedDeathsWard } = await import("../fixtures/deathsWard");
+    const { spawnPatient } = await import("@sim/systems/arrivals");
+    const { die } = await import("@sim/systems/deaths");
+    const { reserve, restPoint, siteEntrance } = await import("@sim/places");
+    const state = staffedDeathsWard();
+    for (let i = 0; i < 200; i++) tick(state);
+    const bed = Object.values(state.objects).find((o) => o.defId === "hospital_bed")!;
+    const p = spawnPatient(state, siteEntrance(state)!, "sepsis");
+    reserve(state, bed.id, 0, p.id);
+    p.bed = bed.id;
+    p.stage = "on_ward";
+    const at = restPoint(bed);
+    p.x = p.prevX = at.x;
+    p.y = p.prevY = at.y;
+    p.times.admitted = state.tick;
+    die(state, p, false, true);
+    for (let i = 0; i < 600; i++) tick(state);
+    state.events = [];
+    const loaded = roundTrip(state);
+    expect(snapshot(loaded)).toEqual(snapshot(state));
+    for (let i = 0; i < 600; i++) {
+      tick(state);
+      tick(loaded);
+    }
+    expect(loaded.patients[p.id]?.death).toEqual(state.patients[p.id]?.death);
+  });
+
+  it("upgrades a version-7 save with no deaths or morale", () => {
+    const state = staffedSmallAE(9);
+    for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v7")));
+    save.version = 7;
+    for (const p of save.state.patients) {
+      delete p.endOfLife;
+      delete p.death;
+    }
+    for (const st of save.state.staff) delete st.morale;
+    for (const stats of [
+      save.state.today.stats,
+      ...save.state.history.map((d: { stats: object }) => d.stats),
+    ]) {
+      for (const k of Object.keys(NO_V8_STATS)) delete stats[k];
+    }
+    const loaded = decodeSave(save).state;
+    expect(loaded.history[0]!.stats).toEqual({ ...state.history[0]!.stats, ...NO_V8_STATS });
+    expect(Object.values(loaded.staff).every((s) => s.morale === 75)).toBe(true);
+  });
+});
+
 describe("fixtures in saves", () => {
   it("restores a fixture over a bed into the right layers", async () => {
     const { applyAll } = await import("../fixtures/smallAE");
@@ -106,8 +350,9 @@ describe("plans in saves", () => {
     const save = JSON.parse(JSON.stringify(encodeSave(buildSmallAE(), "old")));
     save.version = 1;
     delete save.state.plan;
+    for (const key of M2_FIELDS) delete save.state[key];
     const { state } = decodeSave(save);
     expect(state.plan).toEqual([]);
-    expect(state.version).toBe(2);
+    expect(state.version).toBe(SIM_STATE_VERSION);
   });
 });

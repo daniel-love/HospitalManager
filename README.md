@@ -12,7 +12,7 @@ A UK-set, top-down hospital **design and management** sim inspired by _Prison Ar
 
 ## Status
 
-**M0 (foundations)** and **M1 (build mode & saving)** are done. You can lay foundations, build walls and doors, zone rooms (with a live validity checklist), place equipment from a ~30-item catalogue, and save/load (IndexedDB slots, daily autosave, file export/import). The next step is **M2: first patient flow**.
+**M0 (foundations)**, **M1 (build mode & saving)** and **M2 (first patient flow)** are done. You can build and equip an A&E, hire staff (receptionists, nurses, junior doctors, cleaners) and watch walk-in patients queue, book in, wait, get triaged, be treated in Minors and go home, or give up and leave. Tariff income, salaries and upkeep move the money, with a daily report, a notifications feed that explains bottlenecks, and an inspector for every patient and member of staff. The next step is **M3: Majors, Resus, wards & monitoring**.
 
 ## Controls
 
@@ -22,12 +22,16 @@ A UK-set, top-down hospital **design and management** sim inspired by _Prison Ar
 | Zoom                   | Mouse wheel / trackpad pinch                                                                                       |
 | Build                  | Pick a tool from the bottom bar, then drag (or click to place)                                                     |
 | Plan mode              | P (or the Plan button): lay out changes and see the cost, then Build plan. Ctrl/⌘+Z undoes the last planned change |
+| Coverage overlay       | O (or the Coverage button): which Majors and Resus beds a staffed nurse station can see                            |
 | Rotate equipment       | R                                                                                                                  |
 | Move equipment         | Equipment → Move equipment, or select an item and press Move; click to put down                                    |
 | Cancel tool / deselect | Right-click or Esc                                                                                                 |
 | Inspect a room         | Click it with no tool selected                                                                                     |
+| Inspect a person       | Click a patient or member of staff                                                                                 |
+| Hire / reports         | Hire and Reports in the bottom bar: hire staff, see today's P&L and A&E performance                                |
+| People                 | Staff and Patients in the bottom bar (or click the patient count): what everyone is doing, sorted and filterable   |
 | Quick help             | Rest the mouse on a room, item or door, or on any build palette entry                                              |
-| Pause / speeds         | Space, 1–4                                                                                                         |
+| Pause / speeds         | Space, 1–5                                                                                                         |
 | Debug overlay          | F3 or `                                                                                                            |
 
 ## Development

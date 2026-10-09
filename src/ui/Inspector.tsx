@@ -1,5 +1,5 @@
 import { formatMoney } from "@game/tools";
-import { inspector } from "./store";
+import { inspector, type AgentInfo } from "./store";
 
 export function Inspector({
   onClose,
@@ -10,12 +10,13 @@ export function Inspector({
 }) {
   const data = inspector.value;
   if (!data) return null;
-  const { room, object } = data;
+  const { room, object, agent } = data;
   return (
     <aside class="panel inspector" aria-label="Inspector">
       <button class="close" title="Close (Esc)" onClick={onClose}>
         ×
       </button>
+      {agent && <AgentSection agent={agent} />}
       {object && (
         <section>
           <h2>{object.name}</h2>
@@ -25,6 +26,9 @@ export function Inspector({
             {object.upkeep !== undefined && ` · upkeep ${formatMoney(object.upkeep)}/month`}
           </p>
           {object.access && <p class="dim">Access: {object.access}</p>}
+          {object.cover && (
+            <p class={object.cover.ok ? "ok-text" : "warn-text"}>{object.cover.text}</p>
+          )}
           {object.capabilities.length > 0 && <Tags items={object.capabilities} />}
           {object.movable && (
             <button
@@ -81,6 +85,119 @@ export function Inspector({
         </section>
       )}
     </aside>
+  );
+}
+
+function moodWord(mood: number): string {
+  if (mood >= 75) return "Content";
+  if (mood >= 50) return "Fed up";
+  if (mood >= 25) return "Unhappy";
+  return "Angry: may leave";
+}
+
+function AgentSection({ agent }: { agent: AgentInfo }) {
+  if (agent.kind === "staff") {
+    return (
+      <section>
+        <h2>{agent.name}</h2>
+        <p class="dim">
+          {agent.role} · {formatMoney(agent.annualCost)}/yr
+        </p>
+        <p>{agent.activity}</p>
+        <h4>Morale</h4>
+        <div class="meter" title={`${agent.morale} / 100`}>
+          <div
+            class={`meter-fill${agent.morale < 40 ? " bad" : agent.morale < 60 ? " warn" : ""}`}
+            style={{ width: `${agent.morale}%` }}
+          />
+        </div>
+      </section>
+    );
+  }
+  if (agent.afterDeath) {
+    return (
+      <section>
+        <h2>{agent.name}</h2>
+        <p class="dim">{agent.condition}</p>
+        <p>{agent.status}</p>
+        <ul class="checklist">
+          {agent.afterDeath.map((s) => (
+            <li key={s.label} class={s.done ? "ok" : "pending"}>
+              <span aria-hidden="true">{s.done ? "✓" : "○"}</span> {s.label}
+              {s.detail && <span class="dim"> ({s.detail})</span>}
+            </li>
+          ))}
+        </ul>
+        <h4>Timeline</h4>
+        <ul class="timeline">
+          {agent.timeline.map((t) => (
+            <li key={t.label}>
+              <span class="when">{t.at}</span> {t.label}
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+  return (
+    <section>
+      <h2>{agent.name}</h2>
+      <p class="dim">Patient · {agent.condition}</p>
+      {agent.category ? (
+        <p>
+          <span class="triage-chip" style={{ background: agent.category.colour }}>
+            {agent.category.label}
+          </span>{" "}
+          <span class="dim">to be seen {agent.category.target}</span>
+        </p>
+      ) : (
+        <p class="dim">Not yet triaged</p>
+      )}
+      <p>{agent.status}</p>
+      {agent.reason && <p class="warn-text">{agent.reason}</p>}
+      <p class={agent.breached ? "bad-text" : "dim"}>
+        In A&E for {agent.inDept}
+        {agent.breached && " (over 4 hours)"}
+      </p>
+      {agent.monitoring && (
+        <>
+          <h4>Monitoring</h4>
+          {agent.monitoring.flag && <p class="bad-text">{agent.monitoring.flag}</p>}
+          {agent.monitoring.obs ? (
+            <p class={agent.monitoring.obs.overdue ? "warn-text" : ""}>
+              NEWS2 {agent.monitoring.obs.news}{" "}
+              <span class="dim">· {agent.monitoring.obs.text}</span>
+            </p>
+          ) : (
+            <p class="dim">No observations yet</p>
+          )}
+          <p class="dim">{agent.monitoring.watch}</p>
+        </>
+      )}
+      <h4>Mood</h4>
+      <div class="meter" title={`${agent.mood} / 100`}>
+        <div
+          class={`meter-fill${agent.mood < 25 ? " bad" : agent.mood < 50 ? " warn" : ""}`}
+          style={{ width: `${agent.mood}%` }}
+        />
+      </div>
+      <p class="dim">{moodWord(agent.mood)}</p>
+      {agent.needs.length > 0 && (
+        <ul class="items">
+          {agent.needs.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      )}
+      <h4>Timeline</h4>
+      <ul class="timeline">
+        {agent.timeline.map((t) => (
+          <li key={t.label}>
+            <span class="when">{t.at}</span> {t.label}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

@@ -24,7 +24,9 @@
  *   #rrrrrrrrcc#mmmm#
  *   ###DD############
  */
+import type { StaffRoleId } from "@data/schema";
 import { applyCommand, type Command } from "@sim/commands";
+import { applyStaffCommand } from "@sim/systems/staffing";
 import { createSimState, type Rotation, type SimState } from "@sim/state";
 import { WallType } from "@sim/world/grid";
 
@@ -96,5 +98,28 @@ export function applyAll(state: SimState, commands: Command[]): void {
 export function buildSmallAE(seed = 1): SimState {
   const state = createSimState({ seed, width: 24, height: 20 });
   applyAll(state, SMALL_AE_COMMANDS);
+  return state;
+}
+
+export type StaffCounts = Partial<Record<StaffRoleId, number>>;
+
+/** The M2 starting team for the small A&E. */
+export const SMALL_AE_TEAM: StaffCounts = {
+  receptionist: 1,
+  nurse: 2,
+  junior_doctor: 2,
+  cleaner: 1,
+};
+
+export function hireTeam(state: SimState, team: StaffCounts): void {
+  for (const [role, n] of Object.entries(team) as [StaffRoleId, number][]) {
+    for (let i = 0; i < n; i++) applyStaffCommand(state, { type: "hire_staff", role });
+  }
+}
+
+/** The small A&E with a team hired, ready to run. */
+export function staffedSmallAE(seed = 1, team: StaffCounts = SMALL_AE_TEAM): SimState {
+  const state = buildSmallAE(seed);
+  hireTeam(state, team);
   return state;
 }

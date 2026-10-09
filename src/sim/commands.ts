@@ -82,6 +82,7 @@ export function applyCommand(state: SimState, cmd: Command): CommandResult {
   if (!plan.ok) return plan;
   run(state, cmd, true);
   state.money -= plan.cost;
+  state.layoutVersion++;
   detectRooms(state);
   return plan;
 }

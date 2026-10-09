@@ -79,8 +79,8 @@ So there are three modes at game start: **NHS Trust**, **Private Hospital** and 
 
 ### 3.1 Time
 
-- Controls: pause, 1×, 2×, 4× (and 8× for sandbox overnight periods).
-- One in-game day takes about 4–6 real minutes at 1×. Day and night matter: demand peaks in the evening and on Monday mornings, and night shifts have fewer staff.
+- Controls: pause, 1×, 2×, 4×, 8× and 16× (for skipping quiet overnight periods).
+- At 1×, one in-game minute passes per real second, so a day takes 24 real minutes (90 seconds at 16×). An early 5-minute day proved too fast to follow. Day and night matter: demand peaks in the evening and on Monday mornings, and night shifts have fewer staff.
 - Building can be done while paused. **Construction is instant** (placement costs money and takes effect immediately) through M6. In M7, **builder agents** become a setting: builders physically construct over in-game time, as in Prison Architect, and instant build stays available as an option.
 
 ---
@@ -284,25 +284,26 @@ Deaths follow the real UK hospital process, because that process is where the op
 
 ### 6.1 Roles
 
-| Role                          | Typical jobs                                       | Notes                                                                                           |
-| ----------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| **Consultant** (by specialty) | Senior review, theatre lead, clinic                | Can be resident or **on-call** (callout delay + fee). Required for specialty gating             |
-| **Registrar**                 | Specialist assessment, surgery assist              | Specialty-tagged                                                                                |
-| **Junior Doctor** (FY/SHO)    | Clerking, prescribing, routine review              | Generalist, needs senior supervision for some steps                                             |
-| **Nurse** (Band 5/6/7)        | Triage, obs, meds, monitoring                      | Band 7 = nurse in charge (improves department flow)                                             |
-| **Healthcare Assistant**      | Obs, comfort, escort                               | Cheaper, limited scope                                                                          |
-| **Paramedic handover**        | Ambulance arrivals                                 | External agents, not hired                                                                      |
-| **Porter**                    | Moving beds and patients, samples                  | Critical for admissions flow                                                                    |
-| **Cleaner**                   | Cleaning, bed turnaround                           | Dirty bays can't be used; cleanliness affects infection                                         |
-| **Receptionist**              | Booking in                                         | Without one, a queue builds at the entrance                                                     |
-| **Radiographer**              | Imaging                                            | Required for X-ray/CT/MRI                                                                       |
-| **Pharmacist**                | Discharge meds                                     | A discharge bottleneck if missing                                                               |
-| **Lab Technician**            | Blood tests                                        | Test turnaround                                                                                 |
-| **Maintenance / Estates**     | Repairs, equipment breakdowns                      |                                                                                                 |
-| **Security**                  | Incidents, aggression                              |                                                                                                 |
-| **Medical Examiner**          | Independent review of every death                  | A part-time duty for a consultant. Without one, death paperwork backs up and the mortuary fills |
-| **Bereavement Officer**       | Family paperwork after a death                     | Admin role. Without one, complaints rise                                                        |
-| **Admin / Managers**          | Unlock admin functions, reduce bureaucracy penalty |                                                                                                 |
+| Role                                      | Typical jobs                                       | Notes                                                                                                                   |
+| ----------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Consultant** (by specialty)             | Senior review, theatre lead, clinic                | Can be resident or **on-call** (callout delay + fee). Required for specialty gating                                     |
+| **Registrar**                             | Specialist assessment, surgery assist              | Specialty-tagged                                                                                                        |
+| **Junior Doctor** (FY/SHO)                | Clerking, prescribing, routine review              | Generalist, needs senior supervision for some steps                                                                     |
+| **Nurse** (Band 5/6/7)                    | Triage, obs, meds, monitoring                      | Band 7 = nurse in charge (improves department flow)                                                                     |
+| **Emergency Nurse Practitioner** (Band 7) | See and treat minor injuries start to finish       | Built in M2. Takes injury assessments before doctors, nursing steps after staff nurses; doesn't triage or see illnesses |
+| **Healthcare Assistant**                  | Obs, comfort, escort                               | Cheaper, limited scope                                                                                                  |
+| **Paramedic handover**                    | Ambulance arrivals                                 | External agents, not hired                                                                                              |
+| **Porter**                                | Moving beds and patients, samples                  | Critical for admissions flow                                                                                            |
+| **Cleaner**                               | Cleaning, bed turnaround                           | Dirty bays can't be used; cleanliness affects infection                                                                 |
+| **Receptionist**                          | Booking in                                         | Without one, a queue builds at the entrance                                                                             |
+| **Radiographer**                          | Imaging                                            | Required for X-ray/CT/MRI                                                                                               |
+| **Pharmacist**                            | Discharge meds                                     | A discharge bottleneck if missing                                                                                       |
+| **Lab Technician**                        | Blood tests                                        | Test turnaround                                                                                                         |
+| **Maintenance / Estates**                 | Repairs, equipment breakdowns                      |                                                                                                                         |
+| **Security**                              | Incidents, aggression                              |                                                                                                                         |
+| **Medical Examiner**                      | Independent review of every death                  | A part-time duty for a consultant. Without one, death paperwork backs up and the mortuary fills                         |
+| **Bereavement Officer**                   | Family paperwork after a death                     | Admin role. Without one, complaints rise                                                                                |
+| **Admin / Managers**                      | Unlock admin functions, reduce bureaucracy penalty |                                                                                                                         |
 
 ### 6.2 Staff attributes
 

@@ -19,6 +19,8 @@ chunks     ${s.chunksVisible} visible
 map        ${s.mapSize.width}×${s.mapSize.height}
 rooms      ${s.rooms}
 objects    ${s.objects}
+agents     ${s.patients} patients, ${s.staff} staff
+jobs       ${s.jobs}
 
 F3/\` toggle · . step when paused`}
     </pre>

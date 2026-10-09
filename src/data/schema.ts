@@ -42,7 +42,7 @@ export const equipmentDefSchema = z.object({
   tier: z.number().int().min(1).max(3),
   /** Purchase price, £. */
   cost: z.number().int().positive(),
-  /** Running cost, £ per month (charged from M2). */
+  /** Running cost, £ per month (charged hourly). */
   upkeep: z.number().int().nonnegative(),
   /** [width, height] in tiles at rotation 0. */
   footprint: z.tuple([z.number().int().min(1), z.number().int().min(1)]),
@@ -129,6 +129,11 @@ export const roomDefSchema = z.object({
    */
   bothBedSides: z.boolean().default(false),
   /**
+   * Patients here are seriously unwell: every bed should be in sight of a
+   * staffed nurse station (GAME_DESIGN §7). Shown by the coverage overlay.
+   */
+  observed: z.boolean().default(false),
+  /**
    * Room types this room must open onto: touching with no wall between, or
    * joined by a door. E.g. reception must lead straight into a waiting area.
    */
@@ -144,12 +149,121 @@ export const capabilityComboSchema = z.object({
 });
 export type CapabilityCombo = z.infer<typeof capabilityComboSchema>;
 
+export const staffRoleIds = [
+  "receptionist",
+  "nurse",
+  "nurse_practitioner",
+  "junior_doctor",
+  "porter",
+  "cleaner",
+  "medical_examiner",
+] as const;
+export type StaffRoleId = (typeof staffRoleIds)[number];
+
+export const staffRoleSchema = z.object({
+  id: z.enum(staffRoleIds),
+  name: z.string().min(1),
+  /** Annual cost to the hospital, £: salary plus employer NI and pension. */
+  annualCost: z.number().int().positive(),
+  description: z.string(),
+});
+export type StaffRoleDef = z.infer<typeof staffRoleSchema>;
+
+/** [min, max] minutes; each patient gets a random duration in the range. */
+const minutesRange = z
+  .tuple([z.number().positive(), z.number().positive()])
+  .refine(([a, b]) => a <= b, "min must not exceed max");
+
+export const pathwayStepSchema = z.object({
+  /** Shown in the patient timeline, e.g. "Wound closure". */
+  name: z.string().min(1),
+  /**
+   * Roles that can do this step, most preferred first: the job goes to a free
+   * member of the earliest listed role, the nearest if there are several.
+   */
+  roles: z.array(z.enum(staffRoleIds)).min(1),
+  /** Room type the step happens in. The room must be valid. */
+  room: id,
+  /** Extra capabilities the room needs for this step, beyond being valid. */
+  capabilities: z.array(id).default([]),
+  mins: minutesRange,
+  /**
+   * Completing this step treats whatever was making the patient deteriorate
+   * (e.g. antibiotics and fluids for sepsis), so they no longer will.
+   */
+  stabilises: z.boolean().default(false),
+});
+export type PathwayStep = z.infer<typeof pathwayStepSchema>;
+
+export const conditionDefSchema = z.object({
+  id,
+  name: z.string().min(1),
+  /** Manchester Triage category: 1 Immediate … 5 Non-urgent. */
+  acuity: z.number().int().min(1).max(5),
+  /** Relative arrival weights per channel. */
+  channels: z.object({
+    walk_in: z.number().nonnegative(),
+    ambulance: z.number().nonnegative().default(0),
+  }),
+  /** Income on discharge, £ (NHS tariff for the attendance). */
+  tariff: z.number().int().nonnegative(),
+  /** Treatment after triage, in order. The outcome follows the last step. */
+  pathway: z.array(pathwayStepSchema).min(1),
+  /**
+   * After the last step: home, or (for the sickest) a transfer to intensive
+   * care. Ward admissions come later in M3.
+   */
+  outcome: z.enum(["discharge", "icu"]).default("discharge"),
+  /**
+   * Chance the doctor decides to admit them to a ward after the last step
+   * (instead of the outcome above), how long they stay, and the NHS tariff
+   * for the inpatient stay.
+   */
+  admission: z
+    .object({
+      chance: z.number().min(0).max(1),
+      stayHours: z
+        .tuple([z.number().positive(), z.number().positive()])
+        .refine(([a, b]) => a <= b, "min must not exceed max"),
+      tariff: z.number().int().nonnegative(),
+      /**
+       * Share of admissions who are dying and admitted for end-of-life care.
+       * They should have a side room, and die (expectedly) on the ward.
+       */
+      endOfLife: z.number().min(0).max(1).default(0),
+    })
+    .optional(),
+  /**
+   * How closely they must be watched after triage (GAME_DESIGN §7). periodic:
+   * a nurse does observations every so often. continuous: observations more
+   * often, and on a trolley they should be in sight of a staffed nurse station.
+   */
+  monitoring: z.enum(["none", "periodic", "continuous"]).default("none"),
+  /**
+   * Some patients get worse before they're treated. `chance` of it happening;
+   * warning signs start `onsetMins` after arrival, and if nobody notices,
+   * they collapse `warningMins` after that. A `stabilises` step stops it.
+   */
+  deterioration: z
+    .object({
+      chance: z.number().min(0).max(1),
+      onsetMins: minutesRange,
+      warningMins: minutesRange,
+    })
+    .optional(),
+  description: z.string(),
+});
+export type ConditionDef = z.infer<typeof conditionDefSchema>;
+export type ConditionInput = z.input<typeof conditionDefSchema>;
+
 export interface Content {
   equipment: readonly unknown[];
   doors: readonly unknown[];
   walls: readonly unknown[];
   rooms: readonly unknown[];
   capabilityCombos: readonly unknown[];
+  staffRoles: readonly unknown[];
+  conditions: readonly unknown[];
 }
 
 export interface ValidContent {
@@ -158,6 +272,8 @@ export interface ValidContent {
   walls: WallDef[];
   rooms: RoomDef[];
   capabilityCombos: CapabilityCombo[];
+  staffRoles: StaffRoleDef[];
+  conditions: ConditionDef[];
 }
 
 function uniqueBy<T>(items: T[], key: (t: T) => unknown, what: string, issues: string[]): void {
@@ -177,6 +293,8 @@ export function validateContent(raw: Content): ValidContent {
     walls: z.array(wallDefSchema).parse(raw.walls),
     rooms: z.array(roomDefSchema).parse(raw.rooms),
     capabilityCombos: z.array(capabilityComboSchema).parse(raw.capabilityCombos),
+    staffRoles: z.array(staffRoleSchema).parse(raw.staffRoles),
+    conditions: z.array(conditionDefSchema).parse(raw.conditions),
   };
 
   const issues: string[] = [];
@@ -185,6 +303,12 @@ export function validateContent(raw: Content): ValidContent {
   uniqueBy(content.walls, (w) => w.type, "wall type", issues);
   uniqueBy(content.rooms, (r) => r.id, "room id", issues);
   uniqueBy(content.rooms, (r) => r.code, "room code", issues);
+  uniqueBy(content.staffRoles, (r) => r.id, "staff role", issues);
+  uniqueBy(content.conditions, (c) => c.id, "condition id", issues);
+  for (const role of staffRoleIds) {
+    if (!content.staffRoles.some((r) => r.id === role))
+      issues.push(`no definition for role ${role}`);
+  }
 
   for (const e of content.equipment) {
     uniqueBy(e.access, (a) => a.side, `access side on ${e.id}`, issues);
@@ -218,6 +342,20 @@ export function validateContent(raw: Content): ValidContent {
   for (const combo of content.capabilityCombos) {
     for (const cap of combo.requires) {
       if (!granted.has(cap)) issues.push(`combo ${combo.capability} needs ungranted ${cap}`);
+    }
+  }
+
+  // Combos can be required too (e.g. "resuscitation" for Resus steps).
+  for (const combo of content.capabilityCombos) granted.add(combo.capability);
+  for (const c of content.conditions) {
+    for (const step of c.pathway) {
+      if (!roomIds.has(step.room)) issues.push(`condition ${c.id} uses unknown room ${step.room}`);
+      for (const cap of step.capabilities) {
+        if (!granted.has(cap)) issues.push(`condition ${c.id} needs ungranted ${cap}`);
+      }
+    }
+    if (c.deterioration && !c.pathway.some((s) => s.stabilises)) {
+      issues.push(`condition ${c.id} can deteriorate but no step stabilises it`);
     }
   }
 

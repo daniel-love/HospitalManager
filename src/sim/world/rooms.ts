@@ -41,6 +41,7 @@ export function detectRooms(state: SimState): void {
   });
 
   // An object belongs to a room only if it is wholly inside it.
+  const objectRoom: Record<number, number> = {};
   for (const obj of Object.values(state.objects)) {
     const grid = state.floors[obj.floor]!;
     const r = objectRect(obj);
@@ -55,11 +56,21 @@ export function detectRooms(state: SimState): void {
         }
       }
     }
-    if (inside) rooms[first - 1]!.objectIds.push(obj.id);
+    if (inside) {
+      rooms[first - 1]!.objectIds.push(obj.id);
+      objectRoom[obj.id] = first;
+    }
   }
 
   for (const room of rooms) evaluateRoom(state, room, rooms);
   state.rooms = rooms;
+  state.objectRoom = objectRoom;
+}
+
+/** The room an object is wholly inside, if any. */
+export function roomOfObject(state: SimState, objectId: number): Room | undefined {
+  const id = state.objectRoom[objectId];
+  return id === undefined ? undefined : state.rooms[id - 1];
 }
 
 /** Room containing tile (x, y) on a floor, if any. */

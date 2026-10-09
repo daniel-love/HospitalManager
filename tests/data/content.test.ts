@@ -42,3 +42,41 @@ describe("room connections", () => {
     );
   });
 });
+
+describe("conditions", () => {
+  it("every pathway step happens in a known room with a role that exists", () => {
+    expect(content.conditions.length).toBe(11);
+    for (const c of content.conditions) expect(c.pathway.length).toBeGreaterThan(0);
+  });
+
+  it("rejects a condition that can deteriorate with no step to stabilise it", () => {
+    const sepsis = content.conditions.find((c) => c.id === "sepsis")!;
+    const bad = {
+      ...sepsis,
+      id: "bad",
+      pathway: sepsis.pathway.map((s) => ({ ...s, stabilises: false })),
+    };
+    expect(() => validateContent({ ...content, conditions: [...content.conditions, bad] })).toThrow(
+      /no step stabilises/,
+    );
+  });
+
+  it("rejects a step in an unknown room", () => {
+    const bad = {
+      ...content.conditions[0]!,
+      id: "bad",
+      pathway: [{ name: "X", roles: ["nurse"], room: "ballroom", mins: [1, 2] }],
+    };
+    expect(() => validateContent({ ...content, conditions: [...content.conditions, bad] })).toThrow(
+      /unknown room ballroom/,
+    );
+  });
+
+  it("rejects a step with min above max minutes", () => {
+    const bad = {
+      ...content.conditions[0]!,
+      pathway: [{ name: "X", roles: ["nurse"], room: "minors_cubicle", mins: [20, 10] }],
+    };
+    expect(() => validateContent({ ...content, conditions: [bad] })).toThrow();
+  });
+});

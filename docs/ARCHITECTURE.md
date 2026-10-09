@@ -30,7 +30,7 @@
 
 - **SimState** is plain, serialisable data (no class instances, no Pixi objects, no functions). Saving = `JSON.stringify(state)` plus versioning.
 - **Commands:** all player actions (place wall, hire nurse, close A&E) are command objects applied by the sim. That makes undo, replay and testing straightforward, and it's a natural seam for future multiplayer or mod tools.
-- **Fixed timestep:** the sim advances in fixed ticks: 10 ticks per in-game minute, 50 ticks per real second at 1× (so a day lasts ~4.8 real minutes). See `sim/time.ts` and `game/loop.ts`. Rendering interpolates between ticks. Speed controls simply run more ticks per frame.
+- **Fixed timestep:** the sim advances in fixed ticks: 10 ticks per in-game minute, 10 ticks per real second at 1× (one game minute per real second, so a day lasts 24 real minutes at 1× and 90 s at 16×). See `sim/time.ts` and `game/loop.ts`. Rendering interpolates between ticks. Speed controls simply run more ticks per frame.
 - **Determinism:** a seeded PRNG (e.g. `mulberry32`/`sfc32`) lives in the state. Same seed + same commands = same outcome, so bug reports can be reproduced from a save.
 - **Events out:** the sim emits domain events (`PatientArrived`, `TargetBreached`, `IncidentRaised`) for the UI notification feed and audio. Events never feed back into sim logic.
 
@@ -44,33 +44,42 @@ src/
     game.ts               # wires sim + loop + renderer + UI; hotkeys
   sim/
     state.ts              # SimState types (the save schema)
+    agents.ts             # Patient, Staff, Job, ledger and event types
+    places.ts             # seats, couches, toilets, desks, reservations, site entrance
+    events.ts             # notifications out (never read back by the sim)
     sim.ts                # tick(): runs systems in order
-    commands.ts           # command types + apply()
+    commands.ts           # build command types + apply()
+    plan.ts               # plan mode (blueprints)
     rng.ts
     world/
       grid.ts             # multi-floor tile grid
       rooms.ts            # room detection (flood fill) + validation
-      pathfinding.ts      # A* + floor portals + path cache
+      objects.ts          # footprints, access sides, placement rules
+      pathfinding.ts      # A* + nearest map-edge search (floor portals later)
       los.ts              # line-of-sight raycasts
     systems/
-      arrivals.ts         # spawn patients per channel, specialty gating
-      triage.ts
-      pathways.ts         # advance patients through condition steps
-      jobs.ts             # job board: post, claim, complete
-      movement.ts
-      needs.ts            # patient/companion/staff needs & mood
-      monitoring.ts       # coverage, obs rounds, alarms
-      deterioration.ts
-      staffing.ts         # shifts, rotas, fatigue, on-call callouts
-      finance.ts
-      events.ts           # scenario/event scheduler
-      reputation.ts
-      kpis.ts
+      arrivals.ts         # walk-in and ambulance arrivals by time of day (specialty gating in M4)
+      ambulances.ts       # parking spaces, queueing outside, handover
+      admissions.ts       # decision to admit, porter transfers (bed-width routes), wards
+      deaths.ts           # verification, family, last offices, mortuary, Medical Examiner, morale
+      staffing.ts         # hire/dismiss; receptionists staff desks (shifts in M5)
+      patients.ts         # A&E lifecycle, needs (seat, toilet), mood, LWBS
+      jobBoard.ts         # post/remove jobs
+      jobs.ts             # job board: assign, run, complete
+      movement.ts         # route following, re-planning after layout changes
+      finance.ts          # tariff, salaries, upkeep, daily reports
+      alerts.ts           # bottleneck warnings; tidies after layout changes
+      monitoring.ts       # nurse stations, coverage (cached per layout), obs rounds
+      deterioration.ts    # NEWS2, noticing and escalation, cardiac arrest, incidents
+      events.ts           # scenario/event scheduler (M6)
+      reputation.ts       # (M6)
   data/                   # content definitions (balance by editing these)
     rooms.ts
     equipment.ts
     conditions.ts
-    staffRoles.ts
+    staff.ts              # staff roles and pay
+    patients.ts           # demand profile, step durations, mood/LWBS balance
+    names.ts
     events.ts
     funding.ts
     schema.ts             # Zod schemas for all of the above
@@ -110,9 +119,15 @@ Key entity kinds and components:
 
 `events → arrivals → staffing (shift change) → needs → deterioration → monitoring → pathways (post jobs) → jobs (assign) → movement → job completion → finance (on day/month boundaries) → kpis/reputation`
 
+As built in M3: `arrivals (walk-ins and ambulances) → ambulances (park, turn round, leave) → staffing (desks and nurse stations) → patients (needs, mood, lifecycle; posts jobs) → deterioration (each minute) → wards (discharge reviews, end-of-life deaths) → deaths (the process after a death, mortuary release, morale recovery) → monitoring (posts obs each minute) → jobs (assign; crash calls may pull staff off other work) → movement → jobs (progress and complete) → finance (hourly; daily report at midnight) → alerts (every 30 min)`.
+
+**Agents** (M2) store float positions in tiles (whole numbers are tile centres) plus their position at the start of the tick, so the renderer can interpolate. Systems decide where an agent should be each tick and call `headTo()`, which plans a route once and re-plans when `layoutVersion` changes. Agents never block each other. They refer to places by **object id** (a seat, a couch, a desk), never by room id, because rooms are renumbered on every rebuild; `SimState.reserved` maps `"objectId:slot"` to the agent holding it.
+
+**Walking speed vs the clock:** the clock runs 60× real time at 1×, so true walking speed (~7 tiles per tick) would look like teleporting. Agents walk at about 5 (patients) and 7 (staff) tiles per in-game minute instead, a ~10× slow-down that also stands in for the overheads of each move (being called, gathering belongings). Tunable in `data/patients.ts`.
+
 ### 4.3 Job board (autonomy)
 
-- Systems **post jobs**: `{ id, type, priority, requiredRole, requiredSkill?, specialty?, location, patientId?, duration, capabilityNeeded? }`.
+- Systems **post jobs** (M2 jobs: triage, treatment steps, cubicle and toilet cleaning): `{ id, type, priority, requiredRole, requiredSkill?, specialty?, location, patientId?, duration, capabilityNeeded? }`.
 - Idle staff evaluate available jobs with a scoring function (`priority × urgency − travel cost`, with policy modifiers) and claim the best one.
 - Jobs have states: `open → claimed → in_progress → done | failed | cancelled`.
 - Assignment is evaluated on a stagger (not every agent every tick) for performance.
@@ -149,13 +164,13 @@ The player paints zones (a room type per tile, `FloorGrid.zone`). After every bu
 
 - **A\*** on the 8-connected grid with costs: door (slower), lift (queue), crowding (soft cost).
 - **Multi-floor:** a small graph of portals (stairs/lifts). Find a portal route first, then A* per floor.
-- **Movement modes:** walking, wheelchair, bed/trolley. Bed mode requires double doors, 2-wide corridors and lifts (no stairs).
+- **Movement modes:** walking, wheelchair, bed/trolley. Bed mode requires double doors, 2-wide corridors and lifts (no stairs). As built (M3): `findPath(…, bed = true)` only steps on tiles that are part of a clear 2×2 square and aren't single doors; admissions check reachability against bed-passable regions labelled once per layout.
 - **Caching:** cache paths keyed by `(from-region, to-room, mode)` and invalidate per chunk on edit. If profiling demands it, move to a **Web Worker** or add flow fields for common destinations (e.g. the A&E entrance).
 
 ### 5.4 Line of sight & coverage
 
 - A Bresenham raycast between the nurse-station tile and the bed tile. Opaque walls and closed doors block. Glass walls don't.
-- `monitoring.ts` recalculates a **coverage map** only when the layout or staffing changes (dirty flag), not every tick.
+- `monitoring.ts` caches which stations can see which beds per `layoutVersion`, and checks live whether a nurse is at each station. A bed counts as seen if any tile of it is in sight, within 12 tiles of where the nurse stands.
 - Remote-monitoring response distance uses the **path length** from the station to the bed (cached).
 
 ## 6. Data-driven content
