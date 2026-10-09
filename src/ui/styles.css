@@ -1238,3 +1238,330 @@ body.planning #game::after {
 .panel .list-section > h3 {
   margin: 0 0 6px;
 }
+
+/* ---------- Reports panel ---------- */
+.reports-panel {
+  /* Wide enough for two columns, without covering the inspector on the right. */
+  width: min(760px, calc(100vw - 332px));
+  min-width: min(360px, calc(100vw - 16px));
+  /* Mostly opaque: there's a lot of small text to read over the map. */
+  background: rgba(18, 24, 32, 0.96);
+}
+.reports-panel .side-scroll {
+  padding: 14px 16px 18px;
+}
+.reports-panel h2 {
+  margin-bottom: 12px;
+}
+.reports-panel h3 {
+  margin-top: 26px;
+  margin-bottom: 4px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--panel-border);
+}
+/* Column headings lead their column, but still need room below the tiles. */
+.reports-panel .reports-cols h3:first-child {
+  margin-top: 22px;
+}
+.reports-panel h4 {
+  margin: 16px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+/* A sub-heading straight under a section heading needs less space. */
+.reports-panel h3 + .report-group > h4:first-child {
+  margin-top: 10px;
+}
+.reports-panel .stages-head h4 {
+  margin: 0;
+}
+.ok-text {
+  color: var(--ok);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.kpi {
+  position: relative;
+  padding: 9px 11px 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.kpi::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--text-dim);
+  opacity: 0.5;
+}
+.kpi.ok::before {
+  background: var(--ok);
+  opacity: 1;
+}
+.kpi.warn::before {
+  background: #f0c060;
+  opacity: 1;
+}
+.kpi.bad::before {
+  background: var(--bad);
+  opacity: 1;
+}
+.kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.kpi-value {
+  margin: 2px 0 2px;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-note {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-dim);
+}
+.kpi-meter {
+  position: relative;
+  height: 5px;
+  margin: 4px 0 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+.kpi-meter-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--text-dim);
+}
+.kpi-tick {
+  position: absolute;
+  top: -2px;
+  width: 1px;
+  height: 9px;
+  background: var(--text);
+  opacity: 0.6;
+}
+
+.reports-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0 24px;
+}
+.report-group + .report-group {
+  margin-top: 4px;
+}
+.report-table td .target {
+  font-size: 11px;
+}
+.report-table .warn {
+  color: #f0c060;
+}
+.report-table.days th,
+.report-table.days td {
+  padding: 4px 6px;
+}
+.report-table.days th:first-child,
+.report-table.days td:first-child {
+  padding-left: 4px;
+}
+.report-table.days tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.025);
+}
+.report-table.days tbody tr.focus {
+  background: rgba(59, 130, 196, 0.22);
+}
+
+/* Finance: income vs costs as two bars on a shared scale. */
+.money-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 0 4px;
+}
+.money-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.money-fill {
+  display: block;
+  height: 100%;
+}
+.money-fill:last-child {
+  border-radius: 0 4px 4px 0;
+}
+.money-fill.income,
+.money-swatch.income {
+  background: #2a9d8f;
+}
+.money-fill.salaries,
+.money-swatch.salaries {
+  background: #e07040;
+}
+.money-fill.upkeep,
+.money-swatch.upkeep {
+  background: #a77bdc;
+}
+.swatch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.money-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+/* Capacity gauges. */
+.capacity {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 8px 0 4px;
+}
+.gauge-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.gauge-count {
+  font-variant-numeric: tabular-nums;
+}
+.gauge-track {
+  height: 7px;
+  margin-top: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.gauge-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.gauge-fill.ok,
+.kpi-meter-fill.ok,
+.chart .bar.ok {
+  background: var(--ok);
+  fill: var(--ok);
+}
+.gauge-fill.warn,
+.kpi-meter-fill.warn,
+.chart .bar.warn {
+  background: #f0c060;
+  fill: #f0c060;
+}
+.gauge-fill.bad,
+.kpi-meter-fill.bad,
+.chart .bar.bad {
+  background: var(--bad);
+  fill: var(--bad);
+}
+.gauge-note {
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+/* Patients by stage. */
+.stages {
+  margin-top: 12px;
+}
+.stages-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.stage-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px 24px;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+}
+.stage-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stage-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.stage-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+.stage-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Trend charts. */
+.trend-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 8px 0 2px;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 5px;
+}
+.chart {
+  display: block;
+  width: 100%;
+  /* Keep tick labels near body size when the columns stack. */
+  max-width: 400px;
+  height: auto;
+}
+.chart .axis {
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 1;
+}
+.chart .target {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.chart .tick {
+  font-size: 9px;
+  fill: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.chart .bar {
+  opacity: 0.8;
+  transition: opacity 0.1s;
+}
+.chart .bar.focus {
+  opacity: 1;
+}
+.chart .hit {
+  fill: transparent;
+  cursor: default;
+}
+.chart .hit:hover {
+  fill: rgba(255, 255, 255, 0.04);
+}
