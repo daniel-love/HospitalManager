@@ -3,7 +3,7 @@
  * can treat, and ambulance control deflecting when crews queue here.
  */
 import { describe, expect, it } from "vitest";
-import { DEFLECT_AT_QUEUE } from "@data/patients";
+import { DEFLECT_AT_QUEUE, UNTREATABLE_WALK_IN_SHARE } from "@data/patients";
 import { tick } from "@sim/sim";
 import { ambulanceArrives, ambulancesWaiting } from "@sim/systems/ambulances";
 import { dailyDemand, treatableShare, updateArrivals } from "@sim/systems/arrivals";
@@ -19,9 +19,12 @@ describe("demand", () => {
   });
 
   it("is shared with neighbouring hospitals by what each can treat", () => {
-    // Minors only: most walk-ins, but only minor head injuries by ambulance.
+    // Minors only: most walk-ins (and a quarter of majors walk-ins, who'll be
+    // transferred out), but only minor head injuries by ambulance.
     const minors = buildSmallAE();
-    expect(treatableShare(minors, "walk_in")).toBeCloseTo(100 / 116);
+    expect(treatableShare(minors, "walk_in")).toBeCloseTo(
+      (100 + 16 * UNTREATABLE_WALK_IN_SHARE) / 116,
+    );
     expect(treatableShare(minors, "ambulance")).toBeCloseTo(2 / 35);
     // Majors without Resus: everything but anaphylaxis and septic shock.
     expect(treatableShare(buildMajorsAE(1), "ambulance")).toBeCloseTo(31 / 35);

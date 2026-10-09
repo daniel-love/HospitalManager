@@ -518,6 +518,34 @@ describe("the Medical Examiner in saves", () => {
   });
 });
 
+describe("transfers in saves", () => {
+  it("round-trips a transfer under way, and upgrades a version-14 save without them", () => {
+    const state = staffedSmallAE(9);
+    for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+    const p = Object.values(state.patients)[0]!;
+    p.transfer = { reason: "No working Majors Bay", decided: 5, arranged: 10, ambulanceAt: 900 };
+    expect(snapshot(roundTrip(state))).toEqual(snapshot({ ...state, events: [] }));
+
+    p.transfer = null;
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v14")));
+    save.version = 14;
+    for (const q of save.state.patients) delete q.transfer;
+    for (const d of [save.state.today, ...save.state.history]) {
+      delete d.ledger.transfers;
+      delete d.stats.transferWaitMins;
+    }
+    const loaded = decodeSave(save).state;
+    expect(loaded.history[0]!.ledger.transfers).toBe(0);
+    expect(loaded.history[0]!.stats.transferWaitMins).toBe(0);
+    const zeroed = structuredClone({ ...state, events: [] });
+    for (const d of [zeroed.today, ...zeroed.history]) {
+      d.ledger.transfers = 0;
+      d.stats.transferWaitMins = 0;
+    }
+    expect(snapshot(loaded)).toEqual(snapshot(zeroed));
+  });
+});
+
 describe("fixtures in saves", () => {
   it("restores a fixture over a bed into the right layers", async () => {
     const { applyAll } = await import("../fixtures/smallAE");

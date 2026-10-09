@@ -15,6 +15,7 @@ import { postObservations } from "./systems/monitoring";
 import { moveAgents } from "./systems/movement";
 import { updatePatients } from "./systems/patients";
 import { updateStaff } from "./systems/staffing";
+import { updateTransfers } from "./systems/transfers";
 
 export function tick(state: SimState): void {
   state.tick++;
@@ -22,6 +23,7 @@ export function tick(state: SimState): void {
   updateAmbulances(state);
   updateStaff(state);
   updatePatients(state);
+  updateTransfers(state);
   updateDeterioration(state);
   updateWards(state);
   updateDeaths(state);

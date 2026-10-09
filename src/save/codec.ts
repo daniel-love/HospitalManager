@@ -174,6 +174,14 @@ const patientSchema = z.object({
   specialty: z.enum(specialtyIds).nullable(),
   stayUntil: nullableInt,
   endOfLife: z.boolean(),
+  transfer: z
+    .object({
+      reason: z.string(),
+      decided: int,
+      arranged: nullableInt,
+      ambulanceAt: nullableInt,
+    })
+    .nullable(),
   death: z
     .object({
       tick: int,
@@ -209,6 +217,7 @@ const staffSchema = z.object({
 const jobSchema = z.object({
   id: int.positive(),
   kind: z.enum([
+    "arrange_transfer",
     "referral",
     "transfer",
     "ward_discharge",
@@ -259,7 +268,7 @@ const ambulanceSchema = z.object({
   leaveAt: nullableInt,
 });
 
-const ledgerSchema = z.object({ tariff: num, salaries: num, upkeep: num });
+const ledgerSchema = z.object({ tariff: num, salaries: num, upkeep: num, transfers: num });
 const statsSchema = z.object({
   arrivals: int.min(0),
   discharged: int.min(0),
@@ -281,6 +290,7 @@ const statsSchema = z.object({
   referralMins: num,
   outliers: int.min(0),
   transfersOut: int.min(0),
+  transferWaitMins: num,
   deaths: int.min(0),
   unexpectedDeaths: int.min(0),
   complaints: int.min(0),

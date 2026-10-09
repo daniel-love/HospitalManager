@@ -24,7 +24,7 @@
  *   #rrrrrrrrcc#mmmm#
  *   ###DD############
  */
-import type { StaffRoleId } from "@data/schema";
+import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import { applyCommand, type Command } from "@sim/commands";
 import { applyStaffCommand } from "@sim/systems/staffing";
 import { createSimState, type Rotation, type SimState } from "@sim/state";
@@ -133,6 +133,25 @@ export const SMALL_AE_TEAM: StaffCounts = {
 export function hireTeam(state: SimState, team: StaffCounts): void {
   for (const [role, n] of Object.entries(team) as [StaffRoleId, number][]) {
     for (let i = 0; i < n; i++) applyStaffCommand(state, { type: "hire_staff", role });
+  }
+}
+
+/**
+ * One resident registrar for each specialty, so patients who need admitting
+ * can be referred and admitted rather than transferred out.
+ */
+export const ADMITTING_SPECIALTIES: SpecialtyId[] = [
+  "general_medicine",
+  "cardiology",
+  "general_surgery",
+];
+
+export function hireRegistrars(
+  state: SimState,
+  specialties: readonly SpecialtyId[] = ADMITTING_SPECIALTIES,
+): void {
+  for (const specialty of specialties) {
+    applyStaffCommand(state, { type: "hire_staff", role: "registrar", specialty });
   }
 }
 

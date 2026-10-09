@@ -28,6 +28,30 @@ export const DEFAULT_CATCHMENT = 80_000;
  */
 export const DEFLECT_AT_QUEUE = 3;
 /**
+ * Walk-ins with a condition this hospital can't treat (say, chest pain with
+ * no Majors Bay) mostly know to go to another A&E, but this share turn up
+ * here anyway and have to be transferred out, as at an urgent treatment
+ * centre. Ambulance control never brings them.
+ */
+export const UNTREATABLE_WALK_IN_SHARE = 0.25;
+
+/**
+ * Transfers to another hospital (GAME_DESIGN §5.1). A doctor assesses the
+ * patient and arranges it with the receiving hospital; then they wait for an
+ * inter-hospital ambulance, sooner for the sickest (triage category 1–2).
+ * A&E pays for the ambulance.
+ */
+export const ARRANGE_TRANSFER_MINS: [number, number] = [15, 30];
+export const TRANSFER_AMBULANCE_MINS: [number, number] = [60, 240];
+export const URGENT_TRANSFER_AMBULANCE_MINS: [number, number] = [30, 90];
+export const TRANSFER_COST = 400;
+/**
+ * A doctor decides to transfer a patient once their next step has been
+ * waiting this long with nowhere in the hospital it can happen.
+ */
+export const TRANSFER_DECISION_MINS = 30;
+
+/**
  * Share of walk-ins who come by bus; the rest walk, are dropped off or park,
  * and arrive along the pavement. Most UK A&E walk-ins come by car.
  */

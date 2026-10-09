@@ -16,7 +16,7 @@ import { createFloorGrid, FloorType, tileIndex, WallType } from "@sim/world/grid
 import { findPath } from "@sim/world/pathfinding";
 import { roomOfObject } from "@sim/world/rooms";
 import { waitReason } from "@game/describe";
-import { applyAll, type StaffCounts } from "../fixtures/smallAE";
+import { applyAll, hireRegistrars, type StaffCounts } from "../fixtures/smallAE";
 import {
   buildMajorsAE,
   MAJORS_TEAM,
@@ -242,6 +242,7 @@ describe("central monitoring", () => {
 describe("a hospital with a ward over three days", () => {
   // A seed whose first admissions include short stays, so beds free up within the three days.
   const state = staffedMajorsAE(4, WITH_PORTER, { ward: "door_double", ambulance: true });
+  hireRegistrars(state);
   run(state, 3 * TICKS_PER_DAY);
 
   it("admits patients, fills the ward and discharges them home again", () => {
@@ -258,6 +259,7 @@ describe("a hospital with a ward over three days", () => {
 
   it("is deterministic", () => {
     const again = staffedMajorsAE(4, WITH_PORTER, { ward: "door_double", ambulance: true });
+    hireRegistrars(again);
     run(again, 3 * TICKS_PER_DAY);
     expect(again.history).toEqual(state.history);
   });

@@ -47,7 +47,7 @@ export const staffRoles: StaffRoleInput[] = [
     annualCost: 88_000,
     specialist: true,
     description:
-      "A specialty trainee (ST3+), resident in the hospital. Takes referrals from A&E for their specialty: reviews the patient on their trolley and decides to admit them. Without a team for a specialty, A&E doctors admit its patients without a specialty review (until transfers out arrive later in M4).",
+      "A specialty trainee (ST3+), resident in the hospital. Takes referrals from A&E for their specialty: reviews the patient on their trolley and decides to admit them. Without a team for a specialty, its patients can't be admitted here and are transferred to another hospital.",
   },
   {
     id: "junior_doctor",

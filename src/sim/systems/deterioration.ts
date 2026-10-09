@@ -124,7 +124,7 @@ export function notice(
   d.crash += ESCALATION_GRACE_MINS * TICKS_PER_MINUTE;
   if (p.category > 2) p.category = 2;
   for (const job of jobsForPatient(state, p.id)) {
-    if (job.kind === "treat" || job.kind === "triage" || job.kind === "handover")
+    if (["treat", "triage", "handover", "arrange_transfer"].includes(job.kind))
       job.dueTick = Math.min(job.dueTick, ESCALATED_DUE);
   }
   const name =

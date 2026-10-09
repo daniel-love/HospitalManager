@@ -37,6 +37,7 @@ import { TICKS_PER_MINUTE } from "../time";
 import { canReviewDeath, claimDeathPlace, runDeathJob } from "./deaths";
 import { afterTriage, backToWaiting, callToBed, postTreatment } from "./patients";
 import { canDo } from "./staffing";
+import { transferArranged } from "./transfers";
 
 /**
  * Jobs done wherever the patient is, rather than at a particular couch:
@@ -54,7 +55,10 @@ const DEATH_JOBS = new Set<Job["kind"]>([
 
 function atPatient(job: Job): boolean {
   return (
-    job.kind === "obs" || job.kind === "resus" || (job.kind === "handover" && job.roomType === "")
+    job.kind === "obs" ||
+    job.kind === "resus" ||
+    job.kind === "arrange_transfer" ||
+    (job.kind === "handover" && job.roomType === "")
   );
 }
 
@@ -257,6 +261,8 @@ function runAtPatient(state: SimState, job: Job, staff: Staff, p: Patient): void
     }
   } else if (job.kind === "handover") {
     handoverDone(state, p, null);
+  } else if (job.kind === "arrange_transfer") {
+    transferArranged(state, p);
   } else if (job.step === 0) {
     // The team leader got there this long after the arrest.
     const startedAfter = (state.tick - job.durationTicks - job.createdTick) / TICKS_PER_MINUTE;
@@ -325,6 +331,7 @@ function complete(state: SimState, job: Job, obj: PlacedObject): void {
       break;
     case "obs":
     case "resus":
+    case "arrange_transfer":
       break; // Handled by runAtPatient.
   }
 }

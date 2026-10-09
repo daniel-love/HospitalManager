@@ -311,6 +311,29 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v15 (M4): A&E transfers patients out to other hospitals.
+  14: (save) => {
+    type Day = { ledger: { transfers?: number }; stats: { transferWaitMins?: number } };
+    const state = save.state as {
+      patients: { transfer?: unknown }[];
+      today: Day;
+      history: Day[];
+    };
+    const day = (d: Day) => ({
+      ...d,
+      ledger: { ...d.ledger, transfers: d.ledger.transfers ?? 0 },
+      stats: { ...d.stats, transferWaitMins: d.stats.transferWaitMins ?? 0 },
+    });
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients.map((p) => ({ ...p, transfer: p.transfer ?? null })),
+        today: day(state.today),
+        history: state.history.map(day),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

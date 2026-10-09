@@ -14,6 +14,7 @@ import {
   ARRIVALS_BY_HOUR,
   BLADDER_HOURS,
   START_MOOD,
+  UNTREATABLE_WALK_IN_SHARE,
   WALK_IN_BY_BUS,
   WALK_INS_PER_100K,
 } from "@data/patients";
@@ -59,10 +60,20 @@ export function dailyDemand(state: SimState): { walkIns: number; ambulances: num
 const shareCache = new WeakMap<SimState, { version: number; walk_in: number; ambulance: number }>();
 
 /**
+ * How likely a patient with this condition is to come here by this channel:
+ * 1 if the hospital can treat it; otherwise ambulance control takes them
+ * elsewhere, and only some walk-ins turn up anyway (to be transferred out).
+ */
+function arrivalWeight(c: ConditionDef, ch: "walk_in" | "ambulance", treatable: boolean): number {
+  if (treatable) return c.channels[ch];
+  return ch === "walk_in" ? c.channels[ch] * UNTREATABLE_WALK_IN_SHARE : 0;
+}
+
+/**
  * The share of the catchment's patients who come here: those with a
  * condition the hospital can treat, weighted by how often each arrives by
- * this channel. The rest go to a neighbouring hospital (ambulance control
- * takes them to the nearest one that can treat them). Cached per layout.
+ * this channel, plus some walk-ins it can't (see arrivalWeight). The rest go
+ * to a neighbouring hospital. Cached per layout.
  */
 export function treatableShare(state: SimState, channel: "walk_in" | "ambulance"): number {
   let cached = shareCache.get(state);
@@ -73,7 +84,7 @@ export function treatableShare(state: SimState, channel: "walk_in" | "ambulance"
       let here = 0;
       for (const c of content.conditions) {
         all += c.channels[ch];
-        if (treatable.has(c)) here += c.channels[ch];
+        here += arrivalWeight(c, ch, treatable.has(c));
       }
       return all > 0 ? here / all : 0;
     };
@@ -165,8 +176,8 @@ export function walkInPoint(state: SimState): Point | null {
 
 /**
  * Conditions the hospital can treat: every room type on the pathway has a
- * working room. Interim: once A&E can stabilise and transfer patients out
- * (M4), anyone will turn up regardless.
+ * working room. (Whether it can admit them is another matter: see
+ * systems/transfers.ts.)
  */
 export function treatableConditions(state: SimState): ConditionDef[] {
   return content.conditions.filter((c) =>
@@ -182,9 +193,13 @@ export function spawnPatient(
   channel: "walk_in" | "ambulance" = "walk_in",
 ): Patient {
   const rng = state.rng;
-  let options = treatableConditions(state).filter((c) => c.channels[channel] > 0);
-  if (options.length === 0) options = content.conditions.filter((c) => c.channels[channel] > 0);
-  const weights = options.map((c) => c.channels[channel]);
+  const treatable = new Set(treatableConditions(state));
+  let options = content.conditions.filter((c) => arrivalWeight(c, channel, treatable.has(c)) > 0);
+  let weights = options.map((c) => arrivalWeight(c, channel, treatable.has(c)));
+  if (options.length === 0) {
+    options = content.conditions.filter((c) => c.channels[channel] > 0);
+    weights = options.map((c) => c.channels[channel]);
+  }
   let r = nextFloat(rng) * weights.reduce((a, b) => a + b, 0);
   let condition = options[0]!;
   for (let i = 0; i < weights.length; i++) {
@@ -236,6 +251,7 @@ export function spawnPatient(
     specialty: null,
     stayUntil: null,
     endOfLife: false,
+    transfer: null,
     death: null,
     outcome: null,
   };

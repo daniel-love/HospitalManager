@@ -68,8 +68,8 @@ export type PatientStage =
   | "leaving";
 
 /**
- * transferred: to intensive care. transferred_out: needed admitting, but the
- * hospital has no ward, so they went to another hospital's.
+ * transferred: to intensive care. transferred_out: to another hospital,
+ * which could treat or admit them when this one couldn't.
  */
 export type Outcome = "discharged" | "lwbs" | "transferred" | "transferred_out" | "died";
 
@@ -113,6 +113,17 @@ export interface Deterioration {
 export interface Seat {
   objectId: number;
   slot: number;
+}
+
+/**
+ * Being transferred to another hospital: why, when it was decided, when a
+ * doctor had arranged it, and when the transfer ambulance comes.
+ */
+export interface Transfer {
+  reason: string;
+  decided: number;
+  arranged: number | null;
+  ambulanceAt: number | null;
 }
 
 export interface Patient extends AgentBase {
@@ -171,6 +182,8 @@ export interface Patient extends AgentBase {
   stayUntil: number | null;
   /** Admitted for end-of-life care: they'll die (expectedly) on the ward. */
   endOfLife: boolean;
+  /** Being transferred to another hospital, or null. */
+  transfer: Transfer | null;
   death: Death | null;
   outcome: Outcome | null;
 }
@@ -210,6 +223,7 @@ export interface Staff extends AgentBase {
  * doctor) and support (a nurse) each have a job.
  */
 export type JobKind =
+  | "arrange_transfer"
   | "referral"
   | "transfer"
   | "ward_discharge"
@@ -310,6 +324,8 @@ export interface Ledger {
   tariff: number;
   salaries: number;
   upkeep: number;
+  /** Ambulances taking patients to other hospitals. */
+  transfers: number;
 }
 
 /** Patient flow counts over a period. Times are in minutes. */
@@ -344,8 +360,10 @@ export interface FlowStats {
   referralMins: number;
   /** Admitted to another specialty's ward because theirs was full ("outliers"). */
   outliers: number;
-  /** Needed a ward bed, but the hospital has no ward: sent to another hospital. */
+  /** Transferred to another hospital that could treat or admit them. */
   transfersOut: number;
+  /** Sum of decision-to-transfer to leaving times, for an average. */
+  transferWaitMins: number;
   deaths: number;
   /** Deaths after a failed resuscitation (the rest were expected). */
   unexpectedDeaths: number;
@@ -368,7 +386,7 @@ export interface DayReport {
 }
 
 export function emptyLedger(): Ledger {
-  return { tariff: 0, salaries: 0, upkeep: 0 };
+  return { tariff: 0, salaries: 0, upkeep: 0, transfers: 0 };
 }
 
 export function emptyStats(): FlowStats {
@@ -393,6 +411,7 @@ export function emptyStats(): FlowStats {
     referralMins: 0,
     outliers: 0,
     transfersOut: 0,
+    transferWaitMins: 0,
     deaths: 0,
     unexpectedDeaths: 0,
     complaints: 0,
@@ -405,7 +424,7 @@ export function emptyStats(): FlowStats {
 }
 
 export function net(l: Ledger): number {
-  return l.tariff - l.salaries - l.upkeep;
+  return l.tariff - l.salaries - l.upkeep - l.transfers;
 }
 
 /**

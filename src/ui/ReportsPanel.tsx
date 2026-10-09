@@ -144,7 +144,7 @@ function Headlines({ data }: { data: ReportData }) {
         label="Net today"
         value={formatMoney(n)}
         status={n < 0 ? "bad" : n > 0 ? "ok" : "none"}
-        note={`${formatMoney(l.tariff)} in · ${formatMoney(l.salaries + l.upkeep)} out`}
+        note={`${formatMoney(l.tariff)} in · ${formatMoney(l.salaries + l.upkeep + l.transfers)} out`}
       />
       <Tile
         label="Patients"
@@ -189,7 +189,7 @@ function Tile(props: {
 
 function MoneySection({ ledger }: { ledger: Ledger }) {
   const n = net(ledger);
-  const costs = ledger.salaries + ledger.upkeep;
+  const costs = ledger.salaries + ledger.upkeep + ledger.transfers;
   const scale = Math.max(ledger.tariff, costs, 1);
   return (
     <div class="report-group">
@@ -204,6 +204,10 @@ function MoneySection({ ledger }: { ledger: Ledger }) {
             style={{ width: `${(100 * ledger.salaries) / scale}%` }}
           />
           <span class="money-fill upkeep" style={{ width: `${(100 * ledger.upkeep) / scale}%` }} />
+          <span
+            class="money-fill transport"
+            style={{ width: `${(100 * ledger.transfers) / scale}%` }}
+          />
         </div>
       </div>
       <table class="report-table">
@@ -220,6 +224,12 @@ function MoneySection({ ledger }: { ledger: Ledger }) {
             label={<Swatch kind="upkeep">Equipment upkeep</Swatch>}
             value={`−${formatMoney(ledger.upkeep)}`}
           />
+          {ledger.transfers > 0 && (
+            <Row
+              label={<Swatch kind="transport">Transfer ambulances</Swatch>}
+              value={`−${formatMoney(ledger.transfers)}`}
+            />
+          )}
           <tr class="total">
             <td>Net</td>
             <td class={`num ${n < 0 ? "bad" : "ok"}`}>{formatMoney(n)}</td>
@@ -330,12 +340,19 @@ function FlowSections({ stats: s }: { stats: FlowStats }) {
               bad={s.bedWaitsOver4h > 0}
             />
             {s.transfersOut > 0 && (
-              <Row
-                label="Sent to another hospital"
-                title="Needed admitting, but there's no ward"
-                value={s.transfersOut}
-                bad
-              />
+              <>
+                <Row
+                  label="Transferred to another hospital"
+                  title="Couldn't be treated or admitted here"
+                  value={s.transfersOut}
+                  bad
+                />
+                <Row
+                  label="Average wait to be transferred"
+                  title="Decision to transfer until the transfer ambulance took them"
+                  value={mins(avg(s.transferWaitMins, s.transfersOut))}
+                />
+              </>
             )}
             {s.outliers > 0 && (
               <Row

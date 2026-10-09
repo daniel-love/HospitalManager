@@ -244,7 +244,7 @@ export const pathwayStepSchema = z.object({
   /**
    * A referral to a specialty team (e.g. critical care): done by that
    * specialty's registrar or consultant if the hospital has any, otherwise
-   * by `roles` as an interim (until A&E transfers out, M4 step 3).
+   * by `roles`: A&E's own doctors refer them on to another hospital's team.
    */
   specialty: z.enum(specialtyIds).optional(),
   /**

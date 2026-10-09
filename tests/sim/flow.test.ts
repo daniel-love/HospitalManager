@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { conditionById } from "@data/catalogue";
 import { applyCommand } from "@sim/commands";
-import type { Patient } from "@sim/agents";
+import { net, type Patient } from "@sim/agents";
 import { createSimState, type SimState } from "@sim/state";
 import { TOILET_USES_BEFORE_CLEAN } from "@data/patients";
 import { applyStaffCommand } from "@sim/systems/staffing";
@@ -47,8 +47,7 @@ describe("a staffed small A&E over 24 hours", () => {
     expect(upkeep).toBeGreaterThan(0);
     expect(state.money).not.toBe(startMoney);
     // The day's ledger accounts for every pound (plus today's few hours so far).
-    const today = state.today.ledger;
-    const moved = tariff - salaries - upkeep + today.tariff - today.salaries - today.upkeep;
+    const moved = net(state.history[0]!.ledger) + net(state.today.ledger);
     expect(state.money - startMoney).toBeCloseTo(moved, 6);
   });
 

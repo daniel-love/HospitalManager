@@ -123,7 +123,7 @@ Key entity kinds and components:
 
 `events → arrivals → staffing (shift change) → needs → deterioration → monitoring → pathways (post jobs) → jobs (assign) → movement → job completion → finance (on day/month boundaries) → kpis/reputation`
 
-As built in M3: `arrivals (walk-ins and ambulances) → ambulances (park, turn round, leave) → staffing (desks and nurse stations) → patients (needs, mood, lifecycle; posts jobs) → deterioration (each minute) → wards (discharge reviews, end-of-life deaths) → deaths (the process after a death, mortuary release, morale recovery) → monitoring (posts obs each minute) → jobs (assign; crash calls may pull staff off other work) → movement → jobs (progress and complete) → finance (hourly; daily report at midnight) → alerts (every 30 min)`.
+As built in M3: `arrivals (walk-ins and ambulances) → ambulances (park, turn round, leave) → staffing (desks and nurse stations; on-call callouts from M4) → patients (needs, mood, lifecycle; posts jobs) → transfers (from M4: decisions to transfer out, transfer ambulances collecting) → deterioration (each minute) → wards (discharge reviews, end-of-life deaths) → deaths (the process after a death, mortuary release, morale recovery) → monitoring (posts obs each minute) → jobs (assign; crash calls may pull staff off other work) → movement → jobs (progress and complete) → finance (hourly; daily report at midnight) → alerts (every 30 min)`.
 
 **Agents** (M2) store float positions in tiles (whole numbers are tile centres) plus their position at the start of the tick, so the renderer can interpolate. Systems decide where an agent should be each tick and call `headTo()`, which plans a route once and re-plans when `layoutVersion` changes. Agents never block each other. They refer to places by **object id** (a seat, a couch, a desk), never by room id, because rooms are renumbered on every rebuild; `SimState.reserved` maps `"objectId:slot"` to the agent holding it.
 
@@ -142,7 +142,7 @@ A condition's pathway is an array of steps. For each step the pathways system:
 
 1. Finds a room in an open department with the required capability and a free spot.
 2. Reserves it, and posts the move job (porter if bed-bound) and then the treatment job (role/specialty).
-3. If no capable room exists in the hospital, it falls back to the A&E transfer-out flow.
+3. If no capable room exists in the hospital, it falls back to the A&E transfer-out flow (built in M4 step 3: `systems/transfers.ts`, after the step's job has waited 30 minutes with nowhere it could happen).
 4. Logs timestamps to the patient timeline for KPIs and the inspector.
 
 ### 4.5 Specialty gating

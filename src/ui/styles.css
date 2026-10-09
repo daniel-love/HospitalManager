@@ -1460,6 +1460,10 @@ body.planning #game::after {
 .money-swatch.upkeep {
   background: #a77bdc;
 }
+.money-fill.transport,
+.money-swatch.transport {
+  background: #d9a521;
+}
 .swatch-label {
   display: inline-flex;
   align-items: center;

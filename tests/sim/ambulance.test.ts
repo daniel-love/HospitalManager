@@ -164,7 +164,9 @@ describe("an A&E with ambulances over 24 hours", () => {
 
   it("receives and hands over ambulances, with delays when Majors is full", () => {
     expect(stats.ambulances).toBeGreaterThan(10);
-    expect(stats.handovers).toBeGreaterThan(10);
+    // No ward: patients who need admitting hold Majors trolleys until their
+    // transfer ambulance comes, so fewer crews can hand over.
+    expect(stats.handovers).toBeGreaterThan(7);
     expect(stats.handoversOver30).toBeGreaterThan(0);
   });
 

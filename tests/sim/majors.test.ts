@@ -280,18 +280,20 @@ describe("a crash call", () => {
 describe("majors arrivals", () => {
   const isMajors = (id: string) => conditionById.get(id)!.pathway[0]!.room === "majors_bay";
 
-  it("only come once there's a working Majors Bay", () => {
-    const seen = (state: SimState) => {
+  it("come by ambulance only once there's a working Majors Bay, though some walk in anyway", () => {
+    const conditions = (state: SimState, channel: "walk_in" | "ambulance") => {
       const ids = new Set<string>();
-      runFor(state, 0);
-      for (let i = 0; i < TICKS_PER_DAY; i++) {
-        tick(state);
-        for (const p of Object.values(state.patients)) ids.add(p.conditionId);
+      for (let i = 0; i < 300; i++) {
+        const p = spawnPatient(state, siteEntrance(state)!, undefined, channel);
+        ids.add(p.conditionId);
+        delete state.patients[p.id];
       }
       return [...ids];
     };
-    expect(seen(staffedSmallAE(4)).some(isMajors)).toBe(false);
-    expect(seen(staffedMajorsAE(4)).some(isMajors)).toBe(true);
+    const small = staffedSmallAE(4);
+    expect(conditions(small, "ambulance").some(isMajors)).toBe(false);
+    expect(conditions(small, "walk_in").some(isMajors)).toBe(true);
+    expect(conditions(staffedMajorsAE(4), "ambulance").some(isMajors)).toBe(true);
   });
 });
 
@@ -301,7 +303,8 @@ describe("a staffed A&E with Majors over 24 hours", () => {
   const day1 = state.history[0]!;
 
   it("treats majors patients alongside minors", () => {
-    expect(day1.stats.discharged).toBeGreaterThan(25);
+    // With no ward, those who need admitting are transferred out.
+    expect(day1.stats.discharged + day1.stats.transfersOut).toBeGreaterThan(25);
     expect(day1.ledger.tariff).toBeGreaterThan(0);
   });
 

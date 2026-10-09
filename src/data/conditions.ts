@@ -98,8 +98,8 @@ export const conditions: ConditionInput[] = [
     description: "Sore throat, earache or a urine infection: often something a GP could have seen.",
   },
 
-  // Majors. Until transfers out arrive (M4), these only come to a hospital
-  // with a working Majors Bay (see arrivals.ts).
+  // Majors. Ambulances only bring these to a hospital with a working Majors
+  // Bay; some walk in anyway, and are transferred out (systems/transfers.ts).
   {
     id: "chest_pain",
     name: "Chest pain",

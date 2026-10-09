@@ -126,15 +126,13 @@ describe("specialty referrals", () => {
     expect(waitReason(state, p)).toMatch(/on-call Cardiology consultant, is \d+ min/);
   });
 
-  it("without a team, A&E admits them itself, with a warning", () => {
+  it("without a team, can't be admitted here: they're transferred out", () => {
     const state = quiet();
+    hire(state, "registrar", "general_medicine"); // Another specialty's team doesn't help.
     const p = needsAdmitting(state);
     expect(referral(state, p)).toBeUndefined();
-    expect(p.stage).toBe("awaiting_bed");
     expect(p.specialty).toBe("cardiology");
-    expect(state.events.some((e) => e.text.includes("no Cardiology consultant or registrar"))).toBe(
-      true,
-    );
+    expect(p.transfer?.reason).toMatch(/no Cardiology consultant or registrar/);
   });
 
   it("sends a referral step to the specialty's team when there is one", () => {
@@ -193,6 +191,7 @@ describe("on-call consultants", () => {
 describe("ward specialties", () => {
   it("survive the ward being re-detected, and count outliers on another specialty's ward", () => {
     const state = quiet();
+    hire(state, "registrar", "cardiology");
     const ward = state.rooms.find((r) => r.typeId === "ward")!;
     setWardSpecialty(state, ward, "general_surgery");
     // Every layout change re-detects rooms (new ids); the setting is found again.
@@ -208,6 +207,7 @@ describe("ward specialties", () => {
   it("aren't outliers on their own specialty's ward or one open to any", () => {
     for (const sp of ["cardiology", null] as const) {
       const state = quiet();
+      hire(state, "registrar", "cardiology");
       setWardSpecialty(
         state,
         state.rooms.find((r) => r.typeId === "ward")!,

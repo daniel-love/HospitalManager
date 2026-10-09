@@ -17,7 +17,7 @@
  * ward first, then one open to any specialty, and only then to another
  * specialty's ward (an "outlier").
  */
-import { conditionById, equipmentById, specialtyById } from "@data/catalogue";
+import { conditionById, equipmentById } from "@data/catalogue";
 import { FOUR_HOUR_MINS, REFERRAL_MINS, WARD_DISCHARGE_MINS } from "@data/patients";
 import type { Job, Patient, Point, Staff } from "../agents";
 import { emit, warn } from "../events";
@@ -34,7 +34,7 @@ import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobB
 import { headTo } from "./movement";
 import { die } from "./deaths";
 import { leave } from "./patients";
-import { hasTeam } from "./staffing";
+import { cantAdmit, decideToTransfer } from "./transfers";
 
 const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
 
@@ -49,30 +49,10 @@ export function finishPathway(state: SimState, p: Patient, trolley: PlacedObject
   const admission = condition.admission;
   if (admission && chance(state.rng, admission.chance)) {
     p.specialty = condition.specialty!;
-    if (state.rooms.some((r) => r.valid && r.typeId === "ward")) {
-      if (hasTeam(state, p.specialty)) refer(state, p, trolley);
-      else {
-        // Interim, until A&E transfers out (M4 step 3): A&E admits them itself.
-        const sp = specialtyById.get(p.specialty)!;
-        warn(
-          state,
-          `no_team_${p.specialty}`,
-          6 * TICKS_PER_HOUR,
-          `You have no ${sp.name} consultant or registrar, so A&E doctors are admitting ${sp.name.toLowerCase()} patients without a specialty review.`,
-        );
-        decideToAdmit(state, p);
-      }
-    } else {
-      // Interim, until A&E transfers out properly (M4): no ward, no admission here.
-      leave(state, p, "transferred_out");
-      dirtyCouch(state, trolley.id);
-      warn(
-        state,
-        "no_ward",
-        6 * TICKS_PER_HOUR,
-        "Patients who need admitting are being sent to another hospital: you have no working Ward.",
-      );
-    }
+    // Specialty gating (GAME_DESIGN §5.1): no ward or no team, no admission here.
+    const why = cantAdmit(state, p.specialty);
+    if (why) decideToTransfer(state, p, `${why}, so they can't be admitted here`);
+    else refer(state, p, trolley);
     return;
   }
   leave(state, p, "discharged");

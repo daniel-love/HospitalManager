@@ -83,7 +83,7 @@ const OUTCOME_LABELS: Record<NonNullable<Patient["outcome"]>, string> = {
   discharged: "Discharged home",
   lwbs: "Left without being seen",
   transferred: "Transferred to intensive care",
-  transferred_out: "Transferred to another hospital's ward",
+  transferred_out: "Transferred to another hospital",
   died: "Died",
 };
 
@@ -123,7 +123,15 @@ export function waitReason(state: SimState, p: Patient): string | null {
   const job = Object.values(state.jobs).find(
     (j) =>
       j.patientId === p.id &&
-      ["triage", "treat", "handover", "referral", "transfer", "ward_discharge"].includes(j.kind),
+      [
+        "triage",
+        "treat",
+        "handover",
+        "referral",
+        "arrange_transfer",
+        "transfer",
+        "ward_discharge",
+      ].includes(j.kind),
   );
   if (!job || job.state === "working") return null;
   if (job.state === "assigned") {
@@ -268,6 +276,26 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
     status = "Cardiac arrest: being resuscitated";
   }
 
+  let reason = waitReason(state, p);
+  const transfer = p.transfer;
+  if (transfer && p.stage !== "leaving" && !p.death && p.stage !== "collapsed") {
+    const arranging = Object.values(state.jobs).find(
+      (j) => j.patientId === p.id && j.kind === "arrange_transfer",
+    );
+    if (transfer.ambulanceAt !== null) {
+      const mins = Math.max(1, Math.ceil((transfer.ambulanceAt - state.tick) / TICKS_PER_MINUTE));
+      status = `Waiting for the transfer ambulance: due in about ${formatWait(mins)}`;
+    } else {
+      status =
+        arranging?.state === "working"
+          ? "A doctor is arranging their transfer to another hospital"
+          : "To be transferred: waiting for a doctor to arrange it";
+    }
+    reason = [transfer.reason, transfer.ambulanceAt === null ? reason : null]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
   const needs: string[] = [];
   if (p.stage.startsWith("waiting") && !p.toilet) {
     needs.push(p.seat ? "Has a seat" : "Standing: no free seat");
@@ -298,6 +326,12 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
     timeline.push({ label: `Referred to ${name}`, at: clockAt(t.referred) });
   }
   if (t.decided !== null) timeline.push({ label: "Decision to admit", at: clockAt(t.decided) });
+  if (transfer) {
+    timeline.push({ label: "Decision to transfer", at: clockAt(transfer.decided) });
+    if (transfer.arranged !== null) {
+      timeline.push({ label: "Transfer arranged", at: clockAt(transfer.arranged) });
+    }
+  }
   if (t.admitted !== null) timeline.push({ label: "Arrived on the ward", at: clockAt(t.admitted) });
   if (t.left !== null) {
     timeline.push({ label: OUTCOME_LABELS[p.outcome ?? "discharged"], at: clockAt(t.left) });
@@ -319,7 +353,7 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
         }
       : {}),
     status,
-    reason: waitReason(state, p),
+    reason,
     inDept: formatWait(inDept),
     breached: inDept > FOUR_HOUR_MINS,
     mood: Math.round(p.mood),
@@ -483,6 +517,9 @@ export function staffState(state: SimState, s: Staff): StaffState {
       break;
     case "referral":
       what = `Specialty review in A&E: ${who}`;
+      break;
+    case "arrange_transfer":
+      what = `Arranging a transfer to another hospital: ${who}`;
       break;
     case "transfer":
       what = `Taking ${who} to the ward`;
