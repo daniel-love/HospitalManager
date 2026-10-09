@@ -3,7 +3,13 @@
  * of staff is doing, the staff roster, and the daily report. Pure functions
  * of SimState, so they're easy to test.
  */
-import { conditionById, content, roleNames, roomById, staffRoleById } from "@data/catalogue";
+import {
+  conditionById,
+  roleNames,
+  roomById,
+  staffRoleById,
+  staffRoleSections,
+} from "@data/catalogue";
 import { FOUR_HOUR_MINS, TRIAGE_CATEGORIES, TRIAGE_TARGET_MINS } from "@data/patients";
 import type { Job, Patient, PatientStage, Point, Staff } from "@sim/agents";
 import { couchStatus, freeCouches, receptionDesks, seatCount, staffedDesks } from "@sim/places";
@@ -497,12 +503,15 @@ export function describeStaff(state: SimState, s: Staff): AgentInfo {
 export function describeRoster(state: SimState): RosterData {
   const staff = Object.values(state.staff);
   return {
-    roles: content.staffRoles.map((r) => ({
-      id: r.id,
-      name: r.name,
-      description: r.description,
-      annualCost: r.annualCost,
-      count: staff.filter((s) => s.role === r.id).length,
+    groups: staffRoleSections().map((section) => ({
+      name: section.name,
+      roles: section.items.map((r) => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        annualCost: r.annualCost,
+        count: staff.filter((s) => s.role === r.id).length,
+      })),
     })),
     staff: staff.map((s) => ({
       id: s.id,

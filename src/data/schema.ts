@@ -18,6 +18,7 @@ export const equipmentCategories = [
   "facilities",
   "decor",
 ] as const;
+export type EquipmentCategory = (typeof equipmentCategories)[number];
 
 export const accessSides = ["front", "back", "sides"] as const;
 export type AccessSide = (typeof accessSides)[number];
@@ -109,12 +110,24 @@ export const roomRequirementSchema = z.object({
 });
 export type RoomRequirement = z.infer<typeof roomRequirementSchema>;
 
+/** Departments a room can belong to. "Any" rooms serve every department. */
+export const roomDepartments = [
+  "A&E",
+  "Inpatient",
+  "General",
+  "Any",
+  "Facilities",
+  "Support",
+  "Staff",
+] as const;
+export type RoomDepartment = (typeof roomDepartments)[number];
+
 export const roomDefSchema = z.object({
   id,
   /** Stored in FloorGrid.zone. Never renumber: saves depend on it. */
   code,
   name: z.string().min(1),
-  department: z.string().min(1),
+  department: z.enum(roomDepartments),
   /** Zone tint, 0xRRGGBB. */
   colour: z.number().int().min(0).max(0xffffff),
   /** Minimum [width, height] in tiles, in either orientation. */
@@ -141,6 +154,8 @@ export const roomDefSchema = z.object({
   description: z.string(),
 });
 export type RoomDef = z.infer<typeof roomDefSchema>;
+/** RoomDef as written in data files, before defaults are applied. */
+export type RoomInput = z.input<typeof roomDefSchema>;
 
 export const capabilityComboSchema = z.object({
   /** Granted to a room that has every capability in `requires`. */
@@ -160,9 +175,16 @@ export const staffRoleIds = [
 ] as const;
 export type StaffRoleId = (typeof staffRoleIds)[number];
 
+/** How staff are grouped when hiring and listing them, in display order. */
+export const staffGroups = ["medical", "nursing", "support", "admin"] as const;
+export type StaffGroup = (typeof staffGroups)[number];
+
 export const staffRoleSchema = z.object({
   id: z.enum(staffRoleIds),
   name: z.string().min(1),
+  /** Plural label for filters, e.g. "Nurses". */
+  short: z.string().min(1),
+  group: z.enum(staffGroups),
   /** Annual cost to the hospital, £: salary plus employer NI and pension. */
   annualCost: z.number().int().positive(),
   description: z.string(),

@@ -2,14 +2,14 @@
  * Bottom build bar (Construction / Rooms / Equipment) and the left-hand
  * palette for the open tab. Choosing an entry selects a build tool.
  */
-import { content } from "@data/catalogue";
+import { content, equipmentSections, roomSections } from "@data/catalogue";
 import { FOUNDATION_COST_PER_TILE } from "@data/structures";
-import { equipmentCategories } from "@data/schema";
 import { formatMoney, isPlacementTool, sameTool, type Tool } from "@game/tools";
 import { WallType } from "@sim/world/grid";
 import { CATEGORY_COLOURS } from "@render/palette";
 import { useEffect } from "preact/hooks";
-import { CATEGORY_NAMES, equipmentHelp, roomTypeHelp, simpleHelp, type HelpContent } from "./help";
+import { equipmentHelp, roomTypeHelp, simpleHelp, type HelpContent } from "./help";
+import { ListSection } from "./ListSection";
 import {
   buildTab,
   coverageOverlay,
@@ -180,46 +180,49 @@ function ConstructionTools() {
   const wall = (type: WallType) => content.walls.find((w) => w.type === type)!;
   return (
     <>
-      <h3>Structure</h3>
-      <Entry
-        t={{ kind: "floor" }}
-        name="Foundations"
-        detail={`${formatMoney(FOUNDATION_COST_PER_TILE)}/tile`}
-        swatch={{ colour: 0xd9d4c7 }}
-        help="Turns grass into buildable floor. Rooms must have floor before you can zone them; walls lay their own."
-      />
-      {[WallType.Standard, WallType.Glass].map((type) => (
+      <ListSection title="Structure">
         <Entry
-          key={type}
-          t={{ kind: "wall", wall: type }}
-          name={wall(type).name}
-          detail={`${formatMoney(wall(type).costPerTile)}/tile`}
-          swatch={{ colour: type === WallType.Glass ? 0x9fd3e6 : 0x3b4048 }}
-          help={wall(type).description}
+          t={{ kind: "floor" }}
+          name="Foundations"
+          detail={`${formatMoney(FOUNDATION_COST_PER_TILE)}/tile`}
+          swatch={{ colour: 0xd9d4c7 }}
+          help="Turns grass into buildable floor. Rooms must have floor before you can zone them; walls lay their own."
         />
-      ))}
-      <h3>Doors</h3>
-      {content.doors.map((d) => (
+        {[WallType.Standard, WallType.Glass].map((type) => (
+          <Entry
+            key={type}
+            t={{ kind: "wall", wall: type }}
+            name={wall(type).name}
+            detail={`${formatMoney(wall(type).costPerTile)}/tile`}
+            swatch={{ colour: type === WallType.Glass ? 0x9fd3e6 : 0x3b4048 }}
+            help={wall(type).description}
+          />
+        ))}
+      </ListSection>
+      <ListSection title="Doors">
+        {content.doors.map((d) => (
+          <Entry
+            key={d.id}
+            t={{ kind: "door", defId: d.id }}
+            name={d.name}
+            detail={formatMoney(d.cost)}
+            swatch={{ colour: 0x9a6a3a }}
+            help={d.description}
+          />
+        ))}
+      </ListSection>
+      <ListSection title="Remove">
         <Entry
-          key={d.id}
-          t={{ kind: "door", defId: d.id }}
-          name={d.name}
-          detail={formatMoney(d.cost)}
-          swatch={{ colour: 0x9a6a3a }}
-          help={d.description}
+          t={{ kind: "demolish" }}
+          name="Demolish walls & doors"
+          help="Removes walls and doors in the area you drag. Refunds half the build cost."
         />
-      ))}
-      <h3>Remove</h3>
-      <Entry
-        t={{ kind: "demolish" }}
-        name="Demolish walls & doors"
-        help="Removes walls and doors in the area you drag. Refunds half the build cost."
-      />
-      <Entry
-        t={{ kind: "remove_floor" }}
-        name="Remove floor"
-        help="Clears everything on the tiles back to grass. Refunds half."
-      />
+        <Entry
+          t={{ kind: "remove_floor" }}
+          name="Remove floor"
+          help="Clears everything on the tiles back to grass. Refunds half."
+        />
+      </ListSection>
     </>
   );
 }
@@ -227,19 +230,23 @@ function ConstructionTools() {
 function RoomTools() {
   return (
     <>
-      <h3>Zone a room</h3>
-      {content.rooms.map((r) => (
-        <Entry
-          key={r.id}
-          t={{ kind: "zone", roomType: r.id }}
-          name={r.name}
-          detail={r.department}
-          swatch={{ colour: r.colour }}
-          help={roomTypeHelp(r)}
-        />
+      {roomSections().map((section) => (
+        <ListSection key={section.id} title={section.name}>
+          {section.items.map((r) => (
+            <Entry
+              key={r.id}
+              t={{ kind: "zone", roomType: r.id }}
+              name={r.name}
+              detail={`min ${r.minSize[0]}×${r.minSize[1]}`}
+              swatch={{ colour: r.colour }}
+              help={roomTypeHelp(r)}
+            />
+          ))}
+        </ListSection>
       ))}
-      <h3>Remove</h3>
-      <Entry t={{ kind: "zone", roomType: null }} name="Unzone" help="Clear room zoning" />
+      <ListSection title="Remove">
+        <Entry t={{ kind: "zone", roomType: null }} name="Unzone" help="Clear room zoning" />
+      </ListSection>
     </>
   );
 }
@@ -247,35 +254,33 @@ function RoomTools() {
 function EquipmentTools() {
   return (
     <>
-      {equipmentCategories.map((cat) => (
-        <div key={cat}>
-          <h3>{CATEGORY_NAMES[cat]}</h3>
-          {content.equipment
-            .filter((e) => e.category === cat)
-            .map((e) => (
-              <Entry
-                key={e.id}
-                t={{ kind: "object", defId: e.id }}
-                name={e.name}
-                detail={formatMoney(e.cost)}
-                swatch={{ colour: CATEGORY_COLOURS[cat], glyph: e.glyph }}
-                help={equipmentHelp(e)}
-              />
-            ))}
-        </div>
+      {equipmentSections().map((section) => (
+        <ListSection key={section.id} title={section.name}>
+          {section.items.map((e) => (
+            <Entry
+              key={e.id}
+              t={{ kind: "object", defId: e.id }}
+              name={e.name}
+              detail={formatMoney(e.cost)}
+              swatch={{ colour: CATEGORY_COLOURS[e.category], glyph: e.glyph }}
+              help={equipmentHelp(e)}
+            />
+          ))}
+        </ListSection>
       ))}
-      <h3>Rearrange</h3>
-      <Entry
-        t={{ kind: "move", carry: null }}
-        name="Move equipment"
-        detail="Free"
-        help="Click an item to pick it up, then click where it should go"
-      />
-      <Entry
-        t={{ kind: "sell" }}
-        name="Sell equipment"
-        help="Drag over items to sell them for half price"
-      />
+      <ListSection title="Rearrange">
+        <Entry
+          t={{ kind: "move", carry: null }}
+          name="Move equipment"
+          detail="Free"
+          help="Click an item to pick it up, then click where it should go"
+        />
+        <Entry
+          t={{ kind: "sell" }}
+          name="Sell equipment"
+          help="Drag over items to sell them for half price"
+        />
+      </ListSection>
     </>
   );
 }

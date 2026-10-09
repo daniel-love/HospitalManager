@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { content } from "@data/catalogue";
+import {
+  content,
+  equipmentSections,
+  roomSections,
+  staffRoleSections,
+  type Section,
+} from "@data/catalogue";
 import { validateContent } from "@data/schema";
 
 describe("game content", () => {
@@ -78,5 +84,50 @@ describe("conditions", () => {
       pathway: [{ name: "X", roles: ["nurse"], room: "minors_cubicle", mins: [20, 10] }],
     };
     expect(() => validateContent({ ...content, conditions: [bad] })).toThrow();
+  });
+});
+
+describe("list sections (Hire panel and build palettes)", () => {
+  /** Every item exactly once, under a heading, with no empty sections. */
+  function expectComplete<T extends { id: string }>(sections: Section<T>[], all: T[]) {
+    const listed = sections.flatMap((s) => s.items.map((i) => i.id));
+    expect([...listed].sort()).toEqual(all.map((i) => i.id).sort());
+    for (const s of sections) {
+      expect(s.name).not.toBe("");
+      expect(s.items.length).toBeGreaterThan(0);
+    }
+    expect(new Set(sections.map((s) => s.id)).size).toBe(sections.length);
+  }
+
+  it("list every staff role under its group", () => {
+    expectComplete(staffRoleSections(), content.staffRoles);
+    expect(staffRoleSections().map((s) => s.name)).toEqual([
+      "Medical",
+      "Nursing",
+      "Support services",
+      "Administrative",
+    ]);
+  });
+
+  it("list every room type under its department's section", () => {
+    expectComplete(roomSections(), content.rooms);
+    expect(roomSections()[0]!.name).toBe("A&E");
+  });
+
+  it("list every item of equipment under its category", () => {
+    expectComplete(equipmentSections(), content.equipment);
+  });
+
+  it("reject a room in a department with no section", () => {
+    const bad = { ...content.rooms[0]!, id: "bad", code: 250, department: "Elsewhere" };
+    expect(() => validateContent({ ...content, rooms: [...content.rooms, bad] })).toThrow();
+  });
+
+  it("reject a staff role with no group", () => {
+    const noGroup: Record<string, unknown> = { ...content.staffRoles[0]! };
+    delete noGroup.group;
+    expect(() =>
+      validateContent({ ...content, staffRoles: [noGroup, ...content.staffRoles.slice(1)] }),
+    ).toThrow();
   });
 });

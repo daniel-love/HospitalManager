@@ -10,7 +10,7 @@
  * Wall- and ceiling-mounted fixtures (`mount`) take no floor space: an
  * oxygen outlet beside a bed head doesn't stop staff standing there.
  */
-import type { EquipmentInput } from "./schema";
+import type { EquipmentCategory, EquipmentInput } from "./schema";
 
 /** Patients at the front (arrow), staff behind. */
 const STAFFED_COUNTER: EquipmentInput["access"] = [
@@ -524,3 +524,15 @@ export const equipment: EquipmentInput[] = [
 export const capabilityCombos = [
   { capability: "resuscitation", requires: ["defibrillation", "resus_kit"] },
 ];
+
+/** Build palette sections for equipment, one per category. */
+export const EQUIPMENT_CATEGORY_NAMES: Record<EquipmentCategory, string> = {
+  furnishing: "Furnishing",
+  bedding: "Beds & couches",
+  monitoring: "Monitoring",
+  diagnostic: "Diagnostic",
+  treatment: "Treatment",
+  life_support: "Life support",
+  facilities: "Facilities",
+  decor: "Décor",
+};

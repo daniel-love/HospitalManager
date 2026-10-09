@@ -19,8 +19,19 @@ describe("UI descriptions", () => {
   it("summarises the roster and payroll", () => {
     const r = describeRoster(state);
     expect(r.staff).toHaveLength(6);
-    expect(r.roles.find((x) => x.id === "nurse")!.count).toBe(2);
-    expect(r.payroll).toBe(r.roles.reduce((sum, x) => sum + x.annualCost * x.count, 0));
+    const roles = r.groups.flatMap((g) => g.roles);
+    expect(roles.find((x) => x.id === "nurse")!.count).toBe(2);
+    expect(r.payroll).toBe(roles.reduce((sum, x) => sum + x.annualCost * x.count, 0));
+  });
+
+  it("groups the roles to hire: medical, nursing, support services, administrative", () => {
+    const r = describeRoster(state);
+    expect(r.groups.map((g) => [g.name, g.roles.map((x) => x.id)])).toEqual([
+      ["Medical", ["junior_doctor", "medical_examiner"]],
+      ["Nursing", ["nurse", "nurse_practitioner"]],
+      ["Support services", ["porter", "cleaner"]],
+      ["Administrative", ["receptionist"]],
+    ]);
   });
 
   it("describes a patient's timeline in order", () => {

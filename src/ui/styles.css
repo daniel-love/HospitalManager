@@ -1141,3 +1141,14 @@ body.planning #game::after {
 .four-hour.bad {
   color: var(--bad);
 }
+
+/* ---------- Grouped lists (Hire panel, build palettes) ---------- */
+.list-section {
+  margin-top: 16px;
+}
+.list-section:first-child {
+  margin-top: 0;
+}
+.panel .list-section > h3 {
+  margin: 0 0 6px;
+}

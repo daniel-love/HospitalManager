@@ -2,12 +2,13 @@
  * Room types the player can zone. A room is valid (and functional)
  * only when every requirement is met. See GAME_DESIGN §4.2.
  */
+import type { RoomDepartment, RoomInput } from "./schema";
 
 const bedOrCouch = ["exam_couch", "trolley"];
 const anyMonitor = ["obs_machine", "bedside_monitor"];
 const patientBed = ["trolley", "hospital_bed", "profiling_bed"];
 
-export const rooms = [
+export const rooms: RoomInput[] = [
   {
     id: "corridor",
     code: 1,
@@ -210,3 +211,27 @@ export const rooms = [
       "Where deceased patients stay until the Medical Examiner (and sometimes the coroner) is done and they're released. Needs a bed-width route from the wards and A&E; best kept away from public areas.",
   },
 ];
+
+/** Build palette sections for rooms, in display order. */
+export const roomGroups = ["ae", "wards", "shared", "facilities", "support", "staff"] as const;
+export type RoomGroup = (typeof roomGroups)[number];
+
+export const ROOM_GROUP_NAMES: Record<RoomGroup, string> = {
+  ae: "A&E",
+  wards: "Wards",
+  shared: "Shared spaces",
+  facilities: "Facilities",
+  support: "Support services",
+  staff: "Staff areas",
+};
+
+/** The palette section each department's rooms go in. */
+export const ROOM_GROUP_OF: Record<RoomDepartment, RoomGroup> = {
+  "A&E": "ae",
+  Inpatient: "wards",
+  General: "shared",
+  Any: "shared",
+  Facilities: "facilities",
+  Support: "support",
+  Staff: "staff",
+};

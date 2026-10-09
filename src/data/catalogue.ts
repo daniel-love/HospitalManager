@@ -3,8 +3,8 @@
  * than from the raw data files so everything has been through Zod.
  */
 import { conditions } from "./conditions";
-import { capabilityCombos, equipment } from "./equipment";
-import { rooms } from "./rooms";
+import { capabilityCombos, equipment, EQUIPMENT_CATEGORY_NAMES } from "./equipment";
+import { ROOM_GROUP_NAMES, ROOM_GROUP_OF, roomGroups, rooms } from "./rooms";
 import type {
   ConditionDef,
   DoorDef,
@@ -14,8 +14,8 @@ import type {
   StaffRoleId,
   WallDef,
 } from "./schema";
-import { validateContent } from "./schema";
-import { staffRoles } from "./staff";
+import { equipmentCategories, staffGroups, validateContent } from "./schema";
+import { STAFF_GROUP_NAMES, staffRoles } from "./staff";
 import { doors, walls } from "./structures";
 
 export const content = validateContent({
@@ -63,4 +63,46 @@ export function objectDef(defId: string): ObjectDef | undefined {
 /** Footprint [w, h] at rotation 0. Doors lie along the x axis. */
 export function baseFootprint(o: ObjectDef): [number, number] {
   return o.kind === "equipment" ? o.def.footprint : [o.def.width, 1];
+}
+
+/**
+ * A titled section of a list (the Hire panel, the build palettes). Sections
+ * come from each definition's group, in a fixed order, so new content always
+ * lands under the right heading; empty sections are left out.
+ */
+export interface Section<T> {
+  id: string;
+  name: string;
+  items: T[];
+}
+
+function sections<G extends string, T>(
+  order: readonly G[],
+  names: Record<G, string>,
+  items: readonly T[],
+  groupOf: (item: T) => G,
+): Section<T>[] {
+  return order
+    .map((g) => ({ id: g, name: names[g], items: items.filter((i) => groupOf(i) === g) }))
+    .filter((s) => s.items.length > 0);
+}
+
+/** Staff roles by group: medical, nursing, support services, administrative. */
+export function staffRoleSections(): Section<StaffRoleDef>[] {
+  return sections(staffGroups, STAFF_GROUP_NAMES, content.staffRoles, (r) => r.group);
+}
+
+/** Room types by palette section (A&E, wards, shared spaces…). */
+export function roomSections(): Section<RoomDef>[] {
+  return sections(roomGroups, ROOM_GROUP_NAMES, content.rooms, (r) => ROOM_GROUP_OF[r.department]);
+}
+
+/** Equipment by category. */
+export function equipmentSections(): Section<EquipmentDef>[] {
+  return sections(
+    equipmentCategories,
+    EQUIPMENT_CATEGORY_NAMES,
+    content.equipment,
+    (e) => e.category,
+  );
 }

@@ -3,6 +3,7 @@
  * palette, and rooms, items and doors on the map.
  */
 import { content, objectDef, roomById } from "@data/catalogue";
+import { EQUIPMENT_CATEGORY_NAMES } from "@data/equipment";
 import type { EquipmentDef, RoomDef } from "@data/schema";
 import { describeAccess, formatMoney } from "@game/tools";
 import type { SimState } from "@sim/state";
@@ -23,17 +24,6 @@ export interface HelpContent {
   sections?: { heading: string; items: HelpItem[] }[];
   footer?: string;
 }
-
-export const CATEGORY_NAMES: Record<EquipmentDef["category"], string> = {
-  furnishing: "Furnishing",
-  bedding: "Beds & couches",
-  monitoring: "Monitoring",
-  diagnostic: "Diagnostic",
-  treatment: "Treatment",
-  life_support: "Life support",
-  facilities: "Facilities",
-  decor: "Décor",
-};
 
 const nice = (id: string) => id.replace(/_/g, " ");
 
@@ -82,7 +72,7 @@ export function equipmentHelp(def: EquipmentDef): HelpContent {
   if (def.seats) details.push(`Seats ${def.seats}`);
   return {
     title: def.name,
-    subtitle: `${CATEGORY_NAMES[def.category]} · tier ${def.tier}`,
+    subtitle: `${EQUIPMENT_CATEGORY_NAMES[def.category]} · tier ${def.tier}`,
     body: def.description,
     sections: [
       { heading: "Details", items: details.map((text) => ({ text })) },

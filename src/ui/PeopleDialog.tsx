@@ -6,6 +6,7 @@
  * Clicking a name shows that person on the map and in the inspector.
  */
 import type { Game } from "@game/game";
+import { staffRoleSections } from "@data/catalogue";
 import type { StaffRoleId } from "@data/schema";
 import { useState } from "preact/hooks";
 import {
@@ -195,13 +196,10 @@ function PatientsTab({ onShow }: { onShow: (id: number) => void }) {
 
 // ---------- Staff ----------
 
+/** "All", then each role in staff-group order. */
 const ROLE_FILTERS: { id: StaffRoleId | "all"; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "receptionist", label: "Reception" },
-  { id: "nurse", label: "Nurses" },
-  { id: "nurse_practitioner", label: "Nurse practitioners" },
-  { id: "junior_doctor", label: "Doctors" },
-  { id: "cleaner", label: "Cleaners" },
+  ...staffRoleSections().flatMap((s) => s.items.map((r) => ({ id: r.id, label: r.short }))),
 ];
 
 const STATUS_LABELS: Record<StaffRow["status"], string> = {

@@ -155,17 +155,21 @@ export interface Notification {
 export const notifications = signal<Notification[]>([]);
 
 export interface RosterData {
-  roles: {
-    id: StaffRoleId;
-    name: string;
-    description: string;
-    annualCost: number;
-    count: number;
-  }[];
+  /** Roles to hire, by staff group, in display order. */
+  groups: { name: string; roles: RosterRole[] }[];
   staff: { id: number; name: string; role: string; activity: string }[];
   /** Total staff cost per year. */
   payroll: number;
 }
+
+export interface RosterRole {
+  id: StaffRoleId;
+  name: string;
+  description: string;
+  annualCost: number;
+  count: number;
+}
+
 export const roster = signal<RosterData | null>(null);
 
 export interface ReportData {

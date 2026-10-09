@@ -5,6 +5,7 @@
  */
 import type { Game } from "@game/game";
 import { formatMoney } from "@game/tools";
+import { ListSection } from "./ListSection";
 import { peopleDialog, roster, sidePanel } from "./store";
 
 const noFocus = (e: MouseEvent) => e.preventDefault();
@@ -23,24 +24,27 @@ export function StaffPanel({ game }: { game: Game }) {
           Payroll {formatMoney(data.payroll)} a year ({formatMoney(data.payroll / 365)} a day),
           including employer costs. Until rotas arrive, everyone works around the clock.
         </p>
-        <h3>Hire</h3>
-        {data.roles.map((r) => (
-          <div key={r.id} class="hire-row">
-            <div class="hire-info">
-              <strong>{r.name}</strong>
-              <span class="dim">
-                {formatMoney(r.annualCost)}/yr · {r.count} on staff
-              </span>
-              <span class="hire-desc">{r.description}</span>
-            </div>
-            <button
-              class="small-button"
-              onMouseDown={noFocus}
-              onClick={() => game.applyStaff({ type: "hire_staff", role: r.id })}
-            >
-              Hire
-            </button>
-          </div>
+        {data.groups.map((g) => (
+          <ListSection key={g.name} title={g.name}>
+            {g.roles.map((r) => (
+              <div key={r.id} class="hire-row">
+                <div class="hire-info">
+                  <strong>{r.name}</strong>
+                  <span class="dim">
+                    {formatMoney(r.annualCost)}/yr · {r.count} on staff
+                  </span>
+                  <span class="hire-desc">{r.description}</span>
+                </div>
+                <button
+                  class="small-button"
+                  onMouseDown={noFocus}
+                  onClick={() => game.applyStaff({ type: "hire_staff", role: r.id })}
+                >
+                  Hire
+                </button>
+              </div>
+            ))}
+          </ListSection>
         ))}
         <p class="hire-footer">
           <button
