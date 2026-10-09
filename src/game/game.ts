@@ -16,6 +16,7 @@ import {
 } from "@save/saveManager";
 import { applyCommand, type Command, type CommandResult } from "@sim/commands";
 import { addToPlan, buildPreview, commitPlan, planDiff, type PlanPreview } from "@sim/plan";
+import { roomsPatientsCantReach } from "@sim/places";
 import { tick } from "@sim/sim";
 import { createSimState, type SimState } from "@sim/state";
 import { siteView } from "@sim/world/site";
@@ -642,6 +643,7 @@ export class Game {
         valid: room.valid,
         checks: room.checks,
         forConditions: room.forConditions,
+        patientsCantReach: roomsPatientsCantReach(this.viewState).includes(room),
         capabilities: room.capabilities,
         items: [...counts].map(([name, count]) => ({ name, count })),
       };

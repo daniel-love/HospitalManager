@@ -8,11 +8,13 @@
  * same seat or couch. They refer to object ids, which (unlike room ids)
  * survive rebuilding.
  */
-import { equipmentById, equipmentNamesFor, roomById } from "@data/catalogue";
+import { content, equipmentById, equipmentNamesFor, roomById } from "@data/catalogue";
 import { TOILET_USES_BEFORE_CLEAN } from "@data/patients";
 import type { Point } from "./agents";
-import type { PlacedObject, SimState } from "./state";
+import type { PlacedObject, Room, SimState } from "./state";
+import { OPEN, patientAccess } from "./world/access";
 import { tileIndex } from "./world/grid";
+import { isWalkable } from "./world/pathfinding";
 import { frontDirection, isStandable, objectRect, sideTiles } from "./world/objects";
 import { nearestEdgeTile, nearestTile } from "./world/pathfinding";
 import { rectTiles } from "./world/rect";
@@ -408,4 +410,66 @@ export function siteEntrance(state: SimState): Point | null {
 export function fallbackEntrance(state: SimState): Point {
   const grid = state.floors[0]!;
   return { x: Math.floor(grid.width / 2), y: grid.height - 1 };
+}
+
+// ---------- Rooms patients can't reach ----------
+
+/** Room types patients walk into: reception, waiting, toilets, wards and every pathway room. */
+const PATIENT_ROOMS = new Set([
+  "ae_reception",
+  "waiting_area",
+  "toilets",
+  "ward",
+  ...content.conditions.flatMap((c) => c.pathway.map((s) => s.room)),
+]);
+
+const unreachableCache = new WeakMap<SimState, { version: number; rooms: Room[] }>();
+
+/**
+ * Valid rooms patients need to walk into but can't reach from outside
+ * without crossing a clinical room (patients keep to public routes: see
+ * world/access.ts). Cached per layout.
+ */
+export function roomsPatientsCantReach(state: SimState): Room[] {
+  const cached = unreachableCache.get(state);
+  if (cached && cached.version === state.layoutVersion) return cached.rooms;
+  const grid = state.floors[0]!;
+  const { width, height } = grid;
+  const start = siteEntrance(state);
+  let rooms: Room[] = [];
+  if (start) {
+    // Flood from the entrance over tiles any patient may cross.
+    const access = patientAccess(state);
+    const open = (i: number) => access[i] === OPEN && isWalkable(grid, i);
+    const reached = new Uint8Array(width * height);
+    const queue = [tileIndex(grid, start.x, start.y)];
+    reached[queue[0]!] = 1;
+    const step = (i: number, f: (n: number) => void) => {
+      const x = i % width;
+      const y = (i - x) / width;
+      if (x > 0) f(i - 1);
+      if (x < width - 1) f(i + 1);
+      if (y > 0) f(i - width);
+      if (y < height - 1) f(i + width);
+    };
+    for (let head = 0; head < queue.length; head++) {
+      step(queue[head]!, (n) => {
+        if (reached[n] || !open(n)) return;
+        reached[n] = 1;
+        queue.push(n);
+      });
+    }
+    // A room is reachable if one of its tiles is, or borders a reached tile.
+    rooms = state.rooms.filter((room) => {
+      if (!room.valid || room.floor !== 0 || !PATIENT_ROOMS.has(room.typeId)) return false;
+      return !room.tiles.some((t) => {
+        if (reached[t]) return true;
+        let near = false;
+        step(t, (n) => (near ||= reached[n] === 1));
+        return near;
+      });
+    });
+  }
+  unreachableCache.set(state, { version: state.layoutVersion, rooms });
+  return rooms;
 }

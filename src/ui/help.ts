@@ -6,7 +6,7 @@ import { conditionEquipment, content, objectDef, roomById } from "@data/catalogu
 import { EQUIPMENT_CATEGORY_NAMES } from "@data/equipment";
 import type { EquipmentDef, RoomDef } from "@data/schema";
 import { describeAccess, formatMoney } from "@game/tools";
-import { cleaningStatuses, type CleaningStatus } from "@sim/places";
+import { cleaningStatuses, roomsPatientsCantReach, type CleaningStatus } from "@sim/places";
 import type { SimState } from "@sim/state";
 import { itemsAt } from "@sim/world/objects";
 import { roomAt } from "@sim/world/rooms";
@@ -164,6 +164,16 @@ export function tileHelp(state: SimState, floor: number, x: number, y: number): 
                   })),
                 }
               : { heading: "Requirements", items: [{ text: "All met", ok: true }] },
+            ...(roomsPatientsCantReach(state).includes(room)
+              ? [
+                  {
+                    heading: "Patients can't reach it",
+                    items: [
+                      { text: "Only through another clinical room: add a door onto a corridor" },
+                    ],
+                  },
+                ]
+              : []),
             ...(lacking.length > 0
               ? [
                   {

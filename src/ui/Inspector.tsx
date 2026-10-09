@@ -63,6 +63,12 @@ export function Inspector({
               ))}
             </ul>
           )}
+          {room.patientsCantReach && (
+            <p class="warn-text">
+              Patients can't get here without walking through another clinical room. Give it a door
+              onto a corridor, waiting area or reception.
+            </p>
+          )}
           {room.forConditions.length > 0 && (
             <>
               <h4 title="Not needed for the room to work, but some patients can't be treated here without it">

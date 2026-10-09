@@ -6,7 +6,9 @@ import { createSimState, type SimState } from "@sim/state";
 import { BACK_DOOR, OPEN, PRIVATE, patientAccess } from "@sim/world/access";
 import { tileIndex, WallType } from "@sim/world/grid";
 import { findPath } from "@sim/world/pathfinding";
-import { applyAll } from "../fixtures/smallAE";
+import { roomsPatientsCantReach } from "@sim/places";
+import { buildMajorsAE } from "../fixtures/majorsAE";
+import { applyAll, buildSmallAE } from "../fixtures/smallAE";
 
 /**
  * An 18×12 map with grass all round a building: Resus (x 2–7) and a corridor
@@ -65,5 +67,37 @@ describe("patient access", () => {
     const path = route(12, 5, 4, 5, true)!;
     expect(path).toContain(at(8, 5));
     expect(path).not.toContain(at(1, 5));
+  });
+});
+
+describe("rooms patients can't reach", () => {
+  it("raises no false alarms on the test hospitals", () => {
+    for (const state of [
+      buildSmallAE(),
+      buildSmallAE(1, { site: true }),
+      buildMajorsAE(1, { ambulance: true, ward: "door_double" }),
+      buildMajorsAE(1, { ambulance: true, site: true }),
+    ]) {
+      expect(roomsPatientsCantReach(state)).toEqual([]);
+    }
+  });
+
+  it("flags a cubicle reached only through another cubicle", () => {
+    const state = buildSmallAE();
+    // Close the lower cubicle's corridor door and open one from the upper cubicle.
+    applyAll(state, [
+      { type: "demolish", floor: 0, rect: { x: 13, y: 13, w: 1, h: 1 } },
+      {
+        type: "build_walls",
+        floor: 0,
+        rect: { x: 13, y: 13, w: 1, h: 1 },
+        wall: WallType.Standard,
+      },
+      { type: "place_object", floor: 0, defId: "door_single", x: 15, y: 11, rotation: 0 },
+    ]);
+    const cut = roomsPatientsCantReach(state);
+    expect(cut.map((r) => r.typeId)).toEqual(["minors_cubicle"]);
+    expect(cut[0]!.bounds.y).toBe(12);
+    expect(cut[0]!.valid).toBe(true);
   });
 });

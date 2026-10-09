@@ -51,7 +51,7 @@
 Small fixes and polish from playtesting, to slot in between milestones.
 
 - ~~**Dirty bays and areas**~~ (done 2026-10-09): brown smudges and a brown badge on a couch, trolley, bed or toilet waiting to be cleaned (including the deep clean after a death), a blue sparkle while a cleaner works on it, and a red badge on a toilet too dirty to use (render/cleaningLayer.ts). The item's hover card says what it's waiting for, e.g. "no cleaner on staff".
-- **Unreachable rooms for patients:** warn when patients can't reach a room except through a clinical room (since patients keep to public routes).
+- ~~**Unreachable rooms for patients**~~ (done 2026-10-09): after each layout change, a flood from the entrance over tiles any patient may cross finds rooms patients walk into (reception, waiting, toilets, wards and pathway rooms) that they can only reach through another clinical room (`roomsPatientsCantReach` in places.ts). Each gets an alert that jumps to it, and an amber line in its inspector and hover card.
 
 ## M4: Outpatients, theatres & specialty gating
 

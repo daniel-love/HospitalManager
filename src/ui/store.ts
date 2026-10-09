@@ -95,6 +95,8 @@ export interface InspectorData {
     checks: RoomCheck[];
     /** Advisory equipment for some conditions (doesn't affect validity). */
     forConditions: RoomCheck[];
+    /** Patients can only get here through another clinical room. */
+    patientsCantReach: boolean;
     capabilities: string[];
     items: { name: string; count: number }[];
   };

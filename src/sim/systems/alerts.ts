@@ -10,10 +10,17 @@ import {
   TOILET_CLEAN_MINS,
   TOILET_USES_BEFORE_CLEAN,
 } from "@data/patients";
-import { conditionById, roleNames } from "@data/catalogue";
+import { conditionById, roleNames, roomById } from "@data/catalogue";
 import type { StaffRoleId } from "@data/schema";
 import { warn } from "../events";
-import { freeToilet, isCouch, missingRoom, receptionDesks, seatCount } from "../places";
+import {
+  freeToilet,
+  isCouch,
+  missingRoom,
+  receptionDesks,
+  roomsPatientsCantReach,
+  seatCount,
+} from "../places";
 import type { SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
 import { roomOfObject } from "../world/rooms";
@@ -143,6 +150,21 @@ export function updateAlerts(state: SimState): void {
       `${plural(slow.length, "ambulance crew has", "ambulance crews have")} waited over ${HANDOVER_BREACH_MINS} minutes to hand over${
         reasons.length > 0 ? `: ${reasons.join("; ")}` : ""
       }.`,
+    );
+  }
+
+  // Rooms patients can't walk to without crossing a clinical room.
+  const grid = state.floors[0]!;
+  for (const room of roomsPatientsCantReach(state)) {
+    const name = roomById.get(room.typeId)?.name ?? room.typeId;
+    const t = room.tiles[0]!;
+    warn(
+      state,
+      `unreachable_${t}`,
+      COOLDOWN * 2,
+      `Patients can't reach a ${name} without walking through another clinical room. Give it a door onto a corridor, waiting area or reception.`,
+      "warn",
+      { x: t % grid.width, y: Math.floor(t / grid.width) },
     );
   }
 
