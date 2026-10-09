@@ -203,7 +203,7 @@ function Guide({ tab }: { tab: Exclude<HelpTab, "advice"> }) {
       />
       {shown.length === 0 && <p class="dim">Nothing matches.</p>}
       {shown.map((s) => (
-        <section key={s.name}>
+        <section key={s.name} class="guide-section">
           <h3>{s.name}</h3>
           {s.entries.map((e) => (
             <details key={e.id} class="guide-entry" open={q !== ""}>

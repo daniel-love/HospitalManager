@@ -1620,6 +1620,9 @@ body.planning #game::after {
   min-width: min(360px, calc(100vw - 16px));
   background: rgba(18, 24, 32, 0.96);
 }
+.help-panel .side-scroll {
+  padding: 14px 16px 20px;
+}
 .help-header {
   display: flex;
   align-items: center;
@@ -1639,22 +1642,31 @@ body.planning #game::after {
   position: static;
   flex: none;
 }
+/* Headings lead each section, so they're first-child: space them explicitly. */
 .help-panel h3 {
   display: flex;
   justify-content: space-between;
-  margin-top: 22px;
+  align-items: baseline;
+  margin: 0 0 8px;
   padding-bottom: 5px;
   border-bottom: 1px solid var(--panel-border);
 }
+.help-panel p.dim,
 .help-panel .dim {
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
-.advice-group {
-  margin-top: 22px;
+.advice-group,
+.guide-section {
+  margin-top: 26px;
 }
+.guide-section:first-of-type {
+  margin-top: 20px;
+}
+
+/* Recommendations */
 .advice-next {
-  padding: 10px 12px;
+  padding: 10px 12px 11px;
   border: 1px solid var(--accent);
   border-radius: 7px;
   background: rgba(59, 130, 196, 0.12);
@@ -1663,10 +1675,16 @@ body.planning #game::after {
   border-color: var(--ok);
   background: rgba(111, 208, 140, 0.1);
 }
-.advice-next h3 {
-  margin: 0 0 4px;
+.help-panel .advice-next h3 {
+  margin: 0 0 6px;
   padding: 0;
   border: none;
+}
+.help-panel .advice-next p {
+  margin: 0;
+}
+.help-panel .advice-next p + p {
+  margin-top: 3px;
 }
 .advice-next-text {
   font-weight: 600;
@@ -1678,7 +1696,7 @@ body.planning #game::after {
 }
 .advice-list {
   list-style: none;
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   padding: 0;
 }
 .advice-item {
@@ -1686,6 +1704,10 @@ body.planning #game::after {
   gap: 8px;
   padding: 5px 0;
   font-size: 13px;
+  line-height: 1.35;
+}
+.advice-item .dim {
+  margin-top: 1px;
 }
 .advice-mark {
   flex: none;
@@ -1704,36 +1726,42 @@ body.planning #game::after {
 }
 .capacity-table {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 14px;
   border-collapse: collapse;
   font-size: 13px;
 }
 .capacity-table th,
 .capacity-table td {
-  padding: 5px 4px;
+  padding: 7px 0;
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--panel-border);
 }
 .capacity-table thead th {
+  padding-top: 0;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-dim);
 }
 .capacity-table tbody th {
+  padding-right: 16px;
   font-weight: 500;
 }
-.capacity-table td {
-  width: 72px;
+.capacity-table tbody th .dim {
+  margin-top: 2px;
+  font-weight: 400;
+}
+.capacity-table td,
+.capacity-table thead th:not(:first-child) {
+  width: 76px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.capacity-table thead th:not(:first-child) {
-  text-align: right;
-}
+
+/* Reference tabs */
 .help-filter {
   width: 100%;
-  margin: 8px 0 2px;
+  margin-top: 12px;
   padding: 6px 8px;
   font: inherit;
   font-size: 13px;
@@ -1746,19 +1774,35 @@ body.planning #game::after {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .guide-entry summary {
-  padding: 6px 0;
+  padding: 7px 0;
   font-size: 13px;
   cursor: pointer;
 }
 .guide-title {
   font-weight: 600;
 }
+/* Indent the details under the title, past the disclosure triangle. */
+.guide-entry > p,
+.guide-entry > .help-section {
+  margin-left: 14px;
+}
 .guide-entry[open] {
-  padding-bottom: 8px;
+  padding-bottom: 12px;
+}
+.help-panel .guide-entry > p {
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+.guide-entry .help-section h4 {
+  margin: 12px 0 3px;
 }
 .guide-entry .help-section ul {
-  margin: 2px 0 0;
-  padding-left: 18px;
+  margin: 0;
+  padding-left: 16px;
+  list-style: disc;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
+}
+.guide-entry .help-section li::marker {
+  color: var(--text-dim);
 }
