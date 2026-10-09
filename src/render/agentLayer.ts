@@ -3,8 +3,8 @@
  * smoothly between sim ticks. Staff are coloured by role; patients are white
  * with a ring in their triage colour. Patients in a bad mood show a red dot;
  * one getting worse shows an amber "!", and a cardiac arrest a red cross.
- * Someone who has died is shown only as a covered shape (never graphic),
- * and isn't drawn once they're in the mortuary.
+ * Someone who has died is never shown graphically: deathMarks.ts draws each
+ * step after a death (curtains, sheet, trolley, mortuary drawer, family).
  *
  * Ambulances (driving or parked) are drawn beneath everyone, and a paramedic stands
  * beside each patient still waiting to be handed over.
@@ -12,12 +12,13 @@
  * Views are pooled by agent id: created when an agent appears, destroyed
  * when it leaves.
  */
-import { Container, Graphics } from "pixi.js";
+import { Container, Graphics, GraphicsContext } from "pixi.js";
 import { TRIAGE_CATEGORIES } from "@data/patients";
 import type { AgentBase, Ambulance, Patient, Staff } from "@sim/agents";
 import type { SimState } from "@sim/state";
 import { SPACE_L, SPACE_W } from "@sim/systems/ambulances";
 import { TILE_SIZE } from "./constants";
+import { deceasedLook, drawDeceased, drawFamilies, familiesLook, pushOffset } from "./deathMarks";
 import {
   AMBULANCE_GREEN,
   AMBULANCE_YELLOW,
@@ -48,9 +49,12 @@ export class AgentLayer {
   private readonly views = new Map<number, View>();
   /** Each ambulance's body, and the way it's facing (radians, 0 = along y). */
   private readonly ambulances = new Map<number, { g: Graphics; angle: number }>();
+  /** Families in the Relatives' Room, being told of a death. */
+  private readonly families = new Graphics();
+  private familiesDrawn = "";
 
   constructor() {
-    this.container.addChild(this.vehicles, this.people);
+    this.container.addChild(this.vehicles, this.families, this.people);
   }
   selectedId: number | null = null;
 
@@ -59,8 +63,14 @@ export class AgentLayer {
     this.updateAmbulances(Object.values(state.ambulances), alpha);
     const live = new Set<number>();
     for (const p of Object.values(state.patients)) {
-      if (p.stage === "in_mortuary") continue;
       live.add(p.id);
+      const selected = p.id === this.selectedId;
+      if (p.death) {
+        this.place(p, alpha, deceasedLook(state, p, selected), (g) =>
+          drawDeceased(g, state, p, selected),
+        );
+        continue;
+      }
       const warning = warningOf(p, state.tick);
       this.place(p, alpha, patientLook(p, p.id === this.selectedId, warning), (g) =>
         drawPatient(g, p, p.id === this.selectedId, warning),
@@ -70,6 +80,18 @@ export class AgentLayer {
       live.add(s.id);
       const selected = s.id === this.selectedId;
       this.place(s, alpha, `${s.role}|${selected}`, (g) => drawStaff(g, s, selected));
+      // A porter wheeling a covered trolley pushes it from behind.
+      const push = pushOffset(state, s);
+      if (push) {
+        const pos = this.views.get(s.id)!.g.position;
+        pos.set(pos.x + push.x * TILE_SIZE, pos.y + push.y * TILE_SIZE);
+      }
+    }
+    const families = familiesLook(state);
+    if (families !== this.familiesDrawn) {
+      this.families.clear();
+      drawFamilies(this.families, state);
+      this.familiesDrawn = families;
     }
     for (const [id, view] of this.views) {
       if (!live.has(id)) {
@@ -84,6 +106,8 @@ export class AgentLayer {
     this.views.clear();
     for (const v of this.ambulances.values()) v.g.destroy();
     this.ambulances.clear();
+    this.families.clear();
+    this.familiesDrawn = "";
   }
 
   private updateAmbulances(all: Ambulance[], alpha: number): void {
@@ -93,8 +117,7 @@ export class AgentLayer {
       live.add(a.id);
       let view = this.ambulances.get(a.id);
       if (!view) {
-        view = { g: new Graphics(), angle: 0 };
-        drawAmbulance(view.g);
+        view = { g: new Graphics(ambulanceContext()), angle: 0 };
         this.vehicles.addChild(view.g);
         this.ambulances.set(a.id, view);
       }
@@ -155,19 +178,13 @@ function warningOf(p: Patient, tick: number): Warning {
 }
 
 function patientLook(p: Patient, selected: boolean, warning: Warning): string {
-  return `${p.category}|${p.mood < UNHAPPY_MOOD}|${selected}|${warning}|${withCrew(p)}|${onTheMove(p)}|${p.death !== null}`;
+  return `${p.category}|${p.mood < UNHAPPY_MOOD}|${selected}|${warning}|${withCrew(p)}|${onTheMove(p)}`;
 }
 
 const withCrew = (p: Patient) => p.stage === "awaiting_handover";
 const onTheMove = (p: Patient) => p.stage === "transferring";
 
 function drawPatient(g: Graphics, p: Patient, selected: boolean, warning: Warning): void {
-  if (p.death) {
-    // A plain sheet, nothing more.
-    if (selected) g.roundRect(-11, -16, 22, 32, 6).stroke({ width: 2.5, color: SELECTED_RING });
-    g.roundRect(-8, -13, 16, 26, 5).fill(0xdfe3e8).stroke({ width: 1.5, color: 0x8a929c });
-    return;
-  }
   const ring = p.category === 0 ? UNTRIAGED_RING : TRIAGE_CATEGORIES[p.category]!.colour;
   if (withCrew(p)) {
     // The paramedic staying with them, and the stretcher beneath.
@@ -196,24 +213,66 @@ function drawStaff(g: Graphics, s: Staff, selected: boolean): void {
 }
 
 /**
- * An ambulance, centred on the origin and lying along the y axis: yellow with
- * a band of green and yellow squares (programmer art). It fills a 3×6 space
- * less a margin.
+ * An ambulance seen from above, centred on the origin and lying along the y
+ * axis with its cab at +y: a box body with a Battenburg check down each side,
+ * a light bar and roof unit, then a narrower cab with windscreen and mirrors.
+ * It fills a 3×6 space less a margin. Built once and shared by every
+ * ambulance, so each one costs only a draw of the same geometry.
  */
-function drawAmbulance(g: Graphics): void {
+let ambulanceShape: GraphicsContext | null = null;
+
+function ambulanceContext(): GraphicsContext {
+  if (ambulanceShape) return ambulanceShape;
   const T = TILE_SIZE;
   const pad = T * 0.2;
-  const width = SPACE_W * T - pad * 2;
-  const height = SPACE_L * T - pad * 2;
-  const left = -width / 2;
-  const top = -height / 2;
-  g.roundRect(left, top, width, height, 6)
+  const W = SPACE_W * T - pad * 2;
+  const L = SPACE_L * T - pad * 2;
+  const left = -W / 2;
+  const top = -L / 2;
+  const outline = { width: 1.5, color: 0x2b2b2b };
+  const g = new GraphicsContext();
+  // Shadow.
+  g.roundRect(left + 3, top + 4, W, L, 8).fill({ color: 0x000000, alpha: 0.25 });
+  // Cab: the front 22%, a little narrower than the box, with a rounded nose.
+  const cabL = L * 0.22;
+  const cabTop = top + L - cabL;
+  const cabW = W * 0.9;
+  g.roundRect(-cabW / 2, cabTop - 6, cabW, cabL + 6, 9)
     .fill(AMBULANCE_YELLOW)
-    .stroke({ width: 2, color: 0x2b2b2b });
-  // Battenburg band along the length.
-  const n = 8;
-  const bh = height / n;
-  for (let i = 0; i < n; i += 2) {
-    g.rect(left + width * 0.15, top + i * bh, width * 0.7, bh).fill(AMBULANCE_GREEN);
+    .stroke(outline);
+  // Wing mirrors, then the windscreen and bonnet.
+  g.rect(-cabW / 2 - 4, cabTop + cabL * 0.18, 5, 4).fill(0x2b2b2b);
+  g.rect(cabW / 2 - 1, cabTop + cabL * 0.18, 5, 4).fill(0x2b2b2b);
+  g.roundRect(-cabW * 0.42, cabTop + cabL * 0.08, cabW * 0.84, cabL * 0.38, 3).fill(0x2c3e50);
+  g.rect(-cabW * 0.3, cabTop + cabL * 0.72, cabW * 0.6, 2).fill({ color: 0x000000, alpha: 0.2 });
+  // Box body (the patient compartment), roof in yellow.
+  const boxL = L - cabL;
+  g.roundRect(left, top, W, boxL, 5).fill(AMBULANCE_YELLOW).stroke(outline);
+  // Battenburg: a two-row check down each side.
+  const sq = W * 0.12;
+  const n = Math.floor((boxL - 4) / sq);
+  const y0 = top + (boxL - n * sq) / 2;
+  for (let i = 0; i < n; i++) {
+    const y = y0 + i * sq;
+    for (const [x, odd] of [
+      [left + 1, 0],
+      [left + 1 + sq, 1],
+      [left + W - 1 - sq * 2, 1],
+      [left + W - 1 - sq, 0],
+    ] as const) {
+      if ((i + odd) % 2 === 0) g.rect(x, y, sq, sq).fill(AMBULANCE_GREEN);
+    }
   }
+  // Blue light bar across the front of the box, a smaller one at the back.
+  g.roundRect(-W * 0.3, top + boxL - 9, W * 0.6, 6, 2).fill(0x2f6fff);
+  g.roundRect(-W * 0.2, top + 3, W * 0.4, 4, 2).fill(0x2f6fff);
+  // Air-conditioning unit and a roof vent.
+  g.roundRect(-W * 0.22, top + boxL * 0.45, W * 0.44, boxL * 0.18, 3)
+    .fill(0xdcdcd4)
+    .stroke({ width: 1, color: 0x8a8a84 });
+  g.rect(-W * 0.1, top + boxL * 0.18, W * 0.2, W * 0.2).fill(0xdcdcd4);
+  // Rear doors: the seam between them.
+  g.rect(-0.75, top, 1.5, boxL * 0.08).fill(0x2b2b2b);
+  ambulanceShape = g;
+  return g;
 }

@@ -36,6 +36,7 @@ import {
 } from "./palette";
 import { RoomLabelLayer } from "./roomLabelLayer";
 import { TilemapLayer } from "./tilemapLayer";
+import { BayLayer } from "./bayLayer";
 
 export type GhostTone = "ok" | "bad" | "remove" | "neutral";
 
@@ -65,6 +66,7 @@ export class Renderer {
   readonly camera: Camera;
   private readonly world = new Container();
   private tilemap: TilemapLayer;
+  private readonly bays = new BayLayer();
   private readonly objects = new ObjectLayer();
   private readonly cleaning = new CleaningLayer();
   private readonly agents = new AgentLayer();
@@ -118,6 +120,7 @@ export class Renderer {
     );
     this.world.addChild(
       this.tilemap.container,
+      this.bays.container,
       this.objects.container,
       this.cleaning.container,
       this.labels.container,
@@ -395,6 +398,7 @@ export class Renderer {
 
   private syncContent(): void {
     this.objects.sync(this.state);
+    this.bays.sync(this.state);
     this.labels.sync(this.state.rooms);
   }
 }
