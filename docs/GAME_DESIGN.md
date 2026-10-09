@@ -110,8 +110,9 @@ Build mode has three sub-modes: **Construction**, **Cosmetics** and **Equipment*
 **Exterior elements**
 
 - **Car parks:** staff and visitor spaces. Visitor parking capacity limits how many companions and outpatients arrive by car, and it can generate income (pay & display).
-- **Ambulance bays:** required for ambulance arrivals. Each bay holds one ambulance, so too few bays means **handover delays** (a penalised KPI).
-- **Drop-off / main entrance**, **bus stop** (later), **helipad** (late game, for major trauma).
+- **Ambulance bays:** required for ambulance arrivals, zoned on access road or foundations and linked to the public road by an access road. Each bay holds one ambulance, so too few bays means **handover delays** (a penalised KPI).
+- **Footpaths and access roads** (M3.5): link the hospital to the public road (see Site access above).
+- **Drop-off / main entrance**, **bus stop** (on the public road, M3.5), **helipad** (late game, for major trauma).
 - **Generator & plant room** (needed for power-cut resilience).
 
 ### 4.2 Room zoning
@@ -203,14 +204,14 @@ A room's **capability set** is the union of its equipment's capabilities. Condit
 
 ### 5.1 Arrival channels
 
-| Channel                                    | Requires                                   | Notes                                                                                                                  |
-| ------------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| **Walk-in A&E**                            | An open A&E                                | Most variable stream, with evening peaks                                                                               |
-| **Ambulance**                              | A&E + ambulance bay                        | Higher acuity. Without a free bay, ambulances queue (handover delay KPI). They can be **diverted** if A&E is on divert |
-| **GP referral → outpatient clinic**        | The relevant clinic + specialty consultant | Scheduled appointments. Missing slots grows the waiting list                                                           |
-| **Elective (planned) surgery**             | Theatre + ward bed + specialty             | Drawn from the waiting list and scheduled ahead. Cancellations happen if no bed is available                           |
-| **Inter-hospital transfer in** (late game) | Specialist unit (e.g. Stroke, Cardiac)     | Income boost and reputation                                                                                            |
-| **Major incident / mass casualty**         | Event-driven                               | Bursts of high-acuity ambulances                                                                                       |
+| Channel                                    | Requires                                   | Notes                                                                                                                              |
+| ------------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Walk-in A&E**                            | An open A&E                                | Most variable stream, with evening peaks                                                                                           |
+| **Ambulance**                              | A&E + ambulance bay linked to the road     | Higher acuity. Without a free bay, ambulances queue on the road (handover delay KPI). They can be **diverted** if A&E is on divert |
+| **GP referral → outpatient clinic**        | The relevant clinic + specialty consultant | Scheduled appointments. Missing slots grows the waiting list                                                                       |
+| **Elective (planned) surgery**             | Theatre + ward bed + specialty             | Drawn from the waiting list and scheduled ahead. Cancellations happen if no bed is available                                       |
+| **Inter-hospital transfer in** (late game) | Specialist unit (e.g. Stroke, Cardiac)     | Income boost and reputation                                                                                                        |
+| **Major incident / mass casualty**         | Event-driven                               | Bursts of high-acuity ambulances                                                                                                   |
 
 **Specialty gating (user requirement):** a referral or elective condition spawns only if the hospital has the required **department + specialty staff**. For example, no cardiology clinic and no cardiology consultant means no cardiology referrals. **A&E is the exception:** anyone can turn up. If A&E can't treat a patient, staff must **stabilise and transfer** them, which costs money (ambulance transfer) and reputation, and may count against targets.
 

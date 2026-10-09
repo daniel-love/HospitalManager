@@ -45,7 +45,7 @@ src/
   sim/
     state.ts              # SimState types (the save schema)
     agents.ts             # Patient, Staff, Job, ledger and event types
-    places.ts             # seats, couches, toilets, desks, reservations, site entrance
+    places.ts             # seats, couches, toilets, desks, reservations, arrival points
     events.ts             # notifications out (never read back by the sim)
     sim.ts                # tick(): runs systems in order
     commands.ts           # build command types + apply()
@@ -55,11 +55,13 @@ src/
       grid.ts             # multi-floor tile grid
       rooms.ts            # room detection (flood fill) + validation
       objects.ts          # footprints, access sides, placement rules
-      pathfinding.ts      # A* + nearest map-edge search (floor portals later)
+      pathfinding.ts      # A* (walking, bed and vehicle modes) + nearest-tile search (floor portals later)
+      site.ts             # the public road, pavements and bus stop; fitting the road into old saves
+      vehicles.ts         # drivable tiles, reachability from the road, lanes and road ends
       los.ts              # line-of-sight raycasts
     systems/
       arrivals.ts         # walk-in and ambulance arrivals by time of day (specialty gating in M4)
-      ambulances.ts       # parking spaces, queueing outside, handover
+      ambulances.ts       # parking spaces, driving in, queueing on the road, handover
       admissions.ts       # decision to admit, porter transfers (bed-width routes), wards
       deaths.ts           # verification, family, last offices, mortuary, Medical Examiner, morale
       staffing.ts         # hire/dismiss; receptionists staff desks (shifts in M5)
@@ -95,6 +97,8 @@ src/
     toolbar/ panels/ inspector/ notifications/
   save/
     saveManager.ts        # IndexedDB slots, autosave, export/import
+    codec.ts              # SimState ↔ save file, validated with Zod
+    base64.ts             # typed arrays ↔ base64
     migrations.ts
 tests/
   sim/                    # headless simulation tests
@@ -151,7 +155,7 @@ A condition's pathway is an array of steps. For each step the pathways system:
 
 - One grid per floor. Each floor has a `width × height` array of tiles stored as **typed arrays** (struct-of-arrays) for memory and speed: `floorType: Uint8Array`, `wall: Uint8Array`, `door: Uint8Array`, `zone: Uint8Array`, `roomId: Uint16Array`, `objectId: Int32Array` (floor items and doors) and `mountId: Int32Array` (wall/ceiling fixtures, which share tiles with floor items).
 - Multi-tile objects store their anchor plus footprint, and every covered tile references the object.
-- **Land parcels:** a `parcelId: Uint16Array` per tile, plus a parcel table `{ id, price, owned, conditions }`. Build commands are rejected on unowned tiles, and buying a parcel is a command.
+- **Land:** a `land: Uint8Array` per tile. As built (M3.5): 0 = the hospital's own land, 1 = council land (the public road and pavements from `world/site.ts`), which build commands refuse, except an access road across the pavement (a dropped kerb). **Parcels (M7)** extend the same array with parcel codes, plus a parcel table `{ id, price, owned, conditions }`; build commands are rejected on unowned tiles, and buying a parcel is a command.
 - **Patient volume** (the realism slider) is a single multiplier in the sim settings, applied in `arrivals.ts`, so balance data stays at real-world rates.
 
 ### 5.2 Rooms
@@ -162,9 +166,9 @@ The player paints zones (a room type per tile, `FloorGrid.zone`). After every bu
 
 ### 5.3 Pathfinding
 
-- **A\*** on the 8-connected grid with costs: door (slower), lift (queue), crowding (soft cost).
+- **A\*** on the 8-connected grid with costs: door (slower), grass (double: walked at half speed, so people keep to paths), lift (queue), crowding (soft cost).
 - **Multi-floor:** a small graph of portals (stairs/lifts). Find a portal route first, then A* per floor.
-- **Movement modes:** walking, wheelchair, bed/trolley. Bed mode requires double doors, 2-wide corridors and lifts (no stairs). As built (M3): `findPath(…, bed = true)` only steps on tiles that are part of a clear 2×2 square and aren't single doors; admissions check reachability against bed-passable regions labelled once per layout.
+- **Movement modes:** walking, wheelchair, bed/trolley. Bed mode requires double doors, 2-wide corridors and lifts (no stairs). As built (M3): `findPath(…, bed = true)` only steps on tiles that are part of a clear 2×2 square and aren't single doors; admissions check reachability against bed-passable regions labelled once per layout. Vehicle mode (M3.5): `findPath(…, vehicle)` only uses tiles marked drivable by `world/vehicles.ts` (tarmac and Ambulance Bays, in a clear 3×3 square), and charges extra for driving against the traffic on the public road, so vehicles keep left.
 - **Caching:** cache paths keyed by `(from-region, to-room, mode)` and invalidate per chunk on edit. If profiling demands it, move to a **Web Worker** or add flow fields for common destinations (e.g. the A&E entrance).
 
 ### 5.4 Line of sight & coverage
@@ -244,7 +248,7 @@ Benefits: balancing without code changes, easy to add conditions, and a path to 
 - **Format:** `{ version: number, meta: { name, createdAt, gameDate, thumbnail }, state: SimState }`, serialised as JSON. Typed arrays are encoded as base64 (and optionally compressed with `CompressionStream('gzip')`).
 - **Storage:** IndexedDB object store `saves`, with autosave rotation (last 3) plus named slots.
 - **Export/import:** download and upload `.hospital.json` (gzipped variant `.hospital`). Under Tauri, write to the user's documents folder.
-- **Versioning:** `migrations.ts` holds an ordered list of `(fromVersion) => state` transforms. Loading an old save runs it forward, and Zod validates the result.
+- **Versioning:** `migrations.ts` holds an ordered list of `(fromVersion) => state` transforms. Loading an old save runs it forward, and Zod validates the result. A migration may add content as well as fields: v11 fits the public road into maps built before it existed (`fitSite()` in `world/site.ts`).
 - **Derived data is not saved:** rooms (and the `roomId` grid), the `objectId` grid (rebuilt from the object list), path caches and coverage maps are rebuilt after load. This keeps saves small and means derived data can never disagree with the layout. See `save/codec.ts`.
 
 ## 9. Testing strategy
