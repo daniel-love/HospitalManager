@@ -72,6 +72,7 @@ import {
 } from "./jobBoard";
 import { headTo, stop } from "./movement";
 import { leaveScanner } from "./diagnostics";
+import { isEscorted } from "./escorts";
 import { hasTeam } from "./staffing";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
@@ -280,6 +281,7 @@ export function releaseSeat(state: SimState, p: Patient): void {
 function goToBed(state: SimState, p: Patient): void {
   const bed = p.bed === null ? undefined : state.objects[p.bed];
   if (!bed) return; // The job system notices and sends them back to wait.
+  if (isEscorted(state, p)) return; // A porter wheels them (systems/escorts.ts).
   const arrival = headTo(state, p, restPoint(bed), bedside(state, bed));
   if (arrival !== "arrived") return;
   if (p.stage === "called_triage") p.stage = "triage";

@@ -40,6 +40,7 @@ import { afterTriage, backToWaiting, callToBed, lift, postTreatment, retriage } 
 import { MOOD_LIFT_SEEN, MOOD_LIFT_STEP } from "@data/patients";
 import { canDo } from "./staffing";
 import { transferArranged } from "./transfers";
+import { escortSpot, isEscorted, runEscort, sendForScan } from "./escorts";
 import {
   claimDiagnosticPlace,
   DIAGNOSTIC_JOBS,
@@ -135,7 +136,12 @@ function claimPlace(state: SimState, job: Job): Point | null {
   if (job.kind === "transfer") return claimWardBed(state, job);
   if (DEATH_JOBS.has(job.kind)) return claimDeathPlace(state, job);
   if (DIAGNOSTIC_JOBS.has(job.kind)) return claimDiagnosticPlace(state, job);
+  if (job.kind === "escort") {
+    const p = job.patientId === null ? undefined : state.patients[job.patientId];
+    return p ? escortSpot(state, p) : null;
+  }
   const step = treatStep(state, job);
+  if (step && isEscorted(state, state.patients[job.patientId!]!)) return null; // On the move.
   if (step?.needsResults && pendingResults(state, state.patients[job.patientId!]!).length > 0) {
     return null; // Waiting for results.
   }
@@ -170,7 +176,9 @@ function claimPlace(state: SimState, job: Job): Point | null {
   );
   if (!couch) return null;
   job.objectId = couch.id;
-  callToBed(state, p, couch.id, keepsTrolley(state, p, !!step?.imaging));
+  const wheeled = keepsTrolley(state, p, !!step?.imaging);
+  callToBed(state, p, couch.id, wheeled);
+  if (wheeled) sendForScan(state, p, couch.id);
   return couch;
 }
 
@@ -271,6 +279,10 @@ export function runJobs(state: SimState): void {
     }
     if (job.kind === "return_kit") {
       returnKit(state, job, staff);
+      continue;
+    }
+    if (job.kind === "escort") {
+      runEscort(state, job, staff, patient!);
       continue;
     }
     if (atPatient(job)) {
@@ -428,8 +440,10 @@ function complete(state: SimState, job: Job, obj: PlacedObject): void {
         // X-ray was taken where they lie.
         const atBedside = job.roomType !== done.room;
         scanned(state, p, done.imaging, job, atBedside);
-        const home = p.bed === null ? undefined : roomOfObject(state, p.bed);
-        postTreatment(state, p, home && next!.room === home.typeId ? p.bed : null);
+        // Their trolley, if they kept one (the porter may not have them back on it yet).
+        const homeId = p.homeBed ?? p.bed;
+        const home = homeId === null ? undefined : roomOfObject(state, homeId);
+        postTreatment(state, p, home && next!.room === home.typeId ? homeId : null);
         break;
       }
       if (next) {

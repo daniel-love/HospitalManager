@@ -191,6 +191,20 @@ export function updateAlerts(state: SimState): void {
     );
   }
 
+  // Trolley patients waiting to be wheeled to a scan.
+  const forScan = Object.values(state.jobs).filter(
+    (j) => j.kind === "escort" && j.roles.includes("porter") && j.step === 0,
+  ).length;
+  if (forScan > 0 && !hasStaff("porter")) {
+    warn(
+      state,
+      "no_porter_scan",
+      COOLDOWN,
+      `${plural(forScan, "patient on a trolley is", "patients on trolleys are")} waiting to go for an X-ray or CT, but you have no porters to wheel them there.`,
+      "bad",
+    );
+  }
+
   // Exit block: admitted patients stuck on A&E trolleys.
   const forBed = patients.filter((p) => p.stage === "awaiting_bed");
   if (forBed.length > 0 && !hasStaff("porter")) {

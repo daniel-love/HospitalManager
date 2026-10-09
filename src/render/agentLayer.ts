@@ -90,6 +90,7 @@ export class AgentLayer {
   update(state: SimState, alpha: number): void {
     this.updateAmbulances(Object.values(state.ambulances), alpha);
     const attended = attendedPatients(state);
+    const wheeled = wheeledPatients(state);
     const blinkOn = Math.floor(performance.now() / BLINK_MS) % 2 === 0;
     const live = new Set<number>();
     for (const p of Object.values(state.patients)) {
@@ -104,8 +105,9 @@ export class AgentLayer {
       const warning = warningOf(p, state.tick, attended.has(p.id), blinkOn);
       const bed = p.bed === null ? undefined : state.objects[p.bed];
       const curtains = bed && curtainsDrawn(state, bed.id) ? bedCurtainSize(bed) : null;
-      this.place(p, alpha, patientLook(p, selected, warning, curtains), (g) =>
-        drawPatient(g, p, selected, warning, curtains),
+      const moving = onTheMove(p) || wheeled.has(p.id);
+      this.place(p, alpha, patientLook(p, selected, warning, curtains, moving), (g) =>
+        drawPatient(g, p, selected, warning, curtains, moving),
       );
     }
     for (const s of Object.values(state.staff)) {
@@ -289,6 +291,18 @@ export class AgentLayer {
 type Warning = "none" | "unnoticed" | "hidden" | "escalated" | "attended" | "arrest";
 
 /** Patients a doctor or nurse is working with right now. */
+/** Patients a porter is wheeling to a scan or back on their trolley. */
+function wheeledPatients(state: SimState): Set<number> {
+  const ids = new Set<number>();
+  for (const j of Object.values(state.jobs)) {
+    if (j.kind !== "escort" || j.state !== "working" || j.patientId === null) continue;
+    if (!j.roles.includes("porter")) continue;
+    const p = state.patients[j.patientId];
+    if (p && p.path.length > 0) ids.add(p.id);
+  }
+  return ids;
+}
+
 function attendedPatients(state: SimState): Set<number> {
   const ids = new Set<number>();
   for (const j of Object.values(state.jobs)) {
@@ -312,8 +326,14 @@ function warningOf(p: Patient, tick: number, attended: boolean, blinkOn: boolean
 
 type Curtains = { w: number; h: number } | null;
 
-function patientLook(p: Patient, selected: boolean, warning: Warning, curtains: Curtains): string {
-  return `${p.category}|${p.mood < UNHAPPY_MOOD}|${selected}|${warning}|${withCrew(p)}|${onTheMove(p)}|${curtains?.w}x${curtains?.h}`;
+function patientLook(
+  p: Patient,
+  selected: boolean,
+  warning: Warning,
+  curtains: Curtains,
+  moving: boolean,
+): string {
+  return `${p.category}|${p.mood < UNHAPPY_MOOD}|${selected}|${warning}|${withCrew(p)}|${moving}|${curtains?.w}x${curtains?.h}`;
 }
 
 const withCrew = (p: Patient) => p.stage === "awaiting_handover";
@@ -325,6 +345,7 @@ function drawPatient(
   selected: boolean,
   warning: Warning,
   curtains: Curtains,
+  moving: boolean,
 ): void {
   const ring = p.category === 0 ? UNTRIAGED_RING : TRIAGE_CATEGORIES[p.category]!.colour;
   // Screened for care: the bay's privacy curtain drawn round the bed.
@@ -334,8 +355,8 @@ function drawPatient(
     g.roundRect(-8, -12, 16, 24, 4).fill({ color: 0xffffff, alpha: 0.8 });
     g.circle(14, 0, STAFF_RADIUS).fill(PARAMEDIC_COLOUR).stroke({ width: 2.5, color: 0xffffff });
   }
-  // Being wheeled to the ward on their trolley.
-  if (onTheMove(p)) g.roundRect(-8, -14, 16, 28, 4).fill({ color: 0xffffff, alpha: 0.85 });
+  // Being wheeled to the ward, or to a scan, on their trolley.
+  if (moving) g.roundRect(-8, -14, 16, 28, 4).fill({ color: 0xffffff, alpha: 0.85 });
   if (selected) g.circle(0, 0, PATIENT_RADIUS + 5).stroke({ width: 2.5, color: SELECTED_RING });
   g.circle(0, 0, PATIENT_RADIUS).fill(PATIENT_COLOUR).stroke({ width: 3, color: ring });
   if (p.mood < UNHAPPY_MOOD)

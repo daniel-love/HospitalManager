@@ -280,14 +280,20 @@ function drawDrawerTag(g: Graphics, state: SimState, p: Patient, selected: boole
 // ---------- Others involved ----------
 
 /**
- * A porter wheeling a covered trolley walks behind it: how far to shift
- * them from the trolley (in tiles), or null if they aren't.
+ * A porter wheeling a covered trolley, or a patient on theirs, walks behind
+ * it: how far to shift them from the trolley (in tiles), or null if they
+ * aren't.
  */
 export function pushOffset(state: SimState, s: Staff): Point | null {
   const job = s.jobId === null ? undefined : state.jobs[s.jobId];
-  if (job?.kind !== "to_mortuary" || job.state !== "working" || job.patientId === null) return null;
+  if (job?.state !== "working" || job.patientId === null) return null;
   const p = state.patients[job.patientId];
-  if (!p || p.stage !== "to_mortuary") return null;
+  if (!p) return null;
+  // Also a porter wheeling a patient to a scan (systems/escorts.ts).
+  const pushing =
+    (job.kind === "to_mortuary" && p.stage === "to_mortuary") ||
+    (job.kind === "escort" && job.roles.includes("porter"));
+  if (!pushing) return null;
   const { dx, dy } = headingOf(p);
   return { x: -dx * 0.95, y: -dy * 0.95 };
 }

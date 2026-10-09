@@ -49,6 +49,7 @@ import { analysers, pendingResults } from "@sim/systems/diagnostics";
 import { clockFromTick, TICKS_PER_MINUTE } from "@sim/time";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { roomAt, roomOfObject } from "@sim/world/rooms";
+import { porterJob } from "@sim/systems/escorts";
 import type {
   AgentInfo,
   DeathChecklistItem,
@@ -270,6 +271,24 @@ function queueReason(state: SimState, p: Patient): string {
   return reasons.join(" · ");
 }
 
+/** A trolley patient going to a scan or back with a porter (and maybe a nurse). */
+function escortStatus(state: SimState, p: Patient, porter: Job): string {
+  const nurse = Object.values(state.jobs).find(
+    (j) => j.patientId === p.id && j.kind === "escort" && j.roles.includes("nurse"),
+  );
+  const scanner = porter.step === 0 ? porter.objectId : p.bed;
+  const room = scanner === null ? undefined : roomOfObject(state, scanner);
+  const scanRoom = room ? (roomById.get(room.typeId)?.name ?? "scan room") : "scan room";
+  if (porter.state === "working") {
+    const where = porter.step === 0 ? `to the ${scanRoom}` : "back to their bay";
+    return `Being wheeled ${where}${nurse ? " with a nurse" : ""}`;
+  }
+  const where = porter.step === 0 ? `to the ${scanRoom}` : `back from the ${scanRoom}`;
+  if (porter.staffId === null) return `Waiting for a porter to take them ${where}`;
+  if (nurse && nurse.state !== "working") return `Waiting for a nurse to go with them ${where}`;
+  return `A porter is coming to take them ${where}`;
+}
+
 export function describePatient(state: SimState, p: Patient): AgentInfo {
   const condition = conditionById.get(p.conditionId)!;
   const cat = p.category > 0 ? TRIAGE_CATEGORIES[p.category] : null;
@@ -318,6 +337,9 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
   } else if (p.stage === "collapsed" && working) {
     status = "Cardiac arrest: being resuscitated";
   }
+
+  const porter = p.death ? undefined : porterJob(state, p);
+  if (porter && p.stage !== "collapsed") status = escortStatus(state, p, porter);
 
   let reason = waitReason(state, p);
   const transfer = p.transfer;
@@ -642,6 +664,13 @@ export function staffState(state: SimState, s: Staff): StaffState {
     case "return_kit":
       what = `Taking the ${kitName(state, job.objectId)} back`;
       break;
+    case "escort": {
+      const room = job.objectId === null ? undefined : roomOfObject(state, job.objectId);
+      const to = room ? (roomById.get(room.typeId)?.name ?? "their scan") : "their scan";
+      if (job.roles.includes("nurse")) what = `Escorting ${who} to the ${to} and back`;
+      else what = job.step === 0 ? `Taking ${who} to the ${to}` : `Taking ${who} back to their bay`;
+      break;
+    }
   }
   const patientId = patient?.id ?? null;
   if (job.kit?.at === "store" && job.kind !== "return_kit") {

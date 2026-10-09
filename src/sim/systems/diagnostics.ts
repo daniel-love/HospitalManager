@@ -7,19 +7,22 @@
  *
  * Scans: an `imaging` step happens at an X-ray unit or CT scanner, done by a
  * radiographer. Walking patients go back to wait afterwards; a patient on a
- * Majors or Resus trolley keeps it while they're away (`homeBed`) and returns
- * to it. X-rays are read at once; a radiologist reports CT a little later.
+ * Majors or Resus trolley keeps it while they're away (`homeBed`), and a
+ * porter wheels them there and back on it (systems/escorts.ts). Some are
+ * X-rayed where they lie with a portable X-ray instead (xrayAtBedside).
+ * X-rays are read at once; a radiologist reports CT a little later.
  *
  * A step with `needsResults` waits until every result is back.
  */
 import { ANALYSER_MINS, CT_REPORT_MINS, CT_TARGET_MINS, LAB_PROCESS_MINS } from "@data/diagnostics";
-import { conditionById, roomById } from "@data/catalogue";
+import { roomById } from "@data/catalogue";
 import type { Investigation, Job, Patient, Point, Staff } from "../agents";
 import { bedside, frontOf, release } from "../places";
 import type { PlacedObject, SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
 import { roomOfObject } from "../world/rooms";
 import { postJob, removeJob, ticksFor } from "./jobBoard";
+import { sendBack, unwellToTravel } from "./escorts";
 import { headTo } from "./movement";
 
 /** Jobs this module runs: carrying samples to the lab, and processing them there. */
@@ -172,25 +175,19 @@ export function scanned(
  * leave. Only for patients on a Majors or Resus trolley.
  */
 export function xrayAtBedside(state: SimState, p: Patient): boolean {
-  const room = p.bed === null ? undefined : roomOfObject(state, p.bed);
-  if (!room || !roomById.get(room.typeId)?.observed) return false;
-  if (room.typeId === "resus_bay" || p.category === 1) return true;
-  if (p.deterioration?.noticed != null) return true;
-  return conditionById.get(p.conditionId)?.monitoring === "continuous";
+  return p.homeBed === null && unwellToTravel(state, p);
 }
 
 /**
- * Off the scanner (or out of the scan room): back to the trolley they kept,
- * or to the waiting area.
+ * Off the scanner (or out of the scan room): wheeled back to the trolley
+ * they kept, by a porter (systems/escorts.ts), or back to the waiting area.
  */
 export function leaveScanner(state: SimState, p: Patient): void {
-  if (p.bed !== null) release(state, p.bed, 0, p.id);
   if (p.homeBed !== null && state.objects[p.homeBed]) {
-    p.bed = p.homeBed;
-    p.homeBed = null;
-    p.stage = "called_treatment"; // Walks back, then lies on it again.
+    sendBack(state, p);
     return;
   }
+  if (p.bed !== null) release(state, p.bed, 0, p.id);
   p.homeBed = null;
   p.bed = null;
   p.stage = "waiting_treatment";

@@ -79,6 +79,7 @@ const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
     "Supports a resuscitation",
     "Verifies expected deaths and does last offices",
     "Fetches the shared 12-lead ECG to the bedside and wheels it back",
+    "Goes with monitored trolley patients to X-ray and CT, and stays for the scan",
   ],
   junior_doctor: [
     "Leads resuscitation at a cardiac arrest",
@@ -88,6 +89,7 @@ const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
   ],
   porter: [
     "Wheels admitted patients to the ward",
+    "Wheels Majors and Resus patients to X-ray and CT on their trolley, and back",
     "Takes blood samples to the lab",
     "Takes the deceased to the mortuary",
   ],

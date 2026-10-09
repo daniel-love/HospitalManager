@@ -271,6 +271,8 @@ export type JobKind =
   | "release_body"
   /** Wheeling shared kit (a 12-lead ECG, say) back to where it's kept. */
   | "return_kit"
+  /** A porter (or nurse) taking a trolley patient to a scan and back (systems/escorts.ts). */
+  | "escort"
   | "debrief";
 
 /** A tile rectangle where one ambulance parks. */

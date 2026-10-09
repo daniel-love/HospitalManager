@@ -101,7 +101,7 @@ export const staffRoles: StaffRoleInput[] = [
     group: "support",
     annualCost: 31_500,
     description:
-      "Band 2. Wheels admitted patients on their bed from A&E to a ward, and takes blood samples to the Pathology Lab. Beds need double doors and corridors at least 2 tiles wide. Without porters, admitted patients stay on A&E trolleys and samples never reach the lab.",
+      "Band 2. Wheels admitted patients on their bed from A&E to a ward, wheels Majors and Resus patients to X-ray and CT and back, and takes blood samples to the Pathology Lab. Beds need double doors and corridors at least 2 tiles wide. Without porters, admitted patients stay on A&E trolleys and samples never reach the lab.",
   },
   {
     id: "cleaner",

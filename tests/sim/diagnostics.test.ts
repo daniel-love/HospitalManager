@@ -8,6 +8,7 @@ import { siteEntrance } from "@sim/places";
 import { tick } from "@sim/sim";
 import type { SimState } from "@sim/state";
 import { spawnPatient } from "@sim/systems/arrivals";
+import { isEscorted } from "@sim/systems/escorts";
 import { pendingResults } from "@sim/systems/diagnostics";
 import { TICKS_PER_MINUTE } from "@sim/time";
 import { WallType } from "@sim/world/grid";
@@ -140,8 +141,9 @@ describe("CT scans", () => {
       const trolley = p.homeBed!;
       expect(roomOfObject(state, trolley)!.typeId).toBe("majors_bay");
       runUntil(state, () => p.step > ct);
-      expect(p.bed).toBe(trolley);
-      expect(p.homeBed).toBeNull();
+      // They wait on the scanner for a porter to wheel them back.
+      runUntil(state, () => p.bed === trolley && p.homeBed === null && !isEscorted(state, p));
+      expect(p.stage).toBe("in_cubicle");
       expect(state.today.stats.ctScans).toBe(1);
       expect(state.today.stats.doorToCtMins).toBeGreaterThan(0);
       // The radiologist's report comes after the scan.

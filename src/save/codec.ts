@@ -250,6 +250,7 @@ const jobSchema = z.object({
     "me_review",
     "release_body",
     "return_kit",
+    "escort",
     "debrief",
   ]),
   roles: z.array(z.enum(staffRoleIds)).min(1),

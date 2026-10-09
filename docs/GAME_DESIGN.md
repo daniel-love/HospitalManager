@@ -203,6 +203,8 @@ A room's **capability set** is the union of its equipment's capabilities. Condit
 
 **Shared mobile equipment.** Some kit is wheeled and shared across a department, as in a real ED, rather than fixed in one room: the 12-lead ECG and the portable X-ray. A shared item lends its capabilities to every room within 25 m of walking from where it's kept. Staff fetch it to the bedside, use it, and wheel it back, and only one patient has it at a time, so where it's kept and how many there are both matter. Patients who shouldn't leave their monitoring (in Resus, very sick or deteriorating, or on continuous monitoring) are X-rayed on their trolley when a portable X-ray is free; everyone else goes to the X-ray Room.
 
+**Escorts to scans.** A Majors or Resus patient goes to X-ray or CT on their trolley, wheeled by a porter, and comes back the same way; the same patients who'd get a portable X-ray also need a nurse with them the whole way, scan included. Until the porter (and nurse) come they wait in their bay, with the scanner kept for them, and afterwards on the scanner, which stays taken until they're collected. So porters and nurses, as well as radiographers, set how many scans an hour the department can do.
+
 ---
 
 ## 5. Patients
