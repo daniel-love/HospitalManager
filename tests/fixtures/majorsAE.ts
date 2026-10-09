@@ -25,7 +25,14 @@
 import type { Command } from "@sim/commands";
 import { createSimState, type Rotation, type SimState } from "@sim/state";
 import { WallType } from "@sim/world/grid";
-import { applyAll, hireTeam, SMALL_AE_COMMANDS, type StaffCounts } from "./smallAE";
+import {
+  addRoad,
+  applyAll,
+  hireTeam,
+  SMALL_AE_COMMANDS,
+  type SiteOptions,
+  type StaffCounts,
+} from "./smallAE";
 
 const F = 0;
 const rect = (x0: number, y0: number, x1: number, y1: number) => ({
@@ -129,7 +136,7 @@ export function wardCommands(door: "door_double" | "door_single" = "door_double"
   ];
 }
 
-export interface MajorsOptions {
+export interface MajorsOptions extends SiteOptions {
   /** Include the nurse station (default true). */
   station?: boolean;
   /** A central monitoring station in its place (default false). */
@@ -141,7 +148,8 @@ export interface MajorsOptions {
 }
 
 export function buildMajorsAE(seed = 1, opts: MajorsOptions = {}): SimState {
-  const state = createSimState({ seed, width: 24, height: opts.ambulance ? 36 : 32 });
+  const height = (opts.ambulance ? 36 : 32) + (opts.site ? 12 : 0);
+  const state = createSimState({ seed, width: 24, height });
   applyAll(state, [
     ...SMALL_AE_COMMANDS,
     ...MAJORS_WING_COMMANDS,
@@ -153,6 +161,22 @@ export function buildMajorsAE(seed = 1, opts: MajorsOptions = {}): SimState {
     ...(opts.ambulance ? RESUS_AND_BAY_COMMANDS : []),
     ...(opts.ward ? wardCommands(opts.ward) : []),
   ]);
+  if (opts.site) {
+    addRoad(state);
+    // The main entrance's footpath comes with the road; the ambulance bay
+    // needs an access road down to it, across the pavement.
+    if (opts.ambulance) {
+      const pavement = state.site!.pavements[0];
+      applyAll(state, [
+        {
+          type: "pave",
+          floor: F,
+          rect: rect(15, 35, 17, pavement.y + pavement.h - 1),
+          surface: "road",
+        },
+      ]);
+    }
+  }
   return state;
 }
 

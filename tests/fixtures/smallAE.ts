@@ -29,6 +29,7 @@ import { applyCommand, type Command } from "@sim/commands";
 import { applyStaffCommand } from "@sim/systems/staffing";
 import { createSimState, type Rotation, type SimState } from "@sim/state";
 import { WallType } from "@sim/world/grid";
+import { fitSite } from "@sim/world/site";
 
 const F = 0;
 const rect = (x0: number, y0: number, x1: number, y1: number) => ({
@@ -95,10 +96,28 @@ export function applyAll(state: SimState, commands: Command[]): void {
   }
 }
 
-export function buildSmallAE(seed = 1): SimState {
-  const state = createSimState({ seed, width: 24, height: 20 });
+export interface SiteOptions {
+  /**
+   * Put the public road in below the building (default false), with a
+   * footpath from the front door: walk-ins then arrive along the pavement
+   * or off the bus, and ambulances drive in.
+   */
+  site?: boolean;
+}
+
+export function buildSmallAE(seed = 1, opts: SiteOptions = {}): SimState {
+  const state = createSimState({ seed, width: 24, height: opts.site ? 30 : 20 });
   applyAll(state, SMALL_AE_COMMANDS);
+  if (opts.site) addRoad(state);
   return state;
+}
+
+/** Fits the public road in below whatever's built, as an old save gets (world/site.ts). */
+export function addRoad(state: SimState): void {
+  const site = fitSite(state.floors[0]!);
+  if (!site) throw new Error("No room for the road below the building");
+  state.site = site;
+  state.layoutVersion++;
 }
 
 export type StaffCounts = Partial<Record<StaffRoleId, number>>;
@@ -118,8 +137,12 @@ export function hireTeam(state: SimState, team: StaffCounts): void {
 }
 
 /** The small A&E with a team hired, ready to run. */
-export function staffedSmallAE(seed = 1, team: StaffCounts = SMALL_AE_TEAM): SimState {
-  const state = buildSmallAE(seed);
+export function staffedSmallAE(
+  seed = 1,
+  team: StaffCounts = SMALL_AE_TEAM,
+  opts: SiteOptions = {},
+): SimState {
+  const state = buildSmallAE(seed, opts);
   hireTeam(state, team);
   return state;
 }
