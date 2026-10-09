@@ -290,7 +290,39 @@ export function describeAdvice(state: SimState): AdviceData {
     ],
   };
 
-  const groups = [essentials, diagnostics, majors, admissions, afterDeath];
+  const staffAreas: AdviceGroup = {
+    heading: "Staff areas",
+    intro:
+      "Between jobs, staff wait at a base in their own department, ready for the next one. Without their base they wait in the Staff Room, or, with no Staff Room, wherever their last job ended.",
+    items: [
+      item(
+        hasRoom("staff_base"),
+        "An A&E Staff Base with a desk",
+        "Where doctors and nurse practitioners wait for the next patient. Central, near Minors and Majors.",
+        true,
+      ),
+      item(
+        hasRoom("porters_lodge"),
+        "A Porters' Lodge",
+        "Somewhere central keeps porters' walks to A&E, the wards and the lab short.",
+        true,
+      ),
+      item(
+        hasRoom("domestic_services_room"),
+        "A Domestic Services Room",
+        "The cleaners' base, with a sink.",
+        true,
+      ),
+      item(
+        hasRoom("staff_room"),
+        "A Staff Room",
+        "For breaks (from M5). Until then, anyone without a base waits here.",
+        true,
+      ),
+    ],
+  };
+
+  const groups = [essentials, diagnostics, majors, admissions, afterDeath, staffAreas];
   const next = groups.flatMap((g) => g.items).find((i) => i.status === "todo") ?? null;
   const demand = dailyDemand(state);
   return {

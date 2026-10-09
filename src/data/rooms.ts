@@ -146,7 +146,8 @@ export const rooms: RoomInput[] = [
     enclosed: true,
     required: [{ label: "Kitchenette", anyOf: ["kitchenette"] }],
     minSeats: 4,
-    description: "Staff rest here between jobs to recover from fatigue (M5).",
+    description:
+      "Where staff take their breaks (from M5, when fatigue arrives). Until then, staff with no base of their own wait here between jobs.",
   },
   {
     id: "ambulance_bay",
@@ -252,6 +253,42 @@ export const rooms: RoomInput[] = [
     required: [{ label: "Blood analyser", anyOf: ["blood_analyser"] }],
     description:
       "Biomedical scientists process blood samples here; porters bring them from the wards and A&E. Without one, nobody's bloods can be tested.",
+  },
+  {
+    id: "staff_base",
+    code: 18,
+    name: "A&E Staff Base",
+    department: "A&E",
+    colour: 0xc98f6b,
+    minSize: [3, 3],
+    enclosed: false,
+    required: [{ label: "Desk", anyOf: ["desk"] }],
+    description:
+      "The hub of the department, where doctors and nurse practitioners write notes and wait for the next patient. Nurses wait here too when every nurse station is taken. Best central, close to Minors and Majors.",
+  },
+  {
+    id: "porters_lodge",
+    code: 19,
+    name: "Porters' Lodge",
+    department: "Support",
+    colour: 0xa0a86b,
+    minSize: [3, 3],
+    enclosed: true,
+    required: [{ label: "Desk", anyOf: ["desk"] }],
+    description:
+      "Porters wait here for their next job. Somewhere central keeps their walks to A&E, the wards and the lab short.",
+  },
+  {
+    id: "domestic_services_room",
+    code: 20,
+    name: "Domestic Services Room",
+    department: "Support",
+    colour: 0x8fb0a0,
+    minSize: [2, 2],
+    enclosed: true,
+    required: [{ label: "Hand-wash sink", anyOf: ["sink"] }],
+    description:
+      "The cleaners' base, where their trolleys and supplies are kept. Cleaners wait here between jobs.",
   },
 ];
 

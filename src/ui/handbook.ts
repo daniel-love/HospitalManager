@@ -39,21 +39,29 @@ const ROLE_NEEDS: Partial<Record<StaffRoleId, string[]>> = {
   receptionist: ["A&E Reception with a reception desk (one receptionist per desk)"],
   nurse: [
     "A Triage Room to triage walk-ins",
-    "A nurse station (or central monitor) to wait at between jobs, in sight of Majors and Resus trolleys",
+    "A nurse station (or central monitor) to wait at between jobs, in sight of Majors and Resus trolleys; with every station taken, they wait at the A&E Staff Base",
   ],
-  nurse_practitioner: ["Minors Cubicles"],
-  junior_doctor: ["Minors Cubicles, Majors Bays or a Resus Bay to see patients in"],
+  nurse_practitioner: ["Minors Cubicles", "An A&E Staff Base to wait at between patients"],
+  junior_doctor: [
+    "Minors Cubicles, Majors Bays or a Resus Bay to see patients in",
+    "An A&E Staff Base to wait at between patients",
+  ],
   porter: [
     "A Ward to take patients to",
     "A bed-width route all the way: double doors and corridors 2 tiles wide",
     "A Pathology Lab to take blood samples to",
+    "A Porters' Lodge to wait in between jobs",
   ],
-  radiographer: ["An X-ray Room or CT Room, enclosed by lead-lined walls"],
+  radiographer: [
+    "An X-ray Room or CT Room, enclosed by lead-lined walls; they wait there between patients",
+  ],
   biomedical_scientist: ["A Pathology Lab with a blood analyser"],
-  cleaner: ["Nothing extra: they find dirty beds, trolleys and toilets themselves"],
+  cleaner: [
+    "A Domestic Services Room to wait in between jobs; they find dirty beds, trolleys and toilets themselves",
+  ],
   registrar: [
     "Patients who need their specialty (see Conditions)",
-    "A Ward to admit to, ideally one given to their specialty",
+    "A Ward to admit to, ideally one given to their specialty; they wait there between referrals",
   ],
   consultant: [
     "As for a registrar",

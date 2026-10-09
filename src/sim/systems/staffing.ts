@@ -2,8 +2,9 @@
  * Hiring and dismissing staff, and what staff do between jobs. Clinical
  * staff and cleaners take work from the job board (systems/jobs.ts);
  * receptionists instead sit at a reception desk and book patients in. Free
- * staff nurses wait at a nurse station, if there's one, watching the beds.
- * On-call consultants stay at home until they're needed (see updateOnCall).
+ * staff nurses wait at a nurse station, if there's one, watching the beds;
+ * everyone else waits at their role's base (systems/bases.ts). On-call
+ * consultants stay at home until they're needed (see updateOnCall).
  */
 import { specialtyById, staffRoleById } from "@data/catalogue";
 import { MORALE_START } from "@data/deaths";
@@ -25,6 +26,7 @@ import {
 import { pick } from "../rng";
 import type { SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
+import { waitAtBase } from "./bases";
 import { removeJob, ticksFor, unassignJob } from "./jobBoard";
 import { nurseStations, stationSpot } from "./monitoring";
 import { headTo } from "./movement";
@@ -119,10 +121,12 @@ export function staffTitle(s: Staff): string {
 export function updateStaff(state: SimState): void {
   for (const s of Object.values(state.staff)) {
     if (s.role === "receptionist") staffDesk(state, s);
-    else if (s.role === "nurse") waitAtStation(state, s);
     else if (s.onCall?.state === "leaving") {
       if (s.jobId !== null) s.onCall = { state: "in", at: state.tick };
       else walkHome(state, s);
+    } else if (onSite(s)) {
+      if (s.role === "nurse") waitAtStation(state, s);
+      if (s.desk === null) waitAtBase(state, s);
     }
   }
   updateOnCall(state);

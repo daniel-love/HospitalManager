@@ -63,6 +63,7 @@ function busyDayBeforeTransfers(): SimState {
     p.specialty = null;
     p.times.referred = null;
     p.transfer = null;
+    p.curtainUntil = null; // Curtains came later too (v17).
   }
   return state;
 }
