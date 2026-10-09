@@ -14,7 +14,7 @@
  */
 import { Container, Graphics, GraphicsContext } from "pixi.js";
 import { TRIAGE_CATEGORIES } from "@data/patients";
-import type { AgentBase, Ambulance, Patient, Staff } from "@sim/agents";
+import { onSite, type AgentBase, type Ambulance, type Patient, type Staff } from "@sim/agents";
 import type { SimState } from "@sim/state";
 import { SPACE_L, SPACE_W } from "@sim/systems/ambulances";
 import { TILE_SIZE } from "./constants";
@@ -77,6 +77,7 @@ export class AgentLayer {
       );
     }
     for (const s of Object.values(state.staff)) {
+      if (!onSite(s)) continue; // On call at home, or on the way in.
       live.add(s.id);
       const selected = s.id === this.selectedId;
       this.place(s, alpha, `${s.role}|${selected}`, (g) => drawStaff(g, s, selected));

@@ -5,6 +5,7 @@
  * after loading.
  */
 import { STARTING_CASH } from "@data/economy";
+import type { SpecialtyId } from "@data/schema";
 import { DEFAULT_CATCHMENT } from "@data/patients";
 import {
   type Ambulance,
@@ -25,7 +26,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 12;
+export const SIM_STATE_VERSION = 13;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -62,6 +63,8 @@ export interface Room {
   capabilities: string[];
   checks: RoomCheck[];
   valid: boolean;
+  /** Wards: the specialty it's for (see SimState.wardSpecialties), or null for any. */
+  specialty: SpecialtyId | null;
   /**
    * Advisory: equipment some conditions need here, beyond being valid
    * (e.g. an ECG for chest pain). Doesn't affect `valid`.
@@ -105,6 +108,12 @@ export interface SimState {
   reserved: Record<string, number>;
   /** Uses since last cleaned, by object id (couches and toilets). */
   dirt: Record<number, number>;
+  /**
+   * Wards given to a specialty, keyed "floor:tile" by one of the ward's
+   * tiles. Room ids change whenever rooms are re-detected, so the setting
+   * is pinned to a tile and found again from it (detectRooms).
+   */
+  wardSpecialties: Record<string, SpecialtyId>;
 
   /** Money and patient flow so far today, and reports for past days (newest last). */
   today: { ledger: Ledger; stats: FlowStats };
@@ -168,6 +177,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     nextAmbulanceId: 1,
     reserved: {},
     dirt: {},
+    wardSpecialties: {},
     today: { ledger: emptyLedger(), stats: emptyStats() },
     history: [],
     settings: { catchment: DEFAULT_CATCHMENT, patientVolume: 1 },

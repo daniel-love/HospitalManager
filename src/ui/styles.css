@@ -769,6 +769,35 @@ body.planning #game::after {
   line-height: 1.35;
   color: var(--text-dim);
 }
+.hire-specialty {
+  font-size: 12px;
+  margin-top: 4px;
+}
+.hire-specialty select,
+.inspector select {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+.ward-specialty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  margin: 6px 0;
+}
+.ward-specialty select {
+  align-self: flex-start;
+}
+.hire-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .roster {
   margin: 0;
   padding: 0;
@@ -1141,6 +1170,9 @@ body.planning #game::after {
 }
 .status-pill.no_desk {
   background: var(--bad);
+}
+.status-pill.off_site {
+  background: #d5d9de;
 }
 .people-table .link {
   display: block;

@@ -51,6 +51,8 @@ export const ROLE_COLOURS: Record<StaffRoleId, number> = {
   nurse: 0x2f6fd8,
   nurse_practitioner: 0x16255c,
   junior_doctor: 0x9c2d4a,
+  registrar: 0xc2452d,
+  consultant: 0x5a1426,
   porter: 0x4a5568,
   medical_examiner: 0x5b3a7a,
   cleaner: 0x3f9a6a,

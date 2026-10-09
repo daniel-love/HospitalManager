@@ -17,7 +17,7 @@ import {
   roomByCode,
   roomById,
 } from "@data/catalogue";
-import type { RoomDef } from "@data/schema";
+import type { RoomDef, SpecialtyId } from "@data/schema";
 import type { Room, RoomCheck, SimState } from "../state";
 import { isWallOrDoor, tileIndex, type FloorGrid } from "./grid";
 import { isStandable, objectRect, sideTiles } from "./objects";
@@ -43,6 +43,7 @@ export function detectRooms(state: SimState): void {
         capabilities: [],
         checks: [],
         valid: false,
+        specialty: null,
         forConditions: [],
       });
     }
@@ -71,8 +72,29 @@ export function detectRooms(state: SimState): void {
   }
 
   for (const room of rooms) evaluateRoom(state, room, rooms);
+  // Ward specialties, found again from the tile each is pinned to.
+  for (const [key, specialty] of Object.entries(state.wardSpecialties)) {
+    const [floor, tile] = key.split(":").map(Number);
+    const id = state.floors[floor!]?.roomId[tile!] ?? 0;
+    const room = id === 0 ? undefined : rooms[id - 1];
+    if (room?.typeId === "ward" && room.specialty === null) room.specialty = specialty;
+  }
   state.rooms = rooms;
   state.objectRoom = objectRoom;
+}
+
+/**
+ * Gives a ward to a specialty (null: any). Pinned to one of its tiles; any
+ * older setting for the same room is dropped.
+ */
+export function setWardSpecialty(state: SimState, room: Room, specialty: SpecialtyId | null): void {
+  const grid = state.floors[room.floor]!;
+  for (const key of Object.keys(state.wardSpecialties)) {
+    const [floor, tile] = key.split(":").map(Number);
+    if (floor === room.floor && grid.roomId[tile!] === room.id) delete state.wardSpecialties[key];
+  }
+  if (specialty !== null) state.wardSpecialties[`${room.floor}:${room.tiles[0]!}`] = specialty;
+  room.specialty = specialty;
 }
 
 /** The room an object is wholly inside, if any. */

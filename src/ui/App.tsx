@@ -21,7 +21,11 @@ export function App({ game }: { game: Game }) {
       <Palette />
       <StaffPanel game={game} />
       <ReportsPanel onShow={(at) => game.focus(at)} />
-      <Inspector onClose={() => game.select(null)} onMove={(id) => game.startMove(id)} />
+      <Inspector
+        onClose={() => game.select(null)}
+        onMove={(id) => game.startMove(id)}
+        onWardSpecialty={(sp) => game.setWardSpecialty(sp)}
+      />
       {/* Strips under the top bar stack rather than overlap. */}
       <div class="under-topbar">
         <PlanBar game={game} />

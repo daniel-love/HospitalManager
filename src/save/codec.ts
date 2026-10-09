@@ -11,7 +11,7 @@
  */
 import { z } from "zod";
 import { conditionById, objectDef } from "@data/catalogue";
-import { staffRoleIds } from "@data/schema";
+import { specialtyIds, staffRoleIds } from "@data/schema";
 import { SIM_STATE_VERSION, type PlacedObject, type SimState } from "@sim/state";
 import { clockFromTick, formatClock } from "@sim/time";
 import { createFloorGrid, tileIndex, type FloorGrid } from "@sim/world/grid";
@@ -165,10 +165,12 @@ const patientSchema = z.object({
     booked: nullableInt,
     triaged: nullableInt,
     seen: nullableInt,
+    referred: nullableInt,
     decided: nullableInt,
     admitted: nullableInt,
     left: nullableInt,
   }),
+  specialty: z.enum(specialtyIds).nullable(),
   stayUntil: nullableInt,
   endOfLife: z.boolean(),
   death: z
@@ -192,6 +194,10 @@ const patientSchema = z.object({
 const staffSchema = z.object({
   ...agentFields,
   role: z.enum(staffRoleIds),
+  specialty: z.enum(specialtyIds).nullable(),
+  onCall: z
+    .object({ state: z.enum(["home", "called", "in", "leaving"]), at: int.min(0) })
+    .nullable(),
   jobId: nullableInt,
   desk: nullableInt,
   hiredTick: int.min(0),
@@ -201,6 +207,7 @@ const staffSchema = z.object({
 const jobSchema = z.object({
   id: int.positive(),
   kind: z.enum([
+    "referral",
     "transfer",
     "ward_discharge",
     "handover",
@@ -218,6 +225,7 @@ const jobSchema = z.object({
     "debrief",
   ]),
   roles: z.array(z.enum(staffRoleIds)).min(1),
+  specialty: z.enum(specialtyIds).nullable(),
   patientId: nullableInt,
   objectId: nullableInt,
   roomType: z.string(),
@@ -267,6 +275,9 @@ const statsSchema = z.object({
   bedWaitsOver4h: int.min(0),
   bedWaitsOver12h: int.min(0),
   wardDischarges: int.min(0),
+  referrals: int.min(0),
+  referralMins: num,
+  outliers: int.min(0),
   transfersOut: int.min(0),
   deaths: int.min(0),
   unexpectedDeaths: int.min(0),
@@ -307,6 +318,7 @@ const saveSchema = z.object({
     nextAmbulanceId: int.positive(),
     reserved: z.record(z.string(), int.positive()),
     dirt: z.record(z.string(), int.min(0)),
+    wardSpecialties: z.record(z.string().regex(/^\d+:\d+$/), z.enum(specialtyIds)),
     today: z.object({ ledger: ledgerSchema, stats: statsSchema }),
     history: z.array(z.object({ day: int.positive(), ledger: ledgerSchema, stats: statsSchema })),
     settings: z.object({
@@ -371,6 +383,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       nextAmbulanceId: state.nextAmbulanceId,
       reserved: state.reserved,
       dirt: state.dirt,
+      wardSpecialties: state.wardSpecialties,
       today: state.today,
       history: state.history,
       settings: state.settings,
@@ -426,6 +439,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     nextAmbulanceId: s.nextAmbulanceId,
     reserved: { ...s.reserved },
     dirt: Object.fromEntries(Object.entries(s.dirt).map(([k, v]) => [Number(k), v])),
+    wardSpecialties: { ...s.wardSpecialties },
     today: s.today,
     history: s.history,
     settings: { ...s.settings },

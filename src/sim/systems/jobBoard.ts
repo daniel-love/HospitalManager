@@ -24,13 +24,14 @@ export function ticksFor(rng: RngState, [min, max]: readonly [number, number]): 
 }
 
 export type NewJob = Pick<Job, "kind" | "roles" | "roomType" | "dueTick" | "durationTicks"> &
-  Partial<Pick<Job, "patientId" | "objectId" | "capabilities" | "step">>;
+  Partial<Pick<Job, "patientId" | "objectId" | "capabilities" | "step" | "specialty">>;
 
 export function postJob(state: SimState, j: NewJob): Job {
   const job: Job = {
     id: state.nextJobId++,
     kind: j.kind,
     roles: [...j.roles],
+    specialty: j.specialty ?? null,
     patientId: j.patientId ?? null,
     objectId: j.objectId ?? null,
     roomType: j.roomType,

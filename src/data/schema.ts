@@ -180,8 +180,30 @@ export const staffRoleIds = [
   "porter",
   "cleaner",
   "medical_examiner",
+  "consultant",
+  "registrar",
 ] as const;
 export type StaffRoleId = (typeof staffRoleIds)[number];
+
+/** Medical specialties (GAME_DESIGN §6.1): consultants and registrars belong to one. */
+export const specialtyIds = [
+  "general_medicine",
+  "cardiology",
+  "general_surgery",
+  "trauma_orthopaedics",
+  "anaesthetics",
+] as const;
+export type SpecialtyId = (typeof specialtyIds)[number];
+
+export const specialtySchema = z.object({
+  id: z.enum(specialtyIds),
+  name: z.string().min(1),
+  /** As a team, e.g. "the cardiology team". */
+  team: z.string().min(1),
+  description: z.string(),
+});
+export type SpecialtyDef = z.infer<typeof specialtySchema>;
+export type SpecialtyInput = z.input<typeof specialtySchema>;
 
 /** How staff are grouped when hiring and listing them, in display order. */
 export const staffGroups = ["medical", "nursing", "support", "admin"] as const;
@@ -195,9 +217,12 @@ export const staffRoleSchema = z.object({
   group: z.enum(staffGroups),
   /** Annual cost to the hospital, £: salary plus employer NI and pension. */
   annualCost: z.number().int().positive(),
+  /** Hired into a specialty (consultants, registrars). */
+  specialist: z.boolean().default(false),
   description: z.string(),
 });
 export type StaffRoleDef = z.infer<typeof staffRoleSchema>;
+export type StaffRoleInput = z.input<typeof staffRoleSchema>;
 
 /** [min, max] minutes; each patient gets a random duration in the range. */
 const minutesRange = z
@@ -218,6 +243,12 @@ export const pathwayStepSchema = z.object({
   capabilities: z.array(id).default([]),
   mins: minutesRange,
   /**
+   * A referral to a specialty team (e.g. critical care): done by that
+   * specialty's registrar or consultant if the hospital has any, otherwise
+   * by `roles` as an interim (until A&E transfers out, M4 step 3).
+   */
+  specialty: z.enum(specialtyIds).optional(),
+  /**
    * Completing this step treats whatever was making the patient deteriorate
    * (e.g. antibiotics and fluids for sepsis), so they no longer will.
    */
@@ -235,6 +266,11 @@ export const conditionDefSchema = z.object({
     walk_in: z.number().nonnegative(),
     ambulance: z.number().nonnegative().default(0),
   }),
+  /**
+   * The specialty that takes them on if they're admitted (or referred): its
+   * team reviews them in A&E and decides to admit, and they belong on its ward.
+   */
+  specialty: z.enum(specialtyIds).optional(),
   /** Income on discharge, £ (NHS tariff for the attendance). */
   tariff: z.number().int().nonnegative(),
   /** Treatment after triage, in order. The outcome follows the last step. */
@@ -293,6 +329,7 @@ export interface Content {
   rooms: readonly unknown[];
   capabilityCombos: readonly unknown[];
   staffRoles: readonly unknown[];
+  specialties: readonly unknown[];
   conditions: readonly unknown[];
 }
 
@@ -303,6 +340,7 @@ export interface ValidContent {
   rooms: RoomDef[];
   capabilityCombos: CapabilityCombo[];
   staffRoles: StaffRoleDef[];
+  specialties: SpecialtyDef[];
   conditions: ConditionDef[];
 }
 
@@ -324,6 +362,7 @@ export function validateContent(raw: Content): ValidContent {
     rooms: z.array(roomDefSchema).parse(raw.rooms),
     capabilityCombos: z.array(capabilityComboSchema).parse(raw.capabilityCombos),
     staffRoles: z.array(staffRoleSchema).parse(raw.staffRoles),
+    specialties: z.array(specialtySchema).parse(raw.specialties),
     conditions: z.array(conditionDefSchema).parse(raw.conditions),
   };
 
@@ -338,6 +377,10 @@ export function validateContent(raw: Content): ValidContent {
   for (const role of staffRoleIds) {
     if (!content.staffRoles.some((r) => r.id === role))
       issues.push(`no definition for role ${role}`);
+  }
+  for (const sp of specialtyIds) {
+    if (!content.specialties.some((d) => d.id === sp))
+      issues.push(`no definition for specialty ${sp}`);
   }
 
   for (const e of content.equipment) {
@@ -384,6 +427,7 @@ export function validateContent(raw: Content): ValidContent {
         if (!granted.has(cap)) issues.push(`condition ${c.id} needs ungranted ${cap}`);
       }
     }
+    if (c.admission && !c.specialty) issues.push(`condition ${c.id} admits but has no specialty`);
     if (c.deterioration && !c.pathway.some((s) => s.stabilises)) {
       issues.push(`condition ${c.id} can deteriorate but no step stabilises it`);
     }

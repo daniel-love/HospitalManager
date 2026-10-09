@@ -8,9 +8,47 @@
  * Until shifts and rotas arrive (M5), each person hired works around the
  * clock, so staffing is cheaper than it really would be.
  */
-import type { StaffGroup, StaffRoleDef } from "./schema";
+import type { StaffGroup, StaffRoleInput } from "./schema";
 
-export const staffRoles: StaffRoleDef[] = [
+/**
+ * Consultants can be on call instead of resident (GAME_DESIGN §6.1): at home
+ * until a patient needs their specialty and nobody from it is in the
+ * hospital, then called in. The hospital pays an availability supplement
+ * (about 5% of salary, with on-costs) plus their time on site, and they go
+ * home once there's been nothing for them to do for a while.
+ */
+export const ON_CALL = {
+  /** £ a year for being available. */
+  retainer: 8_000,
+  /** £ an hour while in the hospital (a consultant's pay with on-costs). */
+  hourly: 80,
+  /** Minutes from the call to arriving at the hospital. */
+  calloutMins: [20, 40] as const,
+  /** Minutes with nothing to do before they go home. */
+  homeAfterIdleMins: 60,
+};
+
+export const staffRoles: StaffRoleInput[] = [
+  {
+    id: "consultant",
+    name: "Consultant",
+    short: "Consultants",
+    group: "medical",
+    annualCost: 160_000,
+    specialist: true,
+    description:
+      "The senior doctor of a specialty. Reviews A&E patients referred to the specialty and decides to admit them, like a registrar. Can be resident (always in the hospital) or on call from home: much cheaper, but called in only when nobody from the specialty is in the hospital, and takes 20 to 40 minutes to arrive.",
+  },
+  {
+    id: "registrar",
+    name: "Registrar",
+    short: "Registrars",
+    group: "medical",
+    annualCost: 88_000,
+    specialist: true,
+    description:
+      "A specialty trainee (ST3+), resident in the hospital. Takes referrals from A&E for their specialty: reviews the patient on their trolley and decides to admit them. Without a team for a specialty, A&E doctors admit its patients without a specialty review (until transfers out arrive later in M4).",
+  },
   {
     id: "junior_doctor",
     name: "Junior Doctor",

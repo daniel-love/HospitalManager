@@ -125,6 +125,11 @@ export const BLADDER_HOURS = 3;
 /** Patients head for the toilet above this level, and suffer above 90. */
 export const TOILET_URGE = 70;
 
+/**
+ * A specialty registrar or consultant's review of a patient referred from
+ * A&E: history, examination, results, and the decision to admit.
+ */
+export const REFERRAL_MINS: [number, number] = [20, 40];
 /** The doctor's review before a ward patient goes home. */
 export const WARD_DISCHARGE_MINS: [number, number] = [10, 20];
 /** Making a ward bed up for the next patient (more than wiping a cubicle). */

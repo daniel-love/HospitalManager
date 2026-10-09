@@ -7,7 +7,9 @@
  * diagnostics in M4.
  *
  * Every A&E walk-in books in at reception and is triaged by a nurse first;
- * `pathway` lists what happens after triage. Tariffs are rough NHS prices
+ * `pathway` lists what happens after triage. A patient who needs admitting
+ * is then referred to the condition's `specialty`, whose team reviews them
+ * in A&E and decides to admit (systems/admissions.ts). Tariffs are rough NHS prices
  * for a Type 1 A&E attendance at that level of investigation and treatment.
  */
 import type { ConditionInput } from "./schema";
@@ -57,6 +59,7 @@ export const conditions: ConditionInput[] = [
     name: "Minor head injury",
     acuity: 3,
     channels: { walk_in: 12, ambulance: 2 },
+    specialty: "general_surgery",
     tariff: 220,
     admission: { chance: 0.05, stayHours: [12, 24], tariff: 1100 },
     pathway: [
@@ -75,6 +78,7 @@ export const conditions: ConditionInput[] = [
     name: "Abdominal pain",
     acuity: 3,
     channels: { walk_in: 13 },
+    specialty: "general_surgery",
     tariff: 260,
     admission: { chance: 0.15, stayHours: [24, 72], tariff: 1900 },
     pathway: [
@@ -101,6 +105,7 @@ export const conditions: ConditionInput[] = [
     name: "Chest pain",
     acuity: 2,
     channels: { walk_in: 6, ambulance: 8 },
+    specialty: "cardiology",
     tariff: 420,
     monitoring: "continuous",
     deterioration: { chance: 0.15, onsetMins: [30, 150], warningMins: [45, 90] },
@@ -131,6 +136,7 @@ export const conditions: ConditionInput[] = [
     name: "Shortness of breath",
     acuity: 2,
     channels: { walk_in: 5, ambulance: 7 },
+    specialty: "general_medicine",
     tariff: 380,
     monitoring: "continuous",
     deterioration: { chance: 0.2, onsetMins: [30, 120], warningMins: [40, 80] },
@@ -159,6 +165,7 @@ export const conditions: ConditionInput[] = [
     name: "Suspected sepsis",
     acuity: 2,
     channels: { walk_in: 3, ambulance: 5 },
+    specialty: "general_medicine",
     tariff: 520,
     monitoring: "continuous",
     deterioration: { chance: 0.4, onsetMins: [20, 90], warningMins: [40, 90] },
@@ -182,6 +189,7 @@ export const conditions: ConditionInput[] = [
     name: "Fall in an older person",
     acuity: 3,
     channels: { walk_in: 2, ambulance: 9 },
+    specialty: "general_medicine",
     tariff: 340,
     monitoring: "periodic",
     deterioration: { chance: 0.05, onsetMins: [60, 240], warningMins: [60, 120] },
@@ -206,6 +214,7 @@ export const conditions: ConditionInput[] = [
     name: "Anaphylaxis",
     acuity: 1,
     channels: { walk_in: 0, ambulance: 2 },
+    specialty: "general_medicine",
     tariff: 640,
     monitoring: "continuous",
     deterioration: { chance: 0.5, onsetMins: [5, 20], warningMins: [20, 40] },
@@ -232,6 +241,7 @@ export const conditions: ConditionInput[] = [
     name: "Septic shock",
     acuity: 1,
     channels: { walk_in: 0, ambulance: 2 },
+    specialty: "anaesthetics",
     tariff: 1450,
     monitoring: "continuous",
     deterioration: { chance: 0.6, onsetMins: [10, 30], warningMins: [30, 60] },
@@ -245,7 +255,13 @@ export const conditions: ConditionInput[] = [
         mins: [30, 45],
         stabilises: true,
       },
-      { name: "Critical care referral", roles: [...DOCTOR], room: RESUS, mins: [15, 25] },
+      {
+        name: "Critical care referral",
+        roles: [...DOCTOR],
+        specialty: "anaesthetics",
+        room: RESUS,
+        mins: [15, 25],
+      },
     ],
     description:
       "Sepsis with dangerously low blood pressure. Stabilised in Resus, then transferred to intensive care.",

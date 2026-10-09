@@ -6,7 +6,7 @@
  * Positions are in tiles, where whole numbers are tile centres: an agent at
  * (3, 4) stands in the middle of tile (3, 4). Agents never block each other.
  */
-import type { StaffRoleId } from "@data/schema";
+import type { SpecialtyId, StaffRoleId } from "@data/schema";
 
 export interface Point {
   x: number;
@@ -152,12 +152,16 @@ export interface Patient extends AgentBase {
     triaged: number | null;
     /** First seen by a treating clinician. */
     seen: number | null;
+    /** Referred to a specialty team for review (before a decision to admit). */
+    referred: number | null;
     /** Decision to admit to a ward. */
     decided: number | null;
     /** Arrived on the ward (left A&E). */
     admitted: number | null;
     left: number | null;
   };
+  /** The specialty they're referred or admitted to, once decided; null before. */
+  specialty: SpecialtyId | null;
   /** Inpatients: the tick they'll be well enough for the discharge review. */
   stayUntil: number | null;
   /** Admitted for end-of-life care: they'll die (expectedly) on the ward. */
@@ -166,8 +170,21 @@ export interface Patient extends AgentBase {
   outcome: Outcome | null;
 }
 
+/**
+ * An on-call consultant: at home, called in (arriving at `at`), in the
+ * hospital (`at` = when they last had work), or walking out to go home.
+ */
+export interface OnCall {
+  state: "home" | "called" | "in" | "leaving";
+  at: number;
+}
+
 export interface Staff extends AgentBase {
   role: StaffRoleId;
+  /** Consultants and registrars; null for everyone else. */
+  specialty: SpecialtyId | null;
+  /** On-call consultants; null for staff resident in the hospital. */
+  onCall: OnCall | null;
   jobId: number | null;
   /** Receptionists: the desk they staff. Nurses: the nurse station they wait at. */
   desk: number | null;
@@ -177,14 +194,16 @@ export interface Staff extends AgentBase {
 }
 
 /**
- * transfer: a porter wheels an admitted patient to the ward bed in
- * `objectId`. ward_discharge: a doctor's review before an inpatient goes home.
+ * referral: a specialty registrar or consultant reviews an A&E patient
+ * on their trolley and decides to admit. transfer: a porter wheels an
+ * admitted patient to the ward bed in `objectId`. ward_discharge: a doctor's review before an inpatient goes home.
  * handover: a nurse takes over an ambulance patient from the crew (and
  * triages them), at a trolley or, if they can sit, where they are. obs:
  * observations, wherever the patient is. resus: a crash call; the lead (a
  * doctor) and support (a nurse) each have a job.
  */
 export type JobKind =
+  | "referral"
   | "transfer"
   | "ward_discharge"
   | "handover"
@@ -252,6 +271,8 @@ export interface Job {
   kind: JobKind;
   /** Roles that can do it, most preferred first (see PathwayStep.roles). */
   roles: StaffRoleId[];
+  /** Only staff of this specialty can do it (referrals); null for anyone in `roles`. */
+  specialty: SpecialtyId | null;
   patientId: number | null;
   /**
    * The couch or toilet the work happens at. Null until claimed for triage
@@ -311,6 +332,11 @@ export interface FlowStats {
   bedWaitsOver12h: number;
   /** Inpatients discharged home from a ward. */
   wardDischarges: number;
+  /** Specialty reviews done in A&E, and the sum of referral-to-decision times. */
+  referrals: number;
+  referralMins: number;
+  /** Admitted to another specialty's ward because theirs was full ("outliers"). */
+  outliers: number;
   /** Needed a ward bed, but the hospital has no ward: sent to another hospital. */
   transfersOut: number;
   deaths: number;
@@ -356,6 +382,9 @@ export function emptyStats(): FlowStats {
     bedWaitsOver4h: 0,
     bedWaitsOver12h: 0,
     wardDischarges: 0,
+    referrals: 0,
+    referralMins: 0,
+    outliers: 0,
     transfersOut: 0,
     deaths: 0,
     unexpectedDeaths: 0,
@@ -397,4 +426,9 @@ export interface SimEvent {
   severity: "info" | "warn" | "bad";
   /** Where to jump the camera, in tiles. */
   at?: Point;
+}
+
+/** In the hospital: everyone except on-call consultants at home or on their way in. */
+export function onSite(s: Staff): boolean {
+  return s.onCall === null || s.onCall.state === "in" || s.onCall.state === "leaving";
 }

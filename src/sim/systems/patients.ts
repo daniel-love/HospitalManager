@@ -68,6 +68,7 @@ import {
   ticksFor,
 } from "./jobBoard";
 import { headTo, stop } from "./movement";
+import { hasTeam } from "./staffing";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
 
@@ -311,9 +312,12 @@ export function postTreatment(state: SimState, p: Patient, objectId: number | nu
   const step = condition.pathway[p.step]!;
   const target = TRIAGE_CATEGORIES[p.category]?.targetMins ?? 240;
   const escalated = p.deterioration !== null && p.deterioration.noticed !== null;
+  // A referral step goes to the specialty's team, if the hospital has one.
+  const team = step.specialty !== undefined && hasTeam(state, step.specialty);
   postJob(state, {
     kind: "treat",
-    roles: step.roles,
+    roles: team ? ["registrar", "consultant"] : step.roles,
+    specialty: team ? step.specialty! : null,
     patientId: p.id,
     objectId,
     roomType: step.room,

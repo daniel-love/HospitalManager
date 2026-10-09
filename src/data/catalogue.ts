@@ -10,11 +10,14 @@ import type {
   DoorDef,
   EquipmentDef,
   RoomDef,
+  SpecialtyDef,
+  SpecialtyId,
   StaffRoleDef,
   StaffRoleId,
   WallDef,
 } from "./schema";
 import { equipmentCategories, staffGroups, validateContent } from "./schema";
+import { specialties } from "./specialties";
 import { STAFF_GROUP_NAMES, staffRoles } from "./staff";
 import { doors, walls } from "./structures";
 
@@ -25,6 +28,7 @@ export const content = validateContent({
   rooms,
   capabilityCombos,
   staffRoles,
+  specialties,
   conditions,
 });
 
@@ -39,6 +43,9 @@ export const conditionById = new Map<string, ConditionDef>(
 );
 export const staffRoleById = new Map<StaffRoleId, StaffRoleDef>(
   content.staffRoles.map((r) => [r.id, r]),
+);
+export const specialtyById = new Map<SpecialtyId, SpecialtyDef>(
+  content.specialties.map((s) => [s.id, s]),
 );
 
 /**

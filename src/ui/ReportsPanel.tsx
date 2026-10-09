@@ -304,6 +304,18 @@ function FlowSections({ stats: s }: { stats: FlowStats }) {
         <h4>Admissions</h4>
         <table class="report-table">
           <tbody>
+            <Row
+              label="Specialty reviews in A&E"
+              title="Referred patients reviewed by a specialty registrar or consultant"
+              value={s.referrals}
+            />
+            {s.referrals > 0 && (
+              <Row
+                label="Average referral to decision"
+                title="From referral to the specialty until their review ends in a decision to admit"
+                value={mins(avg(s.referralMins, s.referrals))}
+              />
+            )}
             <Row label="Admitted to a ward" value={s.admissions} />
             <Row
               label="Average wait for a ward bed"
@@ -322,6 +334,14 @@ function FlowSections({ stats: s }: { stats: FlowStats }) {
                 label="Sent to another hospital"
                 title="Needed admitting, but there's no ward"
                 value={s.transfersOut}
+                bad
+              />
+            )}
+            {s.outliers > 0 && (
+              <Row
+                label="Outliers"
+                title="Admitted to another specialty's ward because theirs was full"
+                value={s.outliers}
                 bad
               />
             )}

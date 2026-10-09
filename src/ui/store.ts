@@ -7,7 +7,7 @@
 import { signal } from "@preact/signals";
 import type { Speed } from "@game/loop";
 import type { Tool } from "@game/tools";
-import type { StaffRoleId } from "@data/schema";
+import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import type { DayReport, FlowStats, Ledger } from "@sim/agents";
 import type { Rotation, RoomCheck } from "@sim/state";
 import type { HelpContent } from "./help";
@@ -115,6 +115,11 @@ export interface InspectorData {
     patientsCantReach: boolean;
     capabilities: string[];
     items: { name: string; count: number }[];
+    /** Wards: the specialty it's for (null: any), and the choices. */
+    specialty?: {
+      value: SpecialtyId | null;
+      options: { id: SpecialtyId; name: string }[];
+    };
   };
   object?: {
     id: number;
@@ -177,6 +182,8 @@ export const notifications = signal<Notification[]>([]);
 export interface RosterData {
   /** Roles to hire, by staff group, in display order. */
   groups: { name: string; roles: RosterRole[] }[];
+  /** Specialties consultants and registrars can be hired into. */
+  specialties: { id: SpecialtyId; name: string; description: string }[];
   staff: { id: number; name: string; role: string; activity: string }[];
   /** Total staff cost per year. */
   payroll: number;
@@ -188,6 +195,10 @@ export interface RosterRole {
   description: string;
   annualCost: number;
   count: number;
+  /** Hired into a specialty (consultants, registrars). */
+  specialist: boolean;
+  /** For specialists: how many of each specialty are on staff. */
+  bySpecialty: Record<string, number> | null;
 }
 
 export const roster = signal<RosterData | null>(null);
@@ -290,7 +301,7 @@ export interface StaffRow {
   name: string;
   roleId: StaffRoleId;
   role: string;
-  status: "free" | "on_the_way" | "waiting" | "working" | "at_desk" | "no_desk";
+  status: "free" | "on_the_way" | "waiting" | "working" | "at_desk" | "no_desk" | "off_site";
   activity: string;
   progress: number | null;
   patient: { id: number; name: string } | null;

@@ -1,12 +1,15 @@
+import type { SpecialtyId } from "@data/schema";
 import { formatMoney } from "@game/tools";
 import { inspector, type AgentInfo } from "./store";
 
 export function Inspector({
   onClose,
   onMove,
+  onWardSpecialty,
 }: {
   onClose: () => void;
   onMove: (objectId: number) => void;
+  onWardSpecialty: (specialty: SpecialtyId | null) => void;
 }) {
   const data = inspector.value;
   if (!data) return null;
@@ -53,6 +56,29 @@ export function Inspector({
             {room.department} · {room.size}
           </p>
           <p class="dim">{room.description}</p>
+          {room.specialty && (
+            <label class="ward-specialty">
+              Specialty{" "}
+              <select
+                value={room.specialty.value ?? ""}
+                onChange={(e) => {
+                  const v = (e.currentTarget as HTMLSelectElement).value;
+                  onWardSpecialty(v === "" ? null : (v as SpecialtyId));
+                }}
+              >
+                <option value="">Any specialty</option>
+                {room.specialty.options.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+              <span class="dim">
+                Patients go to their own specialty's ward first, then one for any specialty, and
+                only then to another specialty's ward (an outlier).
+              </span>
+            </label>
+          )}
           {room.checks.length > 0 && (
             <ul class="checklist">
               {room.checks.map((c) => (

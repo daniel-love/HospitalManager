@@ -209,6 +209,7 @@ const STATUS_LABELS: Record<StaffRow["status"], string> = {
   working: "Working",
   at_desk: "At desk",
   no_desk: "No desk",
+  off_site: "Off site",
 };
 
 function StaffTab({ game, onShow }: { game: Game; onShow: (id: number) => void }) {

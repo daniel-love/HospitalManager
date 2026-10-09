@@ -7,11 +7,20 @@ import {
   conditionById,
   roleNames,
   roomById,
+  specialtyById,
   staffRoleById,
   staffRoleSections,
 } from "@data/catalogue";
+import { specialtyIds } from "@data/schema";
 import { FOUR_HOUR_MINS, TRIAGE_CATEGORIES, TRIAGE_TARGET_MINS } from "@data/patients";
-import type { Job, Patient, PatientStage, Point, Staff } from "@sim/agents";
+import {
+  onSite,
+  type Job,
+  type Patient,
+  type PatientStage,
+  type Point,
+  type Staff,
+} from "@sim/agents";
 import {
   couchStatus,
   freeCouches,
@@ -31,7 +40,9 @@ import {
   type DeathStep,
 } from "@sim/systems/deaths";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
+import { annualCost } from "@sim/systems/finance";
 import { formatWait, inAE } from "@sim/systems/patients";
+import { canDo, staffTitle } from "@sim/systems/staffing";
 import { clockFromTick, TICKS_PER_MINUTE } from "@sim/time";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { roomAt, roomOfObject } from "@sim/world/rooms";
@@ -112,7 +123,7 @@ export function waitReason(state: SimState, p: Patient): string | null {
   const job = Object.values(state.jobs).find(
     (j) =>
       j.patientId === p.id &&
-      ["triage", "treat", "handover", "transfer", "ward_discharge"].includes(j.kind),
+      ["triage", "treat", "handover", "referral", "transfer", "ward_discharge"].includes(j.kind),
   );
   if (!job || job.state === "working") return null;
   if (job.state === "assigned") {
@@ -122,8 +133,22 @@ export function waitReason(state: SimState, p: Patient): string | null {
   if (p.toilet) return "At the toilet, so the next patient is called instead";
 
   const reasons: string[] = [];
-  const qualified = Object.values(state.staff).filter((s) => job.roles.includes(s.role));
-  if (qualified.length === 0) reasons.push(`No ${roleNames(job.roles, true)} on staff`);
+  const able = Object.values(state.staff).filter((s) => canDo(s, job));
+  const qualified = able.filter(onSite);
+  const team = job.specialty ? specialtyById.get(job.specialty)! : null;
+  const coming = able.find((s) => s.onCall?.state === "called");
+  if (coming) {
+    const mins = Math.max(1, Math.ceil((coming.onCall!.at - state.tick) / TICKS_PER_MINUTE));
+    reasons.push(
+      `${coming.name}, the on-call ${team?.name ?? ""} consultant, is ${formatWait(mins)} away`,
+    );
+  } else if (qualified.length === 0) {
+    reasons.push(
+      team
+        ? `Nobody from ${team.team} in the hospital`
+        : `No ${roleNames(job.roles, true)} on staff`,
+    );
+  }
   if (job.objectId === null) {
     const room = roomById.get(job.roomType)?.name ?? job.roomType;
     const c = couchStatus(state, job.roomType, job.capabilities);
@@ -140,10 +165,12 @@ export function waitReason(state: SimState, p: Patient): string | null {
     }
   }
   if (qualified.length > 0 && qualified.every((s) => s.jobId !== null)) {
+    const who = team ? `${team.name} doctor` : roleNames(job.roles);
+    const whoPlural = team ? `${team.name} doctors` : roleNames(job.roles, true);
     reasons.push(
       qualified.length === 1
-        ? `The only ${roleNames(job.roles)} is busy`
-        : `All ${qualified.length} ${roleNames(job.roles, true)} are busy`,
+        ? `The only ${who} in the hospital is busy`
+        : `All ${qualified.length} ${whoPlural} are busy`,
     );
   }
   // Open jobs this one competes with that come first (earlier due).
@@ -152,10 +179,17 @@ export function waitReason(state: SimState, p: Patient): string | null {
       j !== job &&
       j.state === "open" &&
       j.roomType === job.roomType &&
+      j.specialty === job.specialty &&
       j.roles.some((r) => job.roles.includes(r)) &&
       (j.dueTick < job.dueTick || (j.dueTick === job.dueTick && j.id < job.id)),
   ).length;
-  if (ahead > 0) reasons.push(`${plural(ahead, "more urgent patient")} first`);
+  if (ahead > 0) {
+    reasons.push(
+      job.kind === "referral"
+        ? `${plural(ahead, "patient")} referred earlier first`
+        : `${plural(ahead, "more urgent patient")} first`,
+    );
+  }
   return reasons.length > 0 ? reasons.join(" · ") : "About to be called";
 }
 
@@ -214,6 +248,16 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
           : `In ${here}, waiting for a ${roomName} for: ${step.name}`
       : status;
     if (working?.kind === "handover") status = label!;
+    const referral = Object.values(state.jobs).find(
+      (j) => j.patientId === p.id && j.kind === "referral",
+    );
+    if (referral && p.specialty) {
+      const team = specialtyById.get(p.specialty)!.team;
+      status =
+        referral.state === "working"
+          ? `Being reviewed by ${team}`
+          : `Referred to ${team}: waiting for their review`;
+    }
   } else if (p.toilet) {
     status = "Using the toilet";
   } else if (p.stage === "leaving") {
@@ -249,6 +293,10 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
     timeline.push({ label: "Escalated: getting worse", at: clockAt(d.noticed) });
   if (d && p.stage === "collapsed")
     timeline.push({ label: "Cardiac arrest", at: clockAt(d.crash) });
+  if (t.referred !== null && p.specialty) {
+    const name = specialtyById.get(p.specialty)!.name;
+    timeline.push({ label: `Referred to ${name}`, at: clockAt(t.referred) });
+  }
   if (t.decided !== null) timeline.push({ label: "Decision to admit", at: clockAt(t.decided) });
   if (t.admitted !== null) timeline.push({ label: "Arrived on the ward", at: clockAt(t.admitted) });
   if (t.left !== null) {
@@ -370,7 +418,8 @@ function monitoringInfo(
   return { monitoring: { obs, watch, flag } };
 }
 
-export type StaffStatus = "free" | "on_the_way" | "waiting" | "working" | "at_desk" | "no_desk";
+export type StaffStatus =
+  "free" | "on_the_way" | "waiting" | "working" | "at_desk" | "no_desk" | "off_site";
 
 export interface StaffState {
   status: StaffStatus;
@@ -385,6 +434,16 @@ export interface StaffState {
 export function staffState(state: SimState, s: Staff): StaffState {
   const walking = s.path.length > 0;
   const none = { progress: null, patientId: null };
+  if (s.onCall?.state === "home") {
+    return { status: "off_site", activity: "On call at home", ...none };
+  }
+  if (s.onCall?.state === "called") {
+    const mins = Math.max(1, Math.ceil((s.onCall.at - state.tick) / TICKS_PER_MINUTE));
+    return { status: "off_site", activity: `Called in: arriving in ${formatWait(mins)}`, ...none };
+  }
+  if (s.onCall?.state === "leaving" && s.jobId === null) {
+    return { status: "on_the_way", activity: "Going home: nothing more for them", ...none };
+  }
   if (s.role === "receptionist") {
     if (s.desk === null) return { status: "no_desk", activity: "No free reception desk", ...none };
     if (walking) return { status: "on_the_way", activity: "Going to the reception desk", ...none };
@@ -421,6 +480,9 @@ export function staffState(state: SimState, s: Staff): StaffState {
     }
     case "handover":
       what = `Ambulance handover: ${who}`;
+      break;
+    case "referral":
+      what = `Specialty review in A&E: ${who}`;
       break;
     case "transfer":
       what = `Taking ${who} to the ward`;
@@ -505,14 +567,13 @@ export function whereIs(state: SimState, a: Point): string {
 }
 
 export function describeStaff(state: SimState, s: Staff): AgentInfo {
-  const role = staffRoleById.get(s.role)!;
   return {
     kind: "staff",
     id: s.id,
     name: s.name,
-    role: role.name,
+    role: staffTitle(s),
     activity: staffActivity(state, s),
-    annualCost: role.annualCost,
+    annualCost: annualCost(s),
     morale: Math.round(s.morale),
   };
 }
@@ -528,15 +589,28 @@ export function describeRoster(state: SimState): RosterData {
         description: r.description,
         annualCost: r.annualCost,
         count: staff.filter((s) => s.role === r.id).length,
+        specialist: r.specialist,
+        bySpecialty: r.specialist
+          ? Object.fromEntries(
+              specialtyIds.map((sp) => [
+                sp,
+                staff.filter((s) => s.role === r.id && s.specialty === sp).length,
+              ]),
+            )
+          : null,
       })),
     })),
+    specialties: specialtyIds.map((id) => {
+      const sp = specialtyById.get(id)!;
+      return { id, name: sp.name, description: sp.description };
+    }),
     staff: staff.map((s) => ({
       id: s.id,
       name: s.name,
-      role: staffRoleById.get(s.role)!.name,
+      role: staffTitle(s),
       activity: staffActivity(state, s),
     })),
-    payroll: staff.reduce((sum, s) => sum + staffRoleById.get(s.role)!.annualCost, 0),
+    payroll: staff.reduce((sum, s) => sum + annualCost(s), 0),
   };
 }
 
@@ -728,14 +802,16 @@ export function describeStaffTable(state: SimState): StaffTable {
       id: s.id,
       name: s.name,
       roleId: s.role,
-      role: staffRoleById.get(s.role)!.name,
+      role: staffTitle(s),
       status: st.status,
       activity: st.activity,
       progress: st.progress,
       patient: patient ? { id: patient.id, name: patient.name } : null,
-      where: whereIs(state, s),
+      where: onSite(s) ? whereIs(state, s) : "Away from the hospital",
     };
   });
-  const busy = rows.filter((r) => r.status !== "free" && r.status !== "at_desk").length;
+  const busy = rows.filter(
+    (r) => r.status !== "free" && r.status !== "at_desk" && r.status !== "off_site",
+  ).length;
   return { rows, busy, free: rows.length - busy };
 }

@@ -1,7 +1,8 @@
 /**
  * Admissions and wards (GAME_DESIGN §5.5):
  *
- *   last A&E step → decision to admit → wait on the A&E trolley for a ward
+ *   last A&E step → referral to the specialty → its registrar or consultant
+ *     reviews them on their trolley → decision to admit → wait on the A&E trolley for a ward
  *     bed and a porter → wheeled to the ward (bed-width route only) → stay
  *     for days → doctor's discharge review → home
  *
@@ -9,10 +10,15 @@
  * a full hospital backs up into A&E ("exit block"): trolleys stay occupied,
  * ambulances can't hand over, and waits grow. The A&E clock stops when they
  * reach the ward; the decision-to-admit wait ("trolley wait") is tracked
- * against the 4- and 12-hour marks.
+ * against the 4- and 12-hour marks. Waiting for the specialty review counts
+ * towards the 4 hours too, as it does in real A&Es.
+ *
+ * Each ward can be given to a specialty. Patients go to their specialty's
+ * ward first, then one open to any specialty, and only then to another
+ * specialty's ward (an "outlier").
  */
-import { conditionById, equipmentById } from "@data/catalogue";
-import { FOUR_HOUR_MINS, WARD_DISCHARGE_MINS } from "@data/patients";
+import { conditionById, equipmentById, specialtyById } from "@data/catalogue";
+import { FOUR_HOUR_MINS, REFERRAL_MINS, WARD_DISCHARGE_MINS } from "@data/patients";
 import type { Job, Patient, Point, Staff } from "../agents";
 import { emit, warn } from "../events";
 import { bedside, freeCouches, release, reserve, restPoint } from "../places";
@@ -28,6 +34,7 @@ import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobB
 import { headTo } from "./movement";
 import { die } from "./deaths";
 import { leave } from "./patients";
+import { hasTeam } from "./staffing";
 
 const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
 
@@ -41,8 +48,21 @@ export function finishPathway(state: SimState, p: Patient, trolley: PlacedObject
   }
   const admission = condition.admission;
   if (admission && chance(state.rng, admission.chance)) {
-    if (state.rooms.some((r) => r.valid && r.typeId === "ward")) decideToAdmit(state, p);
-    else {
+    p.specialty = condition.specialty!;
+    if (state.rooms.some((r) => r.valid && r.typeId === "ward")) {
+      if (hasTeam(state, p.specialty)) refer(state, p, trolley);
+      else {
+        // Interim, until A&E transfers out (M4 step 3): A&E admits them itself.
+        const sp = specialtyById.get(p.specialty)!;
+        warn(
+          state,
+          `no_team_${p.specialty}`,
+          6 * TICKS_PER_HOUR,
+          `You have no ${sp.name} consultant or registrar, so A&E doctors are admitting ${sp.name.toLowerCase()} patients without a specialty review.`,
+        );
+        decideToAdmit(state, p);
+      }
+    } else {
       // Interim, until A&E transfers out properly (M4): no ward, no admission here.
       leave(state, p, "transferred_out");
       dirtyCouch(state, trolley.id);
@@ -57,6 +77,33 @@ export function finishPathway(state: SimState, p: Patient, trolley: PlacedObject
   }
   leave(state, p, "discharged");
   dirtyCouch(state, trolley.id);
+}
+
+/**
+ * Referred to their specialty: they stay on their trolley (or couch) until
+ * one of its registrars or consultants comes to review them.
+ */
+function refer(state: SimState, p: Patient, trolley: PlacedObject): void {
+  p.times.referred = state.tick;
+  postJob(state, {
+    kind: "referral",
+    roles: ["registrar", "consultant"],
+    specialty: p.specialty,
+    patientId: p.id,
+    objectId: trolley.id,
+    roomType: roomOfObject(state, trolley.id)?.typeId ?? "majors_bay",
+    // In turn, behind patients referred earlier.
+    dueTick: state.tick,
+    durationTicks: ticksFor(state.rng, REFERRAL_MINS),
+  });
+}
+
+/** The specialty review is done: they're accepted for admission. */
+export function reviewed(state: SimState, p: Patient): void {
+  const stats = state.today.stats;
+  stats.referrals++;
+  stats.referralMins += (state.tick - (p.times.referred ?? state.tick)) / TICKS_PER_MINUTE;
+  decideToAdmit(state, p);
 }
 
 /** They stay on their A&E trolley; a porter's job waits for a free ward bed. */
@@ -204,12 +251,37 @@ export function claimWardBed(state: SimState, job: Job): Point | null {
   const bed =
     (p.endOfLife
       ? freeCouches(state, "side_room", job.capabilities, from).find(reachable)
-      : undefined) ?? freeCouches(state, job.roomType, job.capabilities, from).find(reachable);
+      : undefined) ??
+    bestWardBed(
+      state,
+      p,
+      freeCouches(state, job.roomType, job.capabilities, from).filter(reachable),
+    );
   if (!bed) return null;
   reserve(state, bed.id, 0, p.id);
   job.objectId = bed.id;
   job.step = wheeled ? 1 : 0;
   return from;
+}
+
+/** How well a ward suits them: 0 their specialty's, 1 open to any, 2 another specialty's. */
+function wardFit(state: SimState, p: Patient, bed: PlacedObject): number {
+  const specialty = roomOfObject(state, bed.id)?.specialty ?? null;
+  return specialty === p.specialty ? 0 : specialty === null ? 1 : 2;
+}
+
+/** The nearest of the best-fitting beds (they're sorted nearest first). */
+function bestWardBed(state: SimState, p: Patient, beds: PlacedObject[]): PlacedObject | undefined {
+  let best: PlacedObject | undefined;
+  let bestFit = Infinity;
+  for (const b of beds) {
+    const fit = wardFit(state, p, b);
+    if (fit < bestFit) {
+      best = b;
+      bestFit = fit;
+    }
+  }
+  return best;
 }
 
 /**
@@ -274,6 +346,9 @@ function arriveOnWard(state: SimState, p: Patient): void {
   const condition = conditionById.get(p.conditionId)!;
   p.stage = "on_ward";
   p.times.admitted = state.tick;
+  if (p.bed !== null && state.objects[p.bed] && wardFit(state, p, state.objects[p.bed]!) === 2) {
+    state.today.stats.outliers++;
+  }
   const [lo, hi] = condition.admission?.stayHours ?? [24, 48];
   p.stayUntil = state.tick + Math.round((lo + (hi - lo) * nextFloat(state.rng)) * TICKS_PER_HOUR);
 

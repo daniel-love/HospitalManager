@@ -259,6 +259,34 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v13 (M4): specialties, consultants and registrars, and referrals.
+  12: (save) => {
+    type Stats = Record<string, unknown>;
+    const state = save.state as {
+      patients: { times: object }[];
+      staff: object[];
+      jobs: object[];
+      today: { ledger: object; stats: Stats };
+      history: { stats: Stats }[];
+    };
+    const stats = (s: Stats) => ({ ...s, referrals: 0, referralMins: 0, outliers: 0 });
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients.map((p) => ({
+          ...p,
+          specialty: null,
+          times: { ...p.times, referred: null },
+        })),
+        staff: state.staff.map((s) => ({ ...s, specialty: null, onCall: null })),
+        jobs: state.jobs.map((j) => ({ ...j, specialty: null })),
+        wardSpecialties: {},
+        today: { ...state.today, stats: stats(state.today.stats) },
+        history: state.history.map((d) => ({ ...d, stats: stats(d.stats) })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

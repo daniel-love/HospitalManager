@@ -249,10 +249,10 @@ Patient needs: **comfort** (seat/bed), **toilet**, **hunger/thirst**, **privacy*
 ```
 Arrive → Book in (reception) → Wait → Triage → Stream (Minors | Majors | Resus | UTC)
  → Wait for cubicle → Assessment → Investigations → Decision
- → Discharge │ Admit (wait for bed → porter transfer → ward) │ Theatre │ Transfer out
+ → Discharge │ Admit (referral → specialty review → wait for bed → porter transfer → ward) │ Theatre │ Transfer out
 ```
 
-Every timestamp is logged. The 4-hour clock runs from arrival to departure from A&E.
+Every timestamp is logged. The 4-hour clock runs from arrival to departure from A&E, so the wait for a specialty review counts towards it, as it does in a real A&E. A patient who needs admitting is referred to their condition's specialty; its registrar or consultant reviews them on their A&E trolley and decides to admit. Wards can be given to a specialty: patients go to their own specialty's ward first, then one open to any specialty, and only then to another specialty's ward (an "outlier", counted in Reports).
 
 ### 5.6 Patient death (realistic process, never graphic)
 
@@ -289,7 +289,7 @@ Deaths follow the real UK hospital process, because that process is where the op
 
 | Role                                      | Typical jobs                                       | Notes                                                                                                                              |
 | ----------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **Consultant** (by specialty)             | Senior review, theatre lead, clinic                | Can be resident or **on-call** (callout delay + fee). Required for specialty gating                                                |
+| **Consultant** (by specialty)             | Senior review, theatre lead, clinic                | Resident, or **on-call** from home: a retainer plus pay for time on site, and 20–40 min to arrive. Required for specialty gating   |     |
 | **Registrar**                             | Specialist assessment, surgery assist              | Specialty-tagged                                                                                                                   |
 | **Junior Doctor** (FY/SHO)                | Clerking, prescribing, routine review              | Generalist, needs senior supervision for some steps                                                                                |
 | **Nurse** (Band 5/6/7)                    | Triage, obs, meds, monitoring                      | Band 7 = nurse in charge (improves department flow)                                                                                |

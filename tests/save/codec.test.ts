@@ -4,6 +4,9 @@ import { tick } from "@sim/sim";
 import { nextU32 } from "@sim/rng";
 import { createSimState, SIM_STATE_VERSION, type SimState } from "@sim/state";
 import { TICKS_PER_DAY } from "@sim/time";
+import { applyStaffCommand } from "@sim/systems/staffing";
+import { setWardSpecialty } from "@sim/world/rooms";
+import { buildMajorsAE } from "../fixtures/majorsAE";
 import { buildSmallAE, staffedSmallAE } from "../fixtures/smallAE";
 
 /** Comparable snapshot of everything that matters, typed arrays included. */
@@ -414,6 +417,55 @@ describe("catchment in saves", () => {
     expect(loaded.settings.catchment).toBe(80_000);
     expect(loaded.history[0]!.stats.deflected).toBe(0);
     // Pending notifications aren't saved.
+    expect(snapshot(loaded)).toEqual(snapshot({ ...state, events: [] }));
+  });
+});
+
+describe("specialties in saves", () => {
+  it("round-trips specialists, on-call state and ward specialties", () => {
+    const state = buildMajorsAE(4, { ward: "door_double" });
+    applyStaffCommand(state, { type: "hire_staff", role: "registrar", specialty: "cardiology" });
+    applyStaffCommand(state, {
+      type: "hire_staff",
+      role: "consultant",
+      specialty: "general_medicine",
+      onCall: true,
+    });
+    setWardSpecialty(
+      state,
+      state.rooms.find((r) => r.typeId === "ward")!,
+      "cardiology",
+    );
+    const loaded = roundTrip(state);
+    expect(snapshot(loaded)).toEqual(snapshot({ ...state, events: [] }));
+    expect(loaded.rooms.find((r) => r.typeId === "ward")!.specialty).toBe("cardiology");
+  });
+
+  it("upgrades a version-12 save with no specialties", () => {
+    const state = staffedSmallAE(9);
+    for (let i = 0; i < TICKS_PER_DAY + 600; i++) tick(state);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v12")));
+    save.version = 12;
+    delete save.state.wardSpecialties;
+    for (const p of save.state.patients) {
+      delete p.specialty;
+      delete p.times.referred;
+    }
+    for (const s of save.state.staff) {
+      delete s.specialty;
+      delete s.onCall;
+    }
+    for (const j of save.state.jobs) delete j.specialty;
+    for (const st of [
+      save.state.today.stats,
+      ...save.state.history.map((d: { stats: object }) => d.stats),
+    ]) {
+      delete st.referrals;
+      delete st.referralMins;
+      delete st.outliers;
+    }
+    const loaded = decodeSave(save).state;
+    expect(loaded.history[0]!.stats.referrals).toBe(0);
     expect(snapshot(loaded)).toEqual(snapshot({ ...state, events: [] }));
   });
 });

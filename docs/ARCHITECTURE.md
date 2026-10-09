@@ -252,7 +252,7 @@ Benefits: balancing without code changes, easy to add conditions, and a path to 
 - **Storage:** IndexedDB object store `saves`, with autosave rotation (last 3) plus named slots.
 - **Export/import:** download and upload `.hospital.json` (gzipped variant `.hospital`). Under Tauri, write to the user's documents folder.
 - **Versioning:** `migrations.ts` holds an ordered list of `(fromVersion) => state` transforms. Loading an old save runs it forward, and Zod validates the result. A migration may add content as well as fields: v11 fits the public road into maps built before it existed (`fitSite()` in `world/site.ts`).
-- **Derived data is not saved:** rooms (and the `roomId` grid), the `objectId` grid (rebuilt from the object list), path caches and coverage maps are rebuilt after load. This keeps saves small and means derived data can never disagree with the layout. See `save/codec.ts`.
+- **Derived data is not saved:** rooms (and the `roomId` grid), the `objectId` grid (rebuilt from the object list), path caches and coverage maps are rebuilt after load. This keeps saves small and means derived data can never disagree with the layout. See `save/codec.ts`. Player settings for a room (a ward's specialty, `SimState.wardSpecialties`) are saved pinned to one of the room's tiles, since room ids change on every re-detection, and `detectRooms` attaches them again.
 
 ## 9. Testing strategy
 

@@ -9,7 +9,7 @@
  * that finds nobody free pulls the nearest qualified person off other work.
  */
 import { conditionById } from "@data/catalogue";
-import type { Job, Patient, Point, Staff } from "../agents";
+import { onSite, type Job, type Patient, type Point, type Staff } from "../agents";
 import {
   bedside,
   freeCouch,
@@ -21,7 +21,13 @@ import {
   seatApproach,
 } from "../places";
 import type { PlacedObject, SimState } from "../state";
-import { claimWardBed, dischargeFromWard, finishPathway, runTransfer } from "./admissions";
+import {
+  claimWardBed,
+  dischargeFromWard,
+  finishPathway,
+  reviewed,
+  runTransfer,
+} from "./admissions";
 import { handoverDone } from "./ambulances";
 import { finishResus, newsScore, notice } from "./deterioration";
 import { NEWS_URGENT } from "@data/monitoring";
@@ -30,6 +36,7 @@ import { headTo } from "./movement";
 import { TICKS_PER_MINUTE } from "../time";
 import { claimDeathPlace, runDeathJob } from "./deaths";
 import { afterTriage, backToWaiting, callToBed, postTreatment } from "./patients";
+import { canDo } from "./staffing";
 
 /**
  * Jobs done wherever the patient is, rather than at a particular couch:
@@ -53,7 +60,7 @@ function atPatient(job: Job): boolean {
 
 export function assignJobs(state: SimState): void {
   const idle = Object.values(state.staff).filter(
-    (s) => s.jobId === null && s.role !== "receptionist",
+    (s) => s.jobId === null && s.role !== "receptionist" && onSite(s),
   );
   if (idle.length === 0) return;
   const open = Object.values(state.jobs)
@@ -61,7 +68,7 @@ export function assignJobs(state: SimState): void {
     .filter((j) => j.state === "open" && j.kind !== "debrief")
     .sort((a, b) => a.dueTick - b.dueTick || a.id - b.id);
   for (const job of open) {
-    let candidates = idle.filter((s) => job.roles.includes(s.role) && s.jobId === null);
+    let candidates = idle.filter((s) => canDo(s, job) && s.jobId === null);
     if (candidates.length === 0 && job.kind === "resus") candidates = pullOffWork(state, job);
     if (candidates.length === 0) continue;
     const place = claimPlace(state, job);
@@ -289,6 +296,9 @@ function complete(state: SimState, job: Job, obj: PlacedObject): void {
       finishPathway(state, p, obj);
       break;
     }
+    case "referral":
+      reviewed(state, patient!);
+      break;
     case "ward_discharge":
       dischargeFromWard(state, patient!, obj);
       break;

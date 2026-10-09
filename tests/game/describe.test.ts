@@ -27,7 +27,7 @@ describe("UI descriptions", () => {
   it("groups the roles to hire: medical, nursing, support services, administrative", () => {
     const r = describeRoster(state);
     expect(r.groups.map((g) => [g.name, g.roles.map((x) => x.id)])).toEqual([
-      ["Medical", ["junior_doctor", "medical_examiner"]],
+      ["Medical", ["consultant", "registrar", "junior_doctor", "medical_examiner"]],
       ["Nursing", ["nurse", "nurse_practitioner"]],
       ["Support services", ["porter", "cleaner"]],
       ["Administrative", ["receptionist"]],

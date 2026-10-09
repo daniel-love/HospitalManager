@@ -6,7 +6,8 @@
  * In plan mode, commands go into the build plan instead (see sim/plan.ts), and
  * the map, tools and inspector all show the plan preview ("viewState").
  */
-import { equipmentById, objectDef, roomById } from "@data/catalogue";
+import { content, equipmentById, objectDef, roomById } from "@data/catalogue";
+import type { SpecialtyId } from "@data/schema";
 import {
   autosave,
   loadGame,
@@ -14,6 +15,7 @@ import {
   saveGame,
   saveResumeSnapshot,
 } from "@save/saveManager";
+import { onSite } from "@sim/agents";
 import { applyCommand, type Command, type CommandResult } from "@sim/commands";
 import { addToPlan, buildPreview, commitPlan, planDiff, type PlanPreview } from "@sim/plan";
 import { roomsPatientsCantReach } from "@sim/places";
@@ -30,7 +32,7 @@ import {
   TICKS_PER_SECOND_1X,
 } from "@sim/time";
 import { itemsAt } from "@sim/world/objects";
-import { roomAt } from "@sim/world/rooms";
+import { roomAt, setWardSpecialty } from "@sim/world/rooms";
 import { CameraControls, isPanModifier } from "@render/cameraControls";
 import { TILE_SIZE } from "@render/constants";
 import { tagSpot } from "@render/deathMarks";
@@ -216,6 +218,19 @@ export class Game {
     this.drainEvents();
     this.refreshPanels();
     this.publishHud();
+  }
+
+  /**
+   * Gives the selected ward to a specialty (null: any). Like staffing, a
+   * setting for the real hospital, even in plan mode.
+   */
+  setWardSpecialty(specialty: SpecialtyId | null): void {
+    const tile = this.selectedTile;
+    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    if (!room || room.typeId !== "ward") return;
+    setWardSpecialty(this.state, room, specialty);
+    if (this.preview) this.rebuildPreview();
+    this.publishInspector();
   }
 
   /** Centres the camera on a tile (e.g. from a notification). */
@@ -542,7 +557,8 @@ export class Game {
     const y = w.y / TILE_SIZE - 0.5;
     let best: number | null = null;
     let bestD = AGENT_PICK_RADIUS;
-    for (const a of [...Object.values(this.state.staff), ...Object.values(this.state.patients)]) {
+    const here = Object.values(this.state.staff).filter(onSite);
+    for (const a of [...here, ...Object.values(this.state.patients)]) {
       // In the mortuary they're shown as a label on their fridge drawer.
       const at = "stage" in a && a.stage === "in_mortuary" ? tagSpot(this.state, a) : a;
       const d = Math.hypot(at.x - x, at.y - y);
@@ -676,6 +692,14 @@ export class Game {
         patientsCantReach: roomsPatientsCantReach(this.viewState).includes(room),
         capabilities: room.capabilities,
         items: [...counts].map(([name, count]) => ({ name, count })),
+        ...(room.typeId === "ward"
+          ? {
+              specialty: {
+                value: room.specialty,
+                options: content.specialties.map((sp) => ({ id: sp.id, name: sp.name })),
+              },
+            }
+          : {}),
       };
       this.renderer.setSelection(
         room.tiles.map((i) => ({ x: i % grid.width, y: Math.floor(i / grid.width) })),

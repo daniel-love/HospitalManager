@@ -6,7 +6,8 @@
  */
 import { equipmentById, staffRoleById } from "@data/catalogue";
 import { DAYS_PER_MONTH } from "@data/economy";
-import { emptyLedger, emptyStats, net, type DayReport } from "../agents";
+import { ON_CALL } from "@data/staff";
+import { emptyLedger, emptyStats, net, onSite, type DayReport, type Staff } from "../agents";
 import { emit } from "../events";
 import type { SimState } from "../state";
 import { clockFromTick, MINUTES_PER_DAY, START_MINUTE_OF_DAY, TICKS_PER_MINUTE } from "../time";
@@ -20,11 +21,20 @@ export function earn(state: SimState, amount: number): void {
   state.today.ledger.tariff += amount;
 }
 
-/** Staff costs per hour, £. */
+/** What someone costs a year: their role's pay, or an on-call consultant's retainer. */
+export function annualCost(s: Staff): number {
+  return s.onCall ? ON_CALL.retainer : staffRoleById.get(s.role)!.annualCost;
+}
+
+/** Staff costs per hour, £: on-call consultants are also paid for hours in the hospital. */
 export function hourlySalaries(state: SimState): number {
   let annual = 0;
-  for (const s of Object.values(state.staff)) annual += staffRoleById.get(s.role)!.annualCost;
-  return annual / 365 / 24;
+  let hourly = 0;
+  for (const s of Object.values(state.staff)) {
+    annual += annualCost(s);
+    if (s.onCall && onSite(s)) hourly += ON_CALL.hourly;
+  }
+  return annual / 365 / 24 + hourly;
 }
 
 /** Equipment upkeep per hour, £. */
