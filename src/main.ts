@@ -1,22 +1,38 @@
 import { h, render } from "preact";
 import { Game } from "@game/game";
 import { Renderer } from "@render/renderer";
+import { loadLastSave } from "@save/saveManager";
 import { createSimState } from "@sim/state";
 import { App } from "@ui/App";
+import { showToast } from "@ui/store";
 import "@ui/styles.css";
 
-/** Seed from `?seed=123` for reproducible runs, otherwise random. */
-function chooseSeed(): number {
+/** Seed from `?seed=123` for reproducible runs, otherwise null. */
+function seedParam(): number | null {
   const param = new URLSearchParams(location.search).get("seed");
-  if (param !== null && /^\d+$/.test(param)) return Number(param) >>> 0;
-  return crypto.getRandomValues(new Uint32Array(1))[0]!;
+  return param !== null && /^\d+$/.test(param) ? Number(param) >>> 0 : null;
 }
 
 async function main(): Promise<void> {
-  const state = createSimState({ seed: chooseSeed() });
+  const seed = seedParam();
+  const state = createSimState({ seed: seed ?? crypto.getRandomValues(new Uint32Array(1))[0]! });
   const renderer = await Renderer.create(document.getElementById("game")!, state);
   const game = new Game(state, renderer);
   render(h(App, { game }), document.getElementById("ui")!);
+
+  // Resume the last save written or loaded, unless a seed asks for a fresh run.
+  if (seed === null) {
+    try {
+      const last = await loadLastSave();
+      if (last) {
+        game.loadState(last.state, last.name);
+        showToast(`Resumed "${last.name}"`);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Couldn't resume your last save, so this is a new game", "error");
+    }
+  }
 
   if (import.meta.env.DEV) {
     // Handy from the browser console: `__game.state`, `__game.setSpeed(8)`.

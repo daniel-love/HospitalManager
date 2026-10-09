@@ -1,6 +1,7 @@
 import type { Game } from "@game/game";
 import { SPEEDS, type Speed } from "@game/loop";
 import { formatMoney } from "@game/tools";
+import { settingsOpen } from "./settings";
 import { hud, peopleDialog, saveDialogOpen } from "./store";
 
 const LABELS: Record<Speed, string> = {
@@ -68,6 +69,9 @@ export function TopBar({ game }: { game: Game }) {
         onClick={() => (saveDialogOpen.value = true)}
       >
         Save / Load
+      </button>
+      <button class="menu-button" onMouseDown={noFocus} onClick={() => (settingsOpen.value = true)}>
+        Settings
       </button>
     </div>
   );

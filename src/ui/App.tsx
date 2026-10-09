@@ -5,10 +5,11 @@ import { MapHelp, PaletteHelp } from "./HelpCard";
 import { Inspector } from "./Inspector";
 import { Notifications } from "./Notifications";
 import { PeopleDialog } from "./PeopleDialog";
-import { CoverageLegend, CursorInfo, Toasts } from "./Overlays";
+import { CoverageLegend, CursorInfo, PausedHint, Toasts } from "./Overlays";
 import { PlanBar } from "./PlanBar";
 import { ReportsPanel } from "./ReportsPanel";
 import { SaveDialog } from "./SaveDialog";
+import { SettingsDialog } from "./SettingsDialog";
 import { StaffPanel } from "./StaffPanel";
 import { planning } from "./store";
 import { TopBar } from "./TopBar";
@@ -30,12 +31,14 @@ export function App({ game }: { game: Game }) {
       <Notifications game={game} />
       <PeopleDialog game={game} />
       <CoverageLegend />
+      <PausedHint />
       <Toasts />
       <DebugOverlay />
       <CursorInfo />
       <MapHelp />
       <PaletteHelp />
       <SaveDialog game={game} />
+      <SettingsDialog />
     </>
   );
 }

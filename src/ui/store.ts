@@ -127,7 +127,7 @@ export const hud = signal<HudState>({
   fourHour: null,
 });
 export const debugStats = signal<DebugStats | null>(null);
-export const debugVisible = signal<boolean>(import.meta.env.DEV);
+export const debugVisible = signal<boolean>(false);
 
 /** Selected build tool, or null for the normal select/pan cursor. */
 export const tool = signal<Tool | null>(null);

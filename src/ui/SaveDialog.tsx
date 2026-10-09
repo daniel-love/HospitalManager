@@ -10,8 +10,6 @@ import {
   exportSave,
   importSaveFile,
   listSaves,
-  loadGame,
-  saveGame,
   type SaveSlot,
 } from "@save/saveManager";
 import { saveDialogOpen, showToast } from "./store";
@@ -29,7 +27,7 @@ export function SaveDialog({ game }: { game: Game }) {
 
 function SaveDialogBody({ game }: { game: Game }) {
   const [slots, setSlots] = useState<SaveSlot[] | null>(null);
-  const [name, setName] = useState("My hospital");
+  const [name, setName] = useState(game.saveName);
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const close = () => (saveDialogOpen.value = false);
@@ -66,7 +64,7 @@ function SaveDialogBody({ game }: { game: Game }) {
     const trimmed = name.trim();
     if (!trimmed) return;
     void run(async () => {
-      await saveGame(game.state, trimmed);
+      await game.save(trimmed);
       showToast(`Saved "${trimmed}"`);
       await refresh();
     });
@@ -74,8 +72,7 @@ function SaveDialogBody({ game }: { game: Game }) {
 
   const onLoad = (slot: SaveSlot) =>
     run(async () => {
-      game.loadState(await loadGame(slot.id));
-      if (!slot.autosave) setName(slot.meta.name);
+      await game.load(slot.id);
       showToast(`Loaded "${slot.meta.name}"`);
       close();
     });
@@ -132,7 +129,10 @@ function SaveDialogBody({ game }: { game: Game }) {
           {slots?.map((slot) => (
             <div class="slot" key={slot.id}>
               <div class="slot-info">
-                <strong>{slot.meta.name}</strong>
+                <strong>
+                  {slot.meta.name}
+                  {slot.autosave && <span class="tag">Autosave</span>}
+                </strong>
                 <span class="dim">
                   {slot.meta.gameTime.replace(/\s+/g, " ")} · {formatMoney(slot.meta.money)} · saved{" "}
                   {dateFormat.format(new Date(slot.meta.savedAt))}

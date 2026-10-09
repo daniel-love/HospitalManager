@@ -1,6 +1,9 @@
-/** Small floating bits: the build cursor tooltip, toast messages and the coverage key. */
+/**
+ * Small floating bits: the build cursor tooltip, toast messages, the paused
+ * hint and the coverage key.
+ */
 import { COVER_COLOURS, COVER_SEEN } from "@render/palette";
-import { coverageOverlay, cursorInfo, toasts } from "./store";
+import { coverageOverlay, cursorInfo, hud, toasts } from "./store";
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
 
@@ -25,6 +28,16 @@ export function Toasts() {
           {t.text}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** A quiet reminder under the top bar while the game is paused. */
+export function PausedHint() {
+  if (hud.value.speed !== 0) return null;
+  return (
+    <div class="paused-hint" role="status">
+      Paused · press Space or pick a speed when you're ready
     </div>
   );
 }

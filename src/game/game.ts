@@ -7,14 +7,26 @@
  * the map, tools and inspector all show the plan preview ("viewState").
  */
 import { equipmentById, objectDef, roomById } from "@data/catalogue";
-import { autosave } from "@save/saveManager";
+import {
+  autosave,
+  loadGame,
+  rememberLastSave,
+  saveGame,
+  saveResumeSnapshot,
+} from "@save/saveManager";
 import { applyCommand, type Command, type CommandResult } from "@sim/commands";
 import { addToPlan, buildPreview, commitPlan, planDiff, type PlanPreview } from "@sim/plan";
 import { tick } from "@sim/sim";
 import { createSimState, type SimState } from "@sim/state";
 import { coverageView, stationsSeeing, bedCover } from "@sim/systems/monitoring";
 import { applyStaffCommand, type StaffCommand } from "@sim/systems/staffing";
-import { clockFromTick, formatClock, TICKS_PER_SECOND_1X } from "@sim/time";
+import {
+  clockFromTick,
+  formatClock,
+  START_MINUTE_OF_DAY,
+  TICKS_PER_MINUTE,
+  TICKS_PER_SECOND_1X,
+} from "@sim/time";
 import { itemsAt } from "@sim/world/objects";
 import { roomAt } from "@sim/world/rooms";
 import { CameraControls, isPanModifier } from "@render/cameraControls";
@@ -42,6 +54,7 @@ import {
   type InspectorData,
 } from "@ui/store";
 import { tileHelp } from "@ui/help";
+import { autosaveOption, settings, settingsOpen } from "@ui/settings";
 import { BuildController } from "./buildController";
 import {
   describePatient,
@@ -96,7 +109,12 @@ export class Game {
   private lastPanels = 0;
   private lastHovered = "";
   private hoverSince = 0;
-  private lastDay: number;
+  /** Name the hospital was last saved or loaded under; autosaves use it too. */
+  saveName = "My hospital";
+  /** Tick of the last save or load, so an unchanged game isn't autosaved again. */
+  private savedTick: number;
+  /** Which autosave interval the clock was in when last checked (see autosavePeriod). */
+  private autosavePeriod: number | null;
   /** The plan applied to a copy of the state; null when there's no plan. */
   private preview: PlanPreview | null = null;
 
@@ -115,6 +133,8 @@ export class Game {
     private readonly renderer: Renderer,
   ) {
     this.loop = new FixedStepLoop(() => tick(this.state), { ticksPerSecond: TICKS_PER_SECOND_1X });
+    // Every game starts paused, so the player can look around first.
+    this.loop.setSpeed(0);
     this.controls = new CameraControls(renderer, {
       canPan: (e) => e.button !== 0 || isPanModifier(e) || !this.build.active,
       onClick: (button, x, y) => {
@@ -124,9 +144,17 @@ export class Game {
     });
     // The build tools see (and edit) the plan preview while planning.
     this.build = new BuildController(renderer, this);
-    this.lastDay = clockFromTick(state.tick).day;
+    this.savedTick = state.tick;
+    this.autosavePeriod = this.currentAutosavePeriod();
+    // A new interval starts the count afresh rather than saving straight away.
+    settings.subscribe(() => (this.autosavePeriod = this.currentAutosavePeriod()));
     if (state.plan.length > 0) this.rebuildPreview();
     window.addEventListener("keydown", (e) => this.onKey(e));
+    // Keep the game for resuming when the tab is hidden, reloaded or closed.
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") this.saveForResume();
+    });
+    window.addEventListener("pagehide", () => this.saveForResume());
     renderer.app.ticker.add((t) => this.frame(t.deltaMS));
     this.publishHud();
   }
@@ -258,10 +286,28 @@ export class Game {
     showToast(`Built ${what} for ${formatMoney(result.cost)}`);
   }
 
-  /** Replaces the running game, e.g. after loading. Pauses so the player can get their bearings. */
-  loadState(state: SimState): void {
+  /** Saves under a name (overwriting a save of the same name) and makes it the one to resume. */
+  async save(name: string): Promise<void> {
+    await saveGame(this.state, name);
+    this.saveName = name;
+    this.savedTick = this.state.tick;
+  }
+
+  /** Loads a save from the list. */
+  async load(id: string): Promise<void> {
+    const { name, state } = await loadGame(id);
+    this.loadState(state, name);
+  }
+
+  /**
+   * Replaces the running game, e.g. after loading. Pauses so the player can get
+   * their bearings. `name` is what the save was called, if it came from one.
+   */
+  loadState(state: SimState, name = "My hospital"): void {
     this.state = state;
-    this.lastDay = clockFromTick(state.tick).day;
+    this.saveName = name;
+    this.savedTick = state.tick;
+    this.autosavePeriod = this.currentAutosavePeriod();
     this.selectedTile = null;
     this.selectedAgent = null;
     this.renderer.setSelectedAgent(null);
@@ -281,6 +327,8 @@ export class Game {
   newGame(): void {
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
     this.loadState(createSimState({ seed }));
+    // Until it's saved, a reload starts afresh rather than resuming the old hospital.
+    rememberLastSave(null);
   }
 
   setSpeed(speed: Speed): void {
@@ -349,6 +397,34 @@ export class Game {
     );
   }
 
+  /**
+   * Counts autosave intervals from midnight on day 1, so saves land on round
+   * clock times (e.g. 06:00). Null when autosave is off.
+   */
+  private currentAutosavePeriod(): number | null {
+    const every = autosaveOption().minutes;
+    if (every === null) return null;
+    const minutes = Math.floor(this.state.tick / TICKS_PER_MINUTE) + START_MINUTE_OF_DAY;
+    return Math.floor(minutes / every);
+  }
+
+  /** Snapshots the game for the next start-up, if it has moved on since it was last saved. */
+  private saveForResume(): void {
+    if (this.state.tick === this.savedTick) return;
+    this.savedTick = this.state.tick;
+    saveResumeSnapshot(this.state, this.saveName);
+  }
+
+  /** Autosaves if autosave is on and the game has moved on since it was last saved. */
+  private autosave(): void {
+    if (autosaveOption().minutes === null || this.state.tick === this.savedTick) return;
+    this.savedTick = this.state.tick;
+    autosave(this.state, this.saveName).catch((err: unknown) => {
+      console.error(err);
+      showToast("Autosave failed", "error");
+    });
+  }
+
   private frame(deltaMs: number): void {
     const stats = this.loop.advance(deltaMs);
     this.controls.update(deltaMs);
@@ -366,13 +442,10 @@ export class Game {
     this.renderer.render(this.loop.alpha, this.state);
     this.drainEvents();
 
-    const day = clockFromTick(this.state.tick).day;
-    if (day !== this.lastDay) {
-      this.lastDay = day;
-      autosave(this.state).catch((err: unknown) => {
-        console.error(err);
-        showToast("Autosave failed", "error");
-      });
+    const period = this.currentAutosavePeriod();
+    if (period !== this.autosavePeriod) {
+      this.autosavePeriod = period;
+      this.autosave();
     }
 
     // Exponential moving averages keep the debug numbers readable.
@@ -449,7 +522,14 @@ export class Game {
   private updateHoverHelp(): void {
     const tile = this.renderer.hoveredTile;
     const at = this.renderer.pointerScreen;
-    if (this.build.active || this.controls.dragging || saveDialogOpen.value || !tile || !at) {
+    if (
+      this.build.active ||
+      this.controls.dragging ||
+      saveDialogOpen.value ||
+      settingsOpen.value ||
+      !tile ||
+      !at
+    ) {
       if (mapHelp.value) mapHelp.value = null;
       return;
     }
