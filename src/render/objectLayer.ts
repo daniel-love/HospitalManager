@@ -8,11 +8,13 @@ import { equipmentById } from "@data/catalogue";
 import type { Access, EquipmentDef } from "@data/schema";
 import type { PlacedObject, Rotation, SimState } from "@sim/state";
 import { frontDirection, objectRect } from "@sim/world/objects";
+import { kitsOut } from "@sim/world/sharedKit";
 import type { Rect } from "@sim/world/rect";
 import { TILE_SIZE } from "./constants";
 import { CATEGORY_COLOURS, STAFF_COLOUR } from "./palette";
 
 const INSET = 3;
+const KIT_AWAY_ALPHA = 0.25;
 
 export class ObjectLayer {
   readonly container = new Container();
@@ -45,12 +47,18 @@ export class ObjectLayer {
     }
   }
 
-  /** Labels are unreadable when zoomed far out, so hide them. */
-  update(zoom: number): void {
+  /**
+   * Labels are unreadable when zoomed far out, so hide them. Shared kit
+   * that's out with someone (drawn beside them by the agent layer) leaves a
+   * faint outline where it's kept.
+   */
+  update(zoom: number, state: SimState): void {
     const showText = zoom >= 0.55;
-    for (const { view } of this.views.values()) {
+    const out = kitsOut(state);
+    for (const [id, { view }] of this.views) {
       const label = view.children[1];
       if (label) label.visible = showText;
+      view.alpha = out.has(id) ? KIT_AWAY_ALPHA : 1;
     }
   }
 

@@ -12,6 +12,13 @@
  */
 import type { EquipmentCategory, EquipmentInput } from "./schema";
 
+/**
+ * How far staff will wheel shared kit (`mobile`), in tiles (metres) of
+ * walking from where it's kept: about one department's span, like the
+ * central monitor's response distance.
+ */
+export const SHARED_KIT_RANGE = 25;
+
 /** Patients at the front (arrow), staff behind. */
 const STAFFED_COUNTER: EquipmentInput["access"] = [
   { side: "front", who: "user" },
@@ -303,7 +310,11 @@ export const equipment: EquipmentInput[] = [
     power: true,
     capabilities: ["ecg_basic", "ecg_12lead"],
     glyph: "E12",
-    description: "Full diagnostic ECG, needed for suspected heart attacks.",
+    mobile: true,
+    // Wheeled out from the front.
+    access: [{ side: "front", who: "staff" }],
+    description:
+      "A wheeled 12-lead ECG machine, needed for suspected heart attacks. One is shared by every bed within 25 m of where it's kept: a nurse fetches it, records the ECG at the bedside and wheels it back, one patient at a time.",
   },
   {
     id: "blood_gas_analyser",
@@ -334,6 +345,23 @@ export const equipment: EquipmentInput[] = [
     access: BEDSIDE,
     description:
       "A digital X-ray table with its overhead tube. Patients lie (or stand) at it while a radiographer takes the images. Needs an X-ray Room.",
+  },
+  {
+    id: "portable_xray",
+    name: "Portable X-ray",
+    category: "diagnostic",
+    tier: 2,
+    cost: 95000,
+    upkeep: 800,
+    footprint: [1, 1],
+    reliability: 0.99,
+    power: true,
+    capabilities: ["portable_xray"],
+    glyph: "PX",
+    mobile: true,
+    access: [{ side: "front", who: "staff" }],
+    description:
+      "A wheeled digital X-ray unit. A radiographer takes it to Majors and Resus patients who shouldn't leave their monitoring (anyone in Resus, very sick or deteriorating, or on continuous monitoring), within 25 m of where it's kept, so they're X-rayed on their trolley. Everyone else still goes to the X-ray Room.",
   },
   {
     id: "ct_scanner",

@@ -78,6 +78,7 @@ const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
     "Observations",
     "Supports a resuscitation",
     "Verifies expected deaths and does last offices",
+    "Fetches the shared 12-lead ECG to the bedside and wheels it back",
   ],
   junior_doctor: [
     "Leads resuscitation at a cardiac arrest",
@@ -89,6 +90,9 @@ const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
     "Wheels admitted patients to the ward",
     "Takes blood samples to the lab",
     "Takes the deceased to the mortuary",
+  ],
+  radiographer: [
+    "Takes the portable X-ray to Majors and Resus patients who shouldn't leave their trolley",
   ],
   biomedical_scientist: ["Books in and processes blood samples on the analyser"],
   cleaner: ["Cleans cubicles, trolleys and beds between patients", "Keeps toilets usable"],

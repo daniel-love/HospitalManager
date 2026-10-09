@@ -13,7 +13,7 @@
  * A step with `needsResults` waits until every result is back.
  */
 import { ANALYSER_MINS, CT_REPORT_MINS, CT_TARGET_MINS, LAB_PROCESS_MINS } from "@data/diagnostics";
-import { roomById } from "@data/catalogue";
+import { conditionById, roomById } from "@data/catalogue";
 import type { Investigation, Job, Patient, Point, Staff } from "../agents";
 import { bedside, frontOf, release } from "../places";
 import type { PlacedObject, SimState } from "../state";
@@ -141,7 +141,13 @@ export function runDiagnosticJob(state: SimState, job: Job, staff: Staff, p: Pat
  * patient leaves the scanner: back to their trolley if they kept one,
  * otherwise back to wait.
  */
-export function scanned(state: SimState, p: Patient, test: "xray" | "ct", job: Job): void {
+export function scanned(
+  state: SimState,
+  p: Patient,
+  test: "xray" | "ct",
+  job: Job,
+  atBedside = false,
+): void {
   const started = state.tick - job.durationTicks;
   p.investigations.push({
     test,
@@ -156,7 +162,21 @@ export function scanned(state: SimState, p: Patient, test: "xray" | "ct", job: J
     stats.doorToCtMins += (started - p.times.arrived) / TICKS_PER_MINUTE;
     if (started - job.createdTick <= CT_TARGET_MINS * TICKS_PER_MINUTE) stats.ctWithinTarget++;
   }
-  leaveScanner(state, p);
+  if (!atBedside) leaveScanner(state, p);
+}
+
+/**
+ * Whether a patient's X-ray should be taken on their trolley with a
+ * portable X-ray rather than in the X-ray Room: they're in Resus, very sick
+ * (category 1) or deteriorating, or on continuous monitoring they shouldn't
+ * leave. Only for patients on a Majors or Resus trolley.
+ */
+export function xrayAtBedside(state: SimState, p: Patient): boolean {
+  const room = p.bed === null ? undefined : roomOfObject(state, p.bed);
+  if (!room || !roomById.get(room.typeId)?.observed) return false;
+  if (room.typeId === "resus_bay" || p.category === 1) return true;
+  if (p.deterioration?.noticed != null) return true;
+  return conditionById.get(p.conditionId)?.monitoring === "continuous";
 }
 
 /**

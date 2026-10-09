@@ -3,7 +3,12 @@
  * than from the raw data files so everything has been through Zod.
  */
 import { conditions } from "./conditions";
-import { capabilityCombos, equipment, EQUIPMENT_CATEGORY_NAMES } from "./equipment";
+import {
+  capabilityCombos,
+  equipment,
+  EQUIPMENT_CATEGORY_NAMES,
+  SHARED_KIT_RANGE,
+} from "./equipment";
 import { ROOM_GROUP_NAMES, ROOM_GROUP_OF, roomGroups, rooms } from "./rooms";
 import type {
   ConditionDef,
@@ -56,7 +61,9 @@ export function equipmentNamesFor(capability: string): string[] {
   const combo = content.capabilityCombos.find((c) => c.capability === capability);
   if (combo) return combo.requires.flatMap(equipmentNamesFor);
   const item = content.equipment.find((e) => e.capabilities.includes(capability));
-  return [item?.name ?? capability];
+  if (!item) return [capability];
+  // Shared kit can be kept elsewhere.
+  return [item.mobile ? `${item.name} within ${SHARED_KIT_RANGE} m` : item.name];
 }
 
 /** Extra equipment a room type needs for some conditions (see conditionEquipment). */

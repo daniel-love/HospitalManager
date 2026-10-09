@@ -12,10 +12,11 @@ import { conditionById } from "@data/catalogue";
 import { onSite, type Job, type Patient, type Point, type Staff } from "../agents";
 import {
   bedside,
-  freeCouch,
+  freeCouches,
   frontOf,
   holder,
   inValidRoom,
+  kitFor,
   release,
   reserve,
   seatApproach,
@@ -31,7 +32,7 @@ import {
 import { handoverDone } from "./ambulances";
 import { finishResus, newsScore, notice } from "./deterioration";
 import { NEWS_URGENT } from "@data/monitoring";
-import { removeJob, unassignJob } from "./jobBoard";
+import { dropKit, removeJob, unassignJob } from "./jobBoard";
 import { headTo } from "./movement";
 import { TICKS_PER_MINUTE } from "../time";
 import { canReviewDeath, claimDeathPlace, runDeathJob } from "./deaths";
@@ -47,6 +48,7 @@ import {
   runDiagnosticJob,
   scanned,
   sendSample,
+  xrayAtBedside,
 } from "./diagnostics";
 import { chance } from "../rng";
 import { roomOfObject } from "../world/rooms";
@@ -104,6 +106,7 @@ export function assignJobs(state: SimState): void {
     job.state = "assigned";
     staff.jobId = job.id;
     if (job.kind === "clean_toilet") reserve(state, job.objectId!, 0, staff.id);
+    if (job.kit) reserve(state, job.kit.objectId, 0, staff.id);
   }
 }
 
@@ -147,6 +150,7 @@ function claimPlace(state: SimState, job: Job): Point | null {
     if (!obj) return null;
     // A toilet in use gets cleaned once it's free.
     if (job.kind === "clean_toilet" && holder(state, obj.id, 0) !== undefined) return null;
+    if (!claimKit(state, job, obj)) return null; // Waiting for the shared ECG, say.
     return obj;
   }
   const p = job.patientId === null ? undefined : state.patients[job.patientId];
@@ -159,11 +163,58 @@ function claimPlace(state: SimState, job: Job): Point | null {
     (p.stage === "in_cubicle" && p.path.length === 0);
   if (!waiting) return null;
   if (isBeingSeen(state, p.id)) return null; // Mid-observations.
-  const couch = freeCouch(state, job.roomType, job.capabilities, p);
+  const trolley = step?.imaging === "xray" ? bedsideXray(state, job, p) : null;
+  if (trolley) return trolley;
+  const couch = freeCouches(state, job.roomType, job.capabilities, p).find((c) =>
+    claimKit(state, job, c),
+  );
   if (!couch) return null;
   job.objectId = couch.id;
   callToBed(state, p, couch.id, keepsTrolley(state, p, !!step?.imaging));
   return couch;
+}
+
+/**
+ * Treatment at this couch with shared kit, if it needs any: picks the
+ * nearest free item (reserved once someone takes the job). False if none is
+ * free.
+ */
+function claimKit(state: SimState, job: Job, couch: PlacedObject): boolean {
+  if (job.kind !== "treat" || job.capabilities.length === 0) return true;
+  const kit = kitFor(state, couch, job.capabilities);
+  if (kit === undefined) {
+    if (job.capabilities.includes(PORTABLE_XRAY)) toXrayRoom(state, job);
+    return false;
+  }
+  job.kit = kit && { objectId: kit.id, at: "store" };
+  return true;
+}
+
+const PORTABLE_XRAY = "portable_xray";
+
+/**
+ * An X-ray for someone who shouldn't leave their trolley (xrayAtBedside):
+ * taken there, if a portable X-ray is free and can be wheeled to them. The
+ * job moves to their trolley; returns it, or null to use the X-ray Room.
+ */
+function bedsideXray(state: SimState, job: Job, p: Patient): PlacedObject | null {
+  if (!xrayAtBedside(state, p)) return null;
+  const trolley = state.objects[p.bed!]!;
+  const kit = kitFor(state, trolley, [PORTABLE_XRAY]);
+  if (!kit) return null;
+  job.objectId = trolley.id;
+  job.roomType = roomOfObject(state, trolley.id)!.typeId;
+  job.capabilities = [PORTABLE_XRAY];
+  job.kit = { objectId: kit.id, at: "store" };
+  return trolley;
+}
+
+/** A bedside X-ray whose portable is gone or taken: back to the X-ray Room. */
+function toXrayRoom(state: SimState, job: Job): void {
+  const step = treatStep(state, job)!;
+  job.objectId = null;
+  job.roomType = step.room;
+  job.capabilities = [...step.capabilities];
 }
 
 /** The pathway step a treatment job is for. */
@@ -202,7 +253,12 @@ export function runJobs(state: SimState): void {
     if (job.state === "open") continue;
     const staff = job.staffId === null ? undefined : state.staff[job.staffId];
     if (!staff) {
+      if (job.kind === "return_kit") {
+        removeJob(state, job); // The kit's left to go back on its own.
+        continue;
+      }
       // Dismissed mid-job: someone else picks it up, at the same place.
+      dropKit(state, job);
       job.staffId = null;
       job.state = "open";
       job.progress = 0;
@@ -211,6 +267,10 @@ export function runJobs(state: SimState): void {
     const patient = job.patientId === null ? undefined : state.patients[job.patientId];
     if (job.patientId !== null && !patient) {
       removeJob(state, job);
+      continue;
+    }
+    if (job.kind === "return_kit") {
+      returnKit(state, job, staff);
       continue;
     }
     if (atPatient(job)) {
@@ -235,6 +295,16 @@ export function runJobs(state: SimState): void {
       abandon(state, job);
       continue;
     }
+    if (job.kit?.at === "store") {
+      // Fetch the shared kit first.
+      const kit = state.objects[job.kit.objectId];
+      if (!kit) {
+        unassignJob(state, job); // It's gone: wait for another.
+        continue;
+      }
+      if (headTo(state, staff, frontOf(kit)) !== "arrived") continue;
+      job.kit.at = "staff";
+    }
     const spot = job.kind === "clean_toilet" ? frontOf(obj) : bedside(state, obj);
     const arrival = headTo(state, staff, spot);
     if (job.state === "assigned") {
@@ -242,6 +312,7 @@ export function runJobs(state: SimState): void {
       const onBed = ["triage", "in_cubicle", "on_ward"].includes(patient?.stage ?? "triage");
       if (patient && !onBed) continue;
       job.state = "working";
+      if (job.kit) job.kit.at = "patient";
       if (job.kind === "treat" && patient && patient.times.seen === null) {
         patient.times.seen = state.tick;
         lift(patient, MOOD_LIFT_SEEN);
@@ -300,6 +371,14 @@ function runAtPatient(state: SimState, job: Job, staff: Staff, p: Patient): void
   }
 }
 
+/** Wheels shared kit back to where it's kept; then it's free for the next patient. */
+function returnKit(state: SimState, job: Job, staff: Staff): void {
+  const kit = job.objectId === null ? undefined : state.objects[job.objectId];
+  if (kit && headTo(state, staff, frontOf(kit)) !== "arrived") return;
+  job.kit!.at = "store";
+  removeJob(state, job);
+}
+
 /** The place stopped working (removed or room invalid): put the job back. */
 function abandon(state: SimState, job: Job): void {
   if (job.patientId === null) {
@@ -308,6 +387,7 @@ function abandon(state: SimState, job: Job): void {
   }
   const staff = job.staffId === null ? undefined : state.staff[job.staffId];
   if (staff) staff.jobId = null;
+  dropKit(state, job, staff);
   const patient = state.patients[job.patientId]!;
   backToWaiting(state, patient);
   job.objectId = null;
@@ -344,8 +424,10 @@ function complete(state: SimState, job: Job, obj: PlacedObject): void {
       }
       const next = pathway[p.step];
       if (done?.imaging) {
-        // Off the scanner: back to their trolley, or to wait.
-        scanned(state, p, done.imaging, job);
+        // Off the scanner: back to their trolley, or to wait. A portable
+        // X-ray was taken where they lie.
+        const atBedside = job.roomType !== done.room;
+        scanned(state, p, done.imaging, job, atBedside);
         const home = p.bed === null ? undefined : roomOfObject(state, p.bed);
         postTreatment(state, p, home && next!.room === home.typeId ? p.bed : null);
         break;

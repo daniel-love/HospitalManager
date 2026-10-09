@@ -18,7 +18,8 @@ import { isWalkable } from "./world/pathfinding";
 import { frontDirection, isStandable, objectRect, sideTiles } from "./world/objects";
 import { nearestEdgeTile, nearestTile } from "./world/pathfinding";
 import { rectTiles } from "./world/rect";
-import { roomOfObject } from "./world/rooms";
+import { capabilitiesOf, roomOfObject } from "./world/rooms";
+import { isMobile, kitReach, sharedKitIds } from "./world/sharedKit";
 
 export type Slot = number | "staff";
 
@@ -101,6 +102,39 @@ function nearest<T extends PlacedObject>(items: T[], from: Point): T | undefined
     }
   }
   return best;
+}
+
+// ---------- Shared kit ----------
+
+/**
+ * Shared kit (world/sharedKit.ts) to fetch for a step at this couch: null
+ * if the room's own equipment has everything, otherwise the nearest free
+ * item that provides what's missing and can be wheeled there, or undefined
+ * if none is free.
+ */
+export function kitFor(
+  state: SimState,
+  couch: PlacedObject,
+  capabilities: readonly string[],
+): PlacedObject | null | undefined {
+  const room = roomOfObject(state, couch.id);
+  if (!room) return undefined;
+  const own = capabilitiesOf(
+    room.objectIds.map((id) => state.objects[id]!.defId).filter((d) => !isMobile(d)),
+  );
+  const needed = capabilities.filter((c) => !own.includes(c));
+  if (needed.length === 0) return null;
+  const kits = sharedKitIds(state)
+    .map((id) => state.objects[id]!)
+    .filter((o) => {
+      const caps = equipmentById.get(o.defId)!.capabilities;
+      return (
+        needed.every((c) => caps.includes(c)) &&
+        holder(state, o.id, 0) === undefined &&
+        kitReach(state, o.id).has(room.id)
+      );
+    });
+  return nearest(kits, couch);
 }
 
 // ---------- Seats ----------

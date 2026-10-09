@@ -83,7 +83,7 @@ export const staffRoles: StaffRoleInput[] = [
     group: "diagnostics",
     annualCost: 49_500,
     description:
-      "Band 6. Takes X-rays and does CT scans in the X-ray and CT Rooms. Patients come to them: walking from Minors, or from their Majors trolley, which is kept for them.",
+      "Band 6. Takes X-rays and does CT scans in the X-ray and CT Rooms. Patients come to them: walking from Minors, or from their Majors trolley, which is kept for them. With a portable X-ray, they X-ray patients who shouldn't leave their monitoring on their trolley.",
   },
   {
     id: "biomedical_scientist",

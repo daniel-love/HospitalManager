@@ -5,6 +5,7 @@
  */
 import {
   conditionById,
+  equipmentById,
   roleNames,
   roomById,
   specialtyById,
@@ -638,9 +639,19 @@ export function staffState(state: SimState, s: Staff): StaffState {
     case "clean_toilet":
       what = "Cleaning a toilet";
       break;
+    case "return_kit":
+      what = `Taking the ${kitName(state, job.objectId)} back`;
+      break;
   }
   const patientId = patient?.id ?? null;
-
+  if (job.kit?.at === "store" && job.kind !== "return_kit") {
+    return {
+      status: "on_the_way",
+      activity: `${what} (fetching the ${kitName(state, job.kit.objectId)})`,
+      progress: null,
+      patientId,
+    };
+  }
   if (job.state === "working") {
     return {
       status: "working",
@@ -657,6 +668,12 @@ export function staffState(state: SimState, s: Staff): StaffState {
         progress: null,
         patientId,
       };
+}
+
+/** "ECG (12-lead)": a piece of shared kit, for activity lines. */
+function kitName(state: SimState, objectId: number | null): string {
+  const obj = objectId === null ? undefined : state.objects[objectId];
+  return (obj && equipmentById.get(obj.defId)?.name) ?? "equipment";
 }
 
 export function staffActivity(state: SimState, s: Staff): string {

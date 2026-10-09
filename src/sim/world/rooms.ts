@@ -21,6 +21,7 @@ import type { RoomDef, SpecialtyId } from "@data/schema";
 import type { Room, RoomCheck, SimState } from "../state";
 import { isSolidWall, isWallOrDoor, tileIndex, WallType, type FloorGrid } from "./grid";
 import { isStandable, objectRect, sideTiles } from "./objects";
+import { shareKit } from "./sharedKit";
 
 export function detectRooms(state: SimState): void {
   const rooms: Room[] = [];
@@ -72,6 +73,14 @@ export function detectRooms(state: SimState): void {
   }
 
   for (const room of rooms) evaluateRoom(state, room, rooms);
+  shareKit(state, rooms);
+  for (const room of rooms) {
+    room.forConditions = conditionEquipment(room.typeId).map((e) => ({
+      label: e.items.join(" and "),
+      ok: room.capabilities.includes(e.capability),
+      detail: `for ${e.conditions.join(", ").toLowerCase()}`,
+    }));
+  }
   // Ward specialties, found again from the tile each is pinned to.
   for (const [key, specialty] of Object.entries(state.wardSpecialties)) {
     const [floor, tile] = key.split(":").map(Number);
@@ -198,11 +207,6 @@ function evaluateRoom(state: SimState, room: Room, rooms: Room[]): void {
   room.checks = checks;
   room.valid = checks.every((c) => c.ok);
   room.capabilities = capabilitiesOf(defIds);
-  room.forConditions = conditionEquipment(room.typeId).map((e) => ({
-    label: e.items.join(" and "),
-    ok: room.capabilities.includes(e.capability),
-    detail: `for ${e.conditions.join(", ").toLowerCase()}`,
-  }));
 }
 
 /**

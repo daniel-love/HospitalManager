@@ -16,13 +16,14 @@
  * when it leaves.
  */
 import { Container, Graphics, GraphicsContext } from "pixi.js";
-import { staffRoleById } from "@data/catalogue";
+import { equipmentById, staffRoleById } from "@data/catalogue";
 import { TRIAGE_CATEGORIES } from "@data/patients";
 import { onSite, type AgentBase, type Ambulance, type Patient, type Staff } from "@sim/agents";
 import type { SimState } from "@sim/state";
 import { SPACE_L, SPACE_W } from "@sim/systems/ambulances";
 import { crewOnFoot } from "@sim/systems/collections";
 import { curtainsDrawn } from "@sim/systems/curtains";
+import { kitsOut } from "@sim/world/sharedKit";
 import { TILE_SIZE } from "./constants";
 import {
   bedCurtainSize,
@@ -41,6 +42,7 @@ import {
   AMBULANCE_YELLOW,
   ARREST_MARK,
   ATTENDED_RING,
+  CATEGORY_COLOURS,
   DETERIORATING_MARK,
   PARAMEDIC_COLOUR,
   PATIENT_COLOUR,
@@ -51,6 +53,8 @@ import {
 
 const PATIENT_RADIUS = 7;
 const STAFF_RADIUS = 8;
+/** Shared kit drawn beside staff, px. */
+const KIT_SIZE = 12;
 const UNHAPPY_MOOD = 30;
 /** How long each on and off half of the unnoticed-deterioration blink lasts. */
 const BLINK_MS = 400;
@@ -73,10 +77,12 @@ export class AgentLayer {
   private readonly privateAmbulances = new Map<number, { g: Graphics; angle: number }>();
   /** Families in the Relatives' Room, being told of a death. */
   private readonly families = new Graphics();
+  /** Shared kit (a 12-lead ECG, say) beside whoever has it out. */
+  private readonly kits = new Graphics();
   private familiesDrawn = "";
 
   constructor() {
-    this.container.addChild(this.vehicles, this.families, this.people);
+    this.container.addChild(this.vehicles, this.families, this.kits, this.people);
   }
   selectedId: number | null = null;
 
@@ -125,6 +131,7 @@ export class AgentLayer {
           .g.position.set((at.x + 0.5) * TILE_SIZE, (at.y + 0.5) * TILE_SIZE);
     }
     this.updatePrivateAmbulances(state, alpha);
+    this.drawKits(state);
     const families = familiesLook(state);
     if (families !== this.familiesDrawn) {
       this.families.clear();
@@ -139,7 +146,39 @@ export class AgentLayer {
     }
   }
 
+  /**
+   * Shared kit out of its store: wheeled just ahead of whoever is taking it
+   * to a patient or back, and left beside them at the bedside.
+   */
+  private drawKits(state: SimState): void {
+    this.kits.clear();
+    const T = TILE_SIZE;
+    for (const [kitId, staffId] of kitsOut(state)) {
+      const kit = state.objects[kitId];
+      const s = state.staff[staffId];
+      const view = this.views.get(staffId);
+      if (!kit || !s || !view) continue;
+      const def = equipmentById.get(kit.defId);
+      const dx = s.x - s.prevX;
+      const dy = s.y - s.prevY;
+      const len = Math.hypot(dx, dy);
+      // Ahead of them while walking; to their right while they work.
+      const ox = len > 1e-6 ? (dx / len) * 0.6 : 0.6;
+      const oy = len > 1e-6 ? (dy / len) * 0.6 : 0;
+      const x = view.g.position.x + ox * T;
+      const y = view.g.position.y + oy * T;
+      const colour = def ? CATEGORY_COLOURS[def.category] : 0x888888;
+      this.kits
+        .roundRect(x - KIT_SIZE / 2, y - KIT_SIZE / 2, KIT_SIZE, KIT_SIZE, 3)
+        .fill(colour)
+        .stroke({ width: 1.5, color: 0xffffff });
+      // Its screen.
+      this.kits.rect(x - KIT_SIZE / 4, y - KIT_SIZE / 4, KIT_SIZE / 2, KIT_SIZE / 3).fill(0x1d232b);
+    }
+  }
+
   clear(): void {
+    this.kits.clear();
     for (const v of this.views.values()) v.g.destroy();
     this.views.clear();
     for (const v of this.ambulances.values()) v.g.destroy();

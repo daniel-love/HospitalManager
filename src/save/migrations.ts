@@ -402,6 +402,12 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
     ...save,
     state: { ...(save.state as object), collections: [], nextCollectionId: 1 },
   }),
+  // v21: shared kit. Old jobs never fetched any: the ECGs already in bays
+  // become shared ones, kept where they stand.
+  20: (save) => {
+    const state = save.state as { jobs: object[] };
+    return { ...save, state: { ...state, jobs: state.jobs.map((j) => ({ ...j, kit: null })) } };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

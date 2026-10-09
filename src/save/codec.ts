@@ -249,6 +249,7 @@ const jobSchema = z.object({
     "to_mortuary",
     "me_review",
     "release_body",
+    "return_kit",
     "debrief",
   ]),
   roles: z.array(z.enum(staffRoleIds)).min(1),
@@ -264,6 +265,7 @@ const jobSchema = z.object({
   staffId: nullableInt,
   state: z.enum(["open", "assigned", "working"]),
   createdTick: int.min(0),
+  kit: z.object({ objectId: int.positive(), at: z.enum(["store", "staff", "patient"]) }).nullable(),
 });
 
 const spaceSchema = z.object({ x: int, y: int, w: int.positive(), h: int.positive() });

@@ -269,6 +269,8 @@ export type JobKind =
   | "me_review"
   /** A porter releases the deceased to the funeral director at the mortuary. */
   | "release_body"
+  /** Wheeling shared kit (a 12-lead ECG, say) back to where it's kept. */
+  | "return_kit"
   | "debrief";
 
 /** A tile rectangle where one ambulance parks. */
@@ -381,6 +383,12 @@ export interface Job {
   staffId: number | null;
   state: "open" | "assigned" | "working";
   createdTick: number;
+  /**
+   * Shared kit the job uses (world/sharedKit.ts), reserved for whoever does
+   * it: still where it's kept (store), being wheeled (staff), or at the
+   * bedside in use (patient). Null if none.
+   */
+  kit: { objectId: number; at: "store" | "staff" | "patient" } | null;
 }
 
 /** Money in and out over a period, £. */

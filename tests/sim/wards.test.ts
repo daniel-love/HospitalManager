@@ -205,7 +205,8 @@ describe("admission", () => {
     const chance = admission.chance;
     admission.chance = 1;
     try {
-      runUntil(state, () => p.stage === "leaving", 6 * HOUR);
+      // Up to 4 hours for the transfer ambulance after a chest X-ray and bloods.
+      runUntil(state, () => p.stage === "leaving", 8 * HOUR);
     } finally {
       admission.chance = chance;
     }

@@ -382,7 +382,7 @@ export class Renderer {
       camera.viewportHeight / 2 - camera.y * camera.zoom,
     );
     this.tilemap.update(camera.visibleWorldRect(), camera.zoom);
-    this.objects.update(camera.zoom);
+    this.objects.update(camera.zoom, live);
     this.cleaning.update(live);
     this.agents.update(live, alpha);
     this.labels.update(camera.zoom);

@@ -71,6 +71,12 @@ export const equipmentDefSchema = z.object({
    * stand beneath them and floor items can share their tile.
    */
   mount: z.enum(["floor", "wall", "ceiling"]).default("floor"),
+  /**
+   * Wheeled kit shared across a department (a 12-lead ECG, say): staff fetch
+   * it to any room within SHARED_KIT_RANGE of where it's kept, so those rooms
+   * gain its capabilities, and one patient uses it at a time.
+   */
+  mobile: z.boolean().default(false),
   description: z.string(),
 });
 export type EquipmentDef = z.infer<typeof equipmentDefSchema>;

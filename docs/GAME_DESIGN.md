@@ -193,13 +193,15 @@ A catalogue organised by category, with tiers:
 
 **Capabilities are the core link between equipment and treatment.** Examples:
 
-- 12-lead ECG grants `ecg_12lead`
+- 12-lead ECG grants `ecg_12lead` (shared: see below)
 - Defibrillator + resus trolley grant `resuscitation`
 - CT scanner grants `ct_imaging`
 - Ventilator grants `ventilation`
 - Operating table + anaesthetic machine + lights grant `general_surgery_theatre`
 
 A room's **capability set** is the union of its equipment's capabilities. Conditions declare which capabilities each pathway step needs. Equipment tiers can also speed up a step or improve its outcome (e.g. a high-end CT scans faster).
+
+**Shared mobile equipment.** Some kit is wheeled and shared across a department, as in a real ED, rather than fixed in one room: the 12-lead ECG and the portable X-ray. A shared item lends its capabilities to every room within 25 m of walking from where it's kept. Staff fetch it to the bedside, use it, and wheel it back, and only one patient has it at a time, so where it's kept and how many there are both matter. Patients who shouldn't leave their monitoring (in Resus, very sick or deteriorating, or on continuous monitoring) are X-rayed on their trolley when a portable X-ray is free; everyone else goes to the X-ray Room.
 
 ---
 

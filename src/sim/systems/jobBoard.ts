@@ -4,8 +4,8 @@
  * import.
  */
 import { CUBICLE_CLEAN_MINS } from "@data/patients";
-import type { Job } from "../agents";
-import { release } from "../places";
+import type { Job, Staff } from "../agents";
+import { release, reserve } from "../places";
 import { noteCareEnded } from "./curtains";
 import { nextFloat, type RngState } from "../rng";
 import type { SimState } from "../state";
@@ -44,12 +44,16 @@ export function postJob(state: SimState, j: NewJob): Job {
     staffId: null,
     state: "open",
     createdTick: state.tick,
+    kit: null,
   };
   state.jobs[job.id] = job;
   return job;
 }
 
-/** Removes a job, freeing whoever was doing it. */
+/**
+ * Removes a job, freeing whoever was doing it. If they'd fetched shared kit,
+ * they wheel it back.
+ */
 export function removeJob(state: SimState, job: Job): void {
   noteCareEnded(state, job);
   const staff = job.staffId === null ? undefined : state.staff[job.staffId];
@@ -60,6 +64,34 @@ export function removeJob(state: SimState, job: Job): void {
     }
   }
   delete state.jobs[job.id];
+  dropKit(state, job, staff);
+}
+
+/**
+ * The job no longer needs its kit. If `returner` has it with them, they
+ * wheel it back (a return_kit job of their own); otherwise it's free where
+ * it's kept.
+ */
+export function dropKit(state: SimState, job: Job, returner?: Staff): void {
+  const kit = job.kit;
+  if (!kit) return;
+  job.kit = null;
+  if (job.staffId !== null) release(state, kit.objectId, 0, job.staffId);
+  const carried = kit.at !== "store" && job.kind !== "return_kit";
+  if (!returner || !carried || returner.jobId !== null || !state.objects[kit.objectId]) return;
+  const back = postJob(state, {
+    kind: "return_kit",
+    roles: [returner.role],
+    objectId: kit.objectId,
+    roomType: "",
+    dueTick: state.tick,
+    durationTicks: 1,
+  });
+  back.kit = { objectId: kit.objectId, at: "staff" };
+  back.staffId = returner.id;
+  back.state = "assigned";
+  returner.jobId = back.id;
+  reserve(state, kit.objectId, 0, returner.id);
 }
 
 /**
@@ -67,6 +99,12 @@ export function removeJob(state: SimState, job: Job): void {
  * its place and patient (they were dismissed, or pulled away to a crash call).
  */
 export function unassignJob(state: SimState, job: Job): void {
+  if (job.kind === "return_kit") {
+    // Called away: the kit is left to go back on its own.
+    removeJob(state, job);
+    return;
+  }
+  dropKit(state, job);
   const staff = job.staffId === null ? undefined : state.staff[job.staffId];
   if (staff) {
     if (job.kind === "clean_toilet" && job.objectId !== null) {

@@ -23,7 +23,7 @@ describe("Majors Bays without a 12-lead ECG", () => {
 
   it("are named as missing it", () => {
     expect(missingRoom(state, "majors_bay", ["ecg_12lead"])).toBe(
-      "No Majors Bay with ECG (12-lead)",
+      "No Majors Bay with ECG (12-lead) within 25 m",
     );
     expect(missingRoom(state, "majors_bay", ["oxygen"])).toBeNull();
     expect(missingRoom(state, "resus_bay", ["resuscitation"])).toBe("No working Resus Bay");
@@ -33,7 +33,11 @@ describe("Majors Bays without a 12-lead ECG", () => {
 describe("equipment for some conditions", () => {
   it("lists what a room type needs beyond being valid", () => {
     expect(conditionEquipment("majors_bay")).toEqual([
-      { capability: "ecg_12lead", items: ["ECG (12-lead)"], conditions: ["Chest pain"] },
+      {
+        capability: "ecg_12lead",
+        items: ["ECG (12-lead) within 25 m"],
+        conditions: ["Chest pain"],
+      },
     ]);
     // Resus's own requirements already cover everything its conditions need.
     expect(conditionEquipment("resus_bay")).toEqual([]);
@@ -42,7 +46,7 @@ describe("equipment for some conditions", () => {
   it("shows on each room, ticked when the room has it", () => {
     const withEcg = buildMajorsAE(1).rooms.find((r) => r.typeId === "majors_bay")!;
     expect(withEcg.forConditions).toEqual([
-      { label: "ECG (12-lead)", ok: true, detail: "for chest pain" },
+      { label: "ECG (12-lead) within 25 m", ok: true, detail: "for chest pain" },
     ]);
     const state = buildMajorsAE(1);
     for (const o of Object.values(state.objects).filter((o) => o.defId === "ecg_12lead")) {

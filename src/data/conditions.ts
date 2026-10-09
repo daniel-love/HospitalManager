@@ -274,6 +274,8 @@ export const conditions: ConditionInput[] = [
         retriageTo: 3,
         sample: true,
       },
+      // Looking for a chest source (NICE NG51).
+      scan("xray", "Chest X-ray", 0.6),
       {
         name: "Doctor review with results",
         roles: [...DOCTOR],

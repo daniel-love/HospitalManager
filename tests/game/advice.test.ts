@@ -74,7 +74,7 @@ describe("Help panel reference", () => {
       .flatMap((s) => s.entries)
       .find((e) => e.id === "chest_pain")!;
     expect(chest.sections[0]!.items[0]).toBe(
-      "12-lead ECG: Staff Nurse, in a Majors Bay with ECG (12-lead)",
+      "12-lead ECG: Staff Nurse, in a Majors Bay with ECG (12-lead) within 25 m",
     );
   });
 });
