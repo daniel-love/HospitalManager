@@ -18,6 +18,7 @@ import { applyCommand, type Command, type CommandResult } from "@sim/commands";
 import { addToPlan, buildPreview, commitPlan, planDiff, type PlanPreview } from "@sim/plan";
 import { tick } from "@sim/sim";
 import { createSimState, type SimState } from "@sim/state";
+import { siteView } from "@sim/world/site";
 import { coverageView, stationsSeeing, bedCover } from "@sim/systems/monitoring";
 import { applyStaffCommand, type StaffCommand } from "@sim/systems/staffing";
 import {
@@ -326,7 +327,9 @@ export class Game {
 
   newGame(): void {
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
-    this.loadState(createSimState({ seed }));
+    const state = createSimState({ seed, site: true });
+    this.loadState(state);
+    if (state.site) this.focus(siteView(state.site));
     // Until it's saved, a reload starts afresh rather than resuming the old hospital.
     rememberLastSave(null);
   }

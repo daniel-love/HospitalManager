@@ -40,6 +40,7 @@ const floorSchema = z.object({
   floorType: z.string(),
   wall: z.string(),
   door: z.string(),
+  land: z.string(),
   zone: z.string(),
 });
 
@@ -56,6 +57,13 @@ const int = z.number().int();
 const rectSchema = z.object({ x: int, y: int, w: int.min(0), h: int.min(0) });
 const rotationSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
 const floorIndex = int.min(0);
+const pointSchema = z.object({ x: int, y: int });
+
+const siteSchema = z.object({
+  road: rectSchema,
+  pavements: z.tuple([rectSchema, rectSchema]),
+  busStop: pointSchema,
+});
 
 /** Every build command, as stored in a saved plan. */
 const commandSchema = z.discriminatedUnion("type", [
@@ -269,6 +277,7 @@ const saveSchema = z.object({
     tick: z.number().int().min(0),
     money: z.number().finite(),
     floors: z.array(floorSchema).min(1),
+    site: siteSchema.nullable(),
     objects: z.array(objectSchema),
     nextObjectId: z.number().int().positive(),
     plan: z.array(z.object({ cmd: commandSchema, createdId: int.positive().optional() })),
@@ -326,8 +335,10 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
         floorType: toBase64(g.floorType),
         wall: toBase64(g.wall),
         door: toBase64(g.door),
+        land: toBase64(g.land),
         zone: toBase64(g.zone),
       })),
+      site: state.site,
       objects: Object.values(state.objects),
       nextObjectId: state.nextObjectId,
       plan: state.plan,
@@ -367,6 +378,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     grid.floorType.set(fromBase64(f.floorType, size, `floor ${n} floorType`));
     grid.wall.set(fromBase64(f.wall, size, `floor ${n} wall`));
     grid.door.set(fromBase64(f.door, size, `floor ${n} door`));
+    grid.land.set(fromBase64(f.land, size, `floor ${n} land`));
     grid.zone.set(fromBase64(f.zone, size, `floor ${n} zone`));
     return grid;
   });
@@ -378,6 +390,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     tick: s.tick,
     money: s.money,
     floors,
+    site: s.site,
     objects: {},
     nextObjectId: s.nextObjectId,
     // Checked when the game builds its plan preview, which drops steps that no longer fit.

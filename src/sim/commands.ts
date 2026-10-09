@@ -11,7 +11,7 @@ import { objectDef, roomById, wallByType } from "@data/catalogue";
 import { RESALE_FRACTION } from "@data/economy";
 import { FOUNDATION_COST_PER_TILE } from "@data/structures";
 import type { PlacedObject, Rotation, SimState } from "./state";
-import { FloorType, tileIndex, WallType, type FloorGrid } from "./world/grid";
+import { FloorType, isPublic, tileIndex, WallType, type FloorGrid } from "./world/grid";
 import {
   accessBlockedBy,
   blockedMessage,
@@ -105,6 +105,9 @@ function finish(state: SimState, o: Outcome): CommandResult {
 /** Error for a command that would change nothing (e.g. walling over walls). */
 export const NOTHING_TO_CHANGE = "Nothing to change here";
 
+/** Error for building on the public road or pavements. */
+export const PUBLIC_LAND = "That's the council's road, not your land";
+
 const refund = (cost: number) => Math.round(cost * RESALE_FRACTION);
 
 function run(state: SimState, cmd: Command, commit: boolean): Outcome {
@@ -138,13 +141,21 @@ function clip(grid: FloorGrid, r: Rect): Rect {
 
 function buildFloor(grid: FloorGrid, rect: Rect, commit: boolean): Outcome {
   let count = 0;
+  let onPublic = false;
   for (const { x, y } of rectTiles(rect)) {
     const i = tileIndex(grid, x, y);
+    if (isPublic(grid, i)) onPublic = true;
     if (grid.floorType[i] !== FloorType.Grass) continue;
     count++;
     if (commit) grid.floorType[i] = FloorType.Floor;
   }
-  return { cost: count * FOUNDATION_COST_PER_TILE, count, changed: rect };
+  const error = count === 0 && onPublic ? PUBLIC_LAND : undefined;
+  return {
+    cost: count * FOUNDATION_COST_PER_TILE,
+    count,
+    changed: rect,
+    ...(error ? { error } : {}),
+  };
 }
 
 function removeFloor(
@@ -160,12 +171,18 @@ function removeFloor(
   let changed: Rect | null = rect;
   for (const o of objs) changed = unionRect(changed, objectRect(o));
   let count = objs.length;
+  let onPublic = false;
   for (const { x, y } of rectTiles(rect)) {
     const i = tileIndex(grid, x, y);
+    if (isPublic(grid, i)) {
+      onPublic = true;
+      continue;
+    }
     if (grid.floorType[i] === FloorType.Grass) continue;
     count++;
     cost -= refund(FOUNDATION_COST_PER_TILE + wallCost(grid.wall[i]!));
   }
+  if (count === 0 && onPublic) return { cost: 0, count: 0, changed: null, error: PUBLIC_LAND };
   // Grass isn't standable, so neighbouring items mustn't face it.
   const removed = new Set(objs.map((o) => o.id));
   const victim = accessBlockedBy(state, floor, rectTiles(rect), removed);
@@ -176,6 +193,7 @@ function removeFloor(
     for (const o of objs) removeObject(state, o);
     for (const { x, y } of rectTiles(rect)) {
       const i = tileIndex(grid, x, y);
+      if (isPublic(grid, i)) continue;
       grid.floorType[i] = FloorType.Grass;
       grid.wall[i] = WallType.None;
       grid.zone[i] = 0;
@@ -199,6 +217,7 @@ function buildWalls(
   const tiles = outlineTiles(rect);
   for (const { x, y } of tiles) {
     const i = tileIndex(grid, x, y);
+    if (isPublic(grid, i)) return { cost: 0, count: 0, changed: null, error: PUBLIC_LAND };
     // Redrawing a room outline over its doors keeps the doors.
     if (grid.door[i] !== 0 || grid.wall[i] === wall) continue;
     const objId = grid.objectId[i] !== -1 ? grid.objectId[i]! : grid.mountId[i]!;

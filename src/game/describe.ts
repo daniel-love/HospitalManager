@@ -20,7 +20,7 @@ import { mortuarySpaces } from "@sim/systems/deaths";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { formatWait, inAE } from "@sim/systems/patients";
 import { clockFromTick, TICKS_PER_MINUTE } from "@sim/time";
-import { FloorType, tileIndex } from "@sim/world/grid";
+import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { roomAt, roomOfObject } from "@sim/world/rooms";
 import type {
   AgentInfo,
@@ -484,7 +484,16 @@ export function whereIs(state: SimState, a: Point): string {
   if (room) return roomById.get(room.typeId)?.name ?? "—";
   const i = tileIndex(grid, x, y);
   if (grid.door[i] !== 0) return "Doorway";
-  return grid.floorType[i] === FloorType.Grass ? "Outside" : "Unzoned area";
+  switch (grid.floorType[i]) {
+    case FloorType.Grass:
+      return "Outside";
+    case FloorType.Path:
+      return isPublic(grid, i) ? "Pavement" : "Footpath";
+    case FloorType.Road:
+      return isPublic(grid, i) ? "Road" : "Access road";
+    default:
+      return "Unzoned area";
+  }
 }
 
 export function describeStaff(state: SimState, s: Staff): AgentInfo {

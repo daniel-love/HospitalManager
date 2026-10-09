@@ -22,8 +22,9 @@ import type { PlanEntry } from "./plan";
 import { createRng, type RngState } from "./rng";
 import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
+import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 8;
+export const SIM_STATE_VERSION = 9;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -72,6 +73,8 @@ export interface SimState {
   money: number;
   /** One grid per floor; index 0 is the ground floor. */
   floors: FloorGrid[];
+  /** The public road and pavements (world/site.ts); null on a blank map. */
+  site: Site | null;
   /** Keyed by object id. */
   objects: Record<number, PlacedObject>;
   nextObjectId: number;
@@ -126,6 +129,8 @@ export interface NewGameOptions {
   width?: number;
   height?: number;
   money?: number;
+  /** Lay out the public road (world/site.ts). Off for blank test maps. */
+  site?: boolean;
 }
 
 export const DEFAULT_MAP_SIZE = 200;
@@ -133,13 +138,15 @@ export const DEFAULT_MAP_SIZE = 200;
 export function createSimState(opts: NewGameOptions): SimState {
   const width = opts.width ?? DEFAULT_MAP_SIZE;
   const height = opts.height ?? DEFAULT_MAP_SIZE;
+  const ground = createFloorGrid(width, height);
   return {
     version: SIM_STATE_VERSION,
     seed: opts.seed >>> 0,
     rng: createRng(opts.seed),
     tick: 0,
     money: opts.money ?? STARTING_CASH,
-    floors: [createFloorGrid(width, height)],
+    floors: [ground],
+    site: opts.site ? layOutSite(ground) : null,
     objects: {},
     nextObjectId: 1,
     plan: [],

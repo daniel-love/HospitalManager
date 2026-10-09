@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { decodeSave, encodeSave, SaveError } from "@save/codec";
 import { tick } from "@sim/sim";
 import { nextU32 } from "@sim/rng";
-import { SIM_STATE_VERSION, type SimState } from "@sim/state";
+import { createSimState, SIM_STATE_VERSION, type SimState } from "@sim/state";
 import { TICKS_PER_DAY } from "@sim/time";
 import { buildSmallAE, staffedSmallAE } from "../fixtures/smallAE";
 
@@ -317,6 +317,27 @@ describe("deaths in saves", () => {
     const loaded = decodeSave(save).state;
     expect(loaded.history[0]!.stats).toEqual({ ...state.history[0]!.stats, ...NO_V8_STATS });
     expect(Object.values(loaded.staff).every((s) => s.morale === 75)).toBe(true);
+  });
+});
+
+describe("the site in saves", () => {
+  it("round-trips the public road and land ownership", () => {
+    const state = createSimState({ seed: 4, width: 40, height: 40, site: true });
+    const loaded = roundTrip(state);
+    expect(loaded.site).toEqual(state.site);
+    expect(snapshot(loaded)).toEqual(snapshot(state));
+  });
+
+  it("upgrades a version-8 save as all the hospital's own land, with no road", () => {
+    const state = buildSmallAE();
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "v8")));
+    save.version = 8;
+    delete save.state.site;
+    for (const f of save.state.floors) delete f.land;
+    const loaded = decodeSave(save).state;
+    expect(loaded.site).toBeNull();
+    expect(loaded.floors[0]!.land.every((l) => l === 0)).toBe(true);
+    expect(snapshot(loaded)).toEqual(snapshot(state));
   });
 });
 

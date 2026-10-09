@@ -14,6 +14,8 @@ import {
   FLOOR_COLOUR,
   GLASS_COLOUR,
   GRASS_SHADES,
+  PATH_COLOUR,
+  ROAD_COLOUR,
   WALL_COLOUR,
   ZONE_ALPHA,
 } from "./palette";
@@ -107,10 +109,15 @@ export class TilemapLayer {
         const i = tileIndex(grid, x, y);
         const px = x * T;
         const py = y * T;
-        if (grid.floorType[i] === FloorType.Floor) {
+        const surface = grid.floorType[i];
+        if (surface === FloorType.Floor) {
           g.rect(px, py, T, T).fill(FLOOR_COLOUR);
           const room = roomByCode.get(grid.zone[i]!);
           if (room) g.rect(px, py, T, T).fill({ color: room.colour, alpha: ZONE_ALPHA });
+        } else if (surface === FloorType.Path) {
+          g.rect(px, py, T, T).fill(PATH_COLOUR);
+        } else if (surface === FloorType.Road) {
+          g.rect(px, py, T, T).fill(ROAD_COLOUR);
         } else {
           g.rect(px, py, T, T).fill(GRASS_SHADES[tileHash(x, y) % GRASS_SHADES.length]!);
         }

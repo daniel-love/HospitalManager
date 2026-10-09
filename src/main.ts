@@ -3,6 +3,7 @@ import { Game } from "@game/game";
 import { Renderer } from "@render/renderer";
 import { loadLastSave } from "@save/saveManager";
 import { createSimState } from "@sim/state";
+import { siteView } from "@sim/world/site";
 import { App } from "@ui/App";
 import { showToast } from "@ui/store";
 import "@ui/styles.css";
@@ -15,9 +16,13 @@ function seedParam(): number | null {
 
 async function main(): Promise<void> {
   const seed = seedParam();
-  const state = createSimState({ seed: seed ?? crypto.getRandomValues(new Uint32Array(1))[0]! });
+  const state = createSimState({
+    seed: seed ?? crypto.getRandomValues(new Uint32Array(1))[0]!,
+    site: true,
+  });
   const renderer = await Renderer.create(document.getElementById("game")!, state);
   const game = new Game(state, renderer);
+  if (state.site) game.focus(siteView(state.site));
   render(h(App, { game }), document.getElementById("ui")!);
 
   // Resume the last save written or loaded, unless a seed asks for a fresh run.

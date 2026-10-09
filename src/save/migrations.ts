@@ -153,7 +153,26 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v9: land ownership and the public road. Older maps were all the hospital's
+  // own land, with no road.
+  8: (save) => {
+    const state = save.state as { floors: { width: number; height: number }[] };
+    return {
+      ...save,
+      state: {
+        ...state,
+        floors: state.floors.map((f) => ({ ...f, land: zeroBase64(f.width * f.height) })),
+        site: null,
+      },
+    };
+  },
 };
+
+/** Base64 of n zero bytes, without building them. */
+function zeroBase64(n: number): string {
+  const tail = ["", "AA==", "AAA="][n % 3]!;
+  return "A".repeat(Math.floor(n / 3) * 4) + tail;
+}
 
 export function migrate(raw: unknown): unknown {
   if (typeof raw !== "object" || raw === null || !("version" in raw)) return raw;
