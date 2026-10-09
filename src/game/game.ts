@@ -33,6 +33,7 @@ import { itemsAt } from "@sim/world/objects";
 import { roomAt } from "@sim/world/rooms";
 import { CameraControls, isPanModifier } from "@render/cameraControls";
 import { TILE_SIZE } from "@render/constants";
+import { tagSpot } from "@render/deathMarks";
 import type { Renderer } from "@render/renderer";
 import {
   buildTab,
@@ -542,7 +543,9 @@ export class Game {
     let best: number | null = null;
     let bestD = AGENT_PICK_RADIUS;
     for (const a of [...Object.values(this.state.staff), ...Object.values(this.state.patients)]) {
-      const d = Math.hypot(a.x - x, a.y - y);
+      // In the mortuary they're shown as a label on their fridge drawer.
+      const at = "stage" in a && a.stage === "in_mortuary" ? tagSpot(this.state, a) : a;
+      const d = Math.hypot(at.x - x, at.y - y);
       if (d < bestD) {
         best = a.id;
         bestD = d;

@@ -345,6 +345,31 @@ button {
 .checklist .pending {
   color: var(--text-dim);
 }
+/* The process after a death: the step in hand, by whether it's moving. */
+.checklist .in-hand.underway > span:first-child,
+.death-status.underway {
+  color: #6fa8ff;
+}
+.checklist .in-hand.waiting > span:first-child,
+.death-status.waiting {
+  color: #f2c94c;
+}
+.checklist .in-hand.blocked,
+.death-status.blocked {
+  color: var(--bad);
+}
+.checklist .step-detail {
+  margin-left: 1.2em;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+.checklist .in-hand.blocked .step-detail {
+  color: var(--bad);
+}
+.death-status {
+  font-weight: 600;
+}
 .checklist .bad {
   color: var(--bad);
 }

@@ -15,7 +15,7 @@
  * happen in a side room. Unexpected deaths follow a failed resuscitation.
  * Staff involved lose morale; resuscitation teams have a short hot debrief.
  */
-import { conditionById, roomById } from "@data/catalogue";
+import { conditionById, roleNames, roomById, staffRoleById } from "@data/catalogue";
 import {
   BODIES_PER_FRIDGE,
   BREAK_NEWS_MINS,
@@ -39,7 +39,7 @@ import { emit, warn } from "../events";
 import { bedside, deskStaffSpot, frontOf, holder, release, reserve } from "../places";
 import { chance, nextFloat } from "../rng";
 import type { PlacedObject, SimState } from "../state";
-import { TICKS_PER_MINUTE } from "../time";
+import { clockFromTick, TICKS_PER_MINUTE } from "../time";
 import { roomAt, roomOfObject } from "../world/rooms";
 import { bedRouteExists } from "./admissions";
 import { earn } from "./finance";
@@ -458,6 +458,16 @@ export function updateDeaths(state: SimState): void {
     if (p.stage === "deceased" && d.lastOffices !== null) {
       const spaces = mortuarySpaces(state);
       if (spaces.taken >= spaces.total) noMortuarySpace(state, p);
+      else if (!mortuaryReachable(state, p)) {
+        warn(
+          state,
+          "mortuary_route",
+          2 * TICKS_PER_HOUR,
+          `${p.name} can't be taken to the mortuary: there's no bed-width route (double doors and 2-wide corridors) from the ${d.where}.`,
+          "bad",
+          tileOf(p),
+        );
+      }
       if (state.tick - d.lastOffices >= CONTINGENCY_HOURS * TICKS_PER_HOUR) {
         contingency(state, p);
         continue;
@@ -540,5 +550,178 @@ function contingency(state: SimState, p: Patient): void {
 function releaseBody(state: SimState, p: Patient): void {
   const f = p.death!.fridge;
   if (f) release(state, f.objectId, f.slot, p.id);
+  emit(state, `The funeral director has collected ${p.name} from the mortuary.`, "info", tileOf(p));
   delete state.patients[p.id];
+}
+
+// ---------- Where things stand ----------
+
+/** The steps after a death, in order. "family" runs alongside last offices. */
+export type DeathStep =
+  "verify" | "family" | "last_offices" | "to_mortuary" | "me_review" | "release";
+
+/**
+ * underway: someone is doing it (or, for release, it's only a matter of time);
+ * waiting: it'll start when someone is free; blocked: it can't happen until
+ * the player changes something.
+ */
+export type DeathProgress = "underway" | "waiting" | "blocked";
+
+export interface DeathStatus {
+  step: DeathStep;
+  progress: DeathProgress;
+  /** In plain English, e.g. "Waiting for a free porter". */
+  reason: string;
+}
+
+/** The steps that apply to this death, in order. */
+export function deathSteps(p: Patient): DeathStep[] {
+  return p.death!.expected
+    ? ["verify", "last_offices", "to_mortuary", "me_review", "release"]
+    : ["verify", "family", "last_offices", "to_mortuary", "me_review", "release"];
+}
+
+/** Whether a step is done. */
+export function deathStepDone(p: Patient, step: DeathStep): boolean {
+  const d = p.death!;
+  switch (step) {
+    case "verify":
+      return d.verified !== null;
+    case "family":
+      return d.familyTold !== null;
+    case "last_offices":
+      return d.lastOffices !== null;
+    case "to_mortuary":
+      return d.inMortuary !== null;
+    case "me_review":
+      return d.meReviewed !== null;
+    case "release":
+      return false;
+  }
+}
+
+/** The step holding things up (the family aside: that runs alongside), and why. */
+export function deathStatus(state: SimState, p: Patient): DeathStatus {
+  const step = deathSteps(p).find((s) => s !== "family" && !deathStepDone(p, s)) ?? "release";
+  return deathStepStatus(state, p, step);
+}
+
+/** Where one step stands. */
+export function deathStepStatus(state: SimState, p: Patient, step: DeathStep): DeathStatus {
+  const d = p.death!;
+  const jobs = jobsForPatient(state, p.id);
+  const status = (progress: DeathProgress, reason: string): DeathStatus => ({
+    step,
+    progress,
+    reason,
+  });
+  const onStaff = (role: Staff["role"]) => Object.values(state.staff).some((s) => s.role === role);
+  /** Someone has the job: they're on the way, or doing it. */
+  const taken = (kind: Job["kind"], doing: (who: string) => string): DeathStatus | null => {
+    const job = jobs.find((j) => j.kind === kind && j.state !== "open");
+    const s = job?.staffId == null ? undefined : state.staff[job.staffId];
+    if (!job || !s) return null;
+    const who = `${staffRoleById.get(s.role)!.name} ${s.name}`;
+    return status("underway", job.state === "working" ? doing(who) : `${who} is on the way`);
+  };
+  /** Nobody has it yet: is there anyone who could? */
+  const unstaffed = (roles: Staff["role"][]): DeathStatus | null =>
+    roles.some(onStaff) ? null : status("blocked", `No ${roleNames(roles, true)} on staff`);
+
+  switch (step) {
+    case "verify":
+      return (
+        taken("verify_death", (who) => `${who} is verifying the death`) ??
+        unstaffed(
+          d.expected ? ["nurse", "junior_doctor"] : ["junior_doctor", "nurse_practitioner"],
+        ) ??
+        status("waiting", "Waiting for a free nurse or doctor to verify the death")
+      );
+    case "family": {
+      if (d.verified === null) return status("waiting", "Once the death is verified");
+      const noRoom = !state.rooms.some((r) => r.valid && r.typeId === "relatives_room");
+      const where = noRoom ? " (no Relatives' Room: it'll be in a corridor)" : "";
+      return (
+        taken("break_news", (who) => `${who} is speaking with the family${where}`) ??
+        unstaffed(["junior_doctor"]) ??
+        status(noRoom ? "blocked" : "waiting", `Waiting for a free doctor${where}`)
+      );
+    }
+    case "last_offices": {
+      if (d.verified === null) return status("waiting", "Once the death is verified");
+      const lo = jobs.filter((j) => j.kind === "last_offices");
+      const here = lo.filter((j) => j.state === "working").length;
+      const coming = lo.filter((j) => j.state === "assigned").length;
+      if (here === 2) return status("underway", "Two nurses are performing last offices");
+      if (here + coming > 0) {
+        return status(
+          "underway",
+          here === 1 && coming === 0
+            ? "One nurse is performing last offices; the second is busy"
+            : `Nurses are on the way (${here} of 2 here)`,
+        );
+      }
+      return unstaffed(["nurse"]) ?? status("waiting", "Waiting for two free nurses");
+    }
+    case "to_mortuary": {
+      if (d.lastOffices === null) return status("waiting", "Once last offices are done");
+      const porter = taken("to_mortuary", (who) => `${who} is taking them to the mortuary`);
+      if (porter) return porter;
+      if (p.stage === "to_mortuary") return status("underway", "Being taken to the mortuary");
+      const left = CONTINGENCY_HOURS * TICKS_PER_HOUR - (state.tick - d.lastOffices);
+      const h = Math.floor(left / TICKS_PER_HOUR);
+      const m = Math.floor((left % TICKS_PER_HOUR) / TICKS_PER_MINUTE);
+      const countdown = `. Contingency store in ${h > 0 ? `${h}h ` : ""}${m}m`;
+      const spaces = mortuarySpaces(state);
+      if (spaces.total === 0) return status("blocked", `No working Mortuary${countdown}`);
+      if (spaces.taken >= spaces.total) {
+        return status("blocked", `The mortuary is full (${spaces.total} spaces)${countdown}`);
+      }
+      if (!mortuaryReachable(state, p)) {
+        return status(
+          "blocked",
+          `No bed-width route to a free mortuary space: it needs double doors and 2-wide corridors${countdown}`,
+        );
+      }
+      return unstaffed(["porter"]) ?? status("waiting", "Waiting for a free porter");
+    }
+    case "me_review": {
+      if (d.inMortuary === null) return status("waiting", "Once they're in the mortuary");
+      const busy = taken("me_review", (who) => `${who} is reviewing the notes`);
+      if (busy) return busy;
+      const blocked = unstaffed(["medical_examiner"]);
+      if (blocked) return blocked;
+      if (!Object.values(state.objects).some((o) => o.defId === "desk")) {
+        return status("blocked", "No desk for the Medical Examiner to work at");
+      }
+      return freeDesk(state)
+        ? status("waiting", "Waiting for the Medical Examiner")
+        : status("waiting", "Waiting for a free desk");
+    }
+    case "release": {
+      if (d.releaseAt === null)
+        return status("waiting", "Once the Medical Examiner has reviewed them");
+      const c = clockFromTick(d.releaseAt);
+      const when = `Day ${c.day} ${String(c.hour).padStart(2, "0")}:${String(c.minute).padStart(2, "0")}`;
+      return status(
+        "underway",
+        d.coroner
+          ? `With the coroner: the funeral director collects about ${when}`
+          : `The funeral director collects about ${when}`,
+      );
+    }
+  }
+}
+
+/** Whether a covered trolley could reach any free mortuary space from where they lie. */
+function mortuaryReachable(state: SimState, p: Patient): boolean {
+  const from = tileOf(p);
+  for (const f of fridges(state)) {
+    for (let slot = 0; slot < BODIES_PER_FRIDGE; slot++) {
+      if (holder(state, f.id, slot) === undefined && bedRouteExists(state, from, frontOf(f))) {
+        return true;
+      }
+    }
+  }
+  return false;
 }

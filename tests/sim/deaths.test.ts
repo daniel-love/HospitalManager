@@ -8,7 +8,7 @@ import { holder, reserve, restPoint, siteEntrance } from "@sim/places";
 import { tick } from "@sim/sim";
 import type { PlacedObject, SimState } from "@sim/state";
 import { spawnPatient } from "@sim/systems/arrivals";
-import { debrief, die, mortuarySpaces } from "@sim/systems/deaths";
+import { deathStatus, debrief, die, mortuarySpaces } from "@sim/systems/deaths";
 import { TICKS_PER_MINUTE } from "@sim/time";
 import { roomOfObject } from "@sim/world/rooms";
 import { describePatient } from "@game/describe";
@@ -168,13 +168,16 @@ describe("when there's nowhere to go", () => {
       "No mortuary space: a deceased patient kept in the bay",
     );
     const info = describePatient(state, p);
-    expect(info.kind === "patient" && info.afterDeath).toContainEqual(
-      expect.objectContaining({
-        label: "Taken to the mortuary",
-        done: false,
-        detail: "No working Mortuary",
-      }),
-    );
+    expect(info.kind === "patient" && info.afterDeath).toContainEqual({
+      label: "Taken to the mortuary",
+      done: false,
+      progress: "blocked",
+    });
+    expect(info.kind === "patient" && info.deathStatus).toEqual({
+      step: "to_mortuary",
+      progress: "blocked",
+      reason: expect.stringMatching(/^No working Mortuary\. Contingency store in \dh \d+m$/),
+    });
     // Hours later the contingency arrangement takes them, freeing the bed.
     runUntil(state, () => !state.patients[p.id], 8 * HOUR);
     expect(holder(state, bed.id, 0)).toBeUndefined();
@@ -192,5 +195,50 @@ describe("when there's nowhere to go", () => {
     expect(p.death!.meReviewed).toBeNull();
     expect(state.patients[p.id]).toBeDefined();
     expect(state.events.map((e) => e.text).join("\n")).toMatch(/no Medical Examiner/);
+  });
+});
+
+describe("where things stand after a death", () => {
+  it("says who is doing each step, and what's in the way", () => {
+    const state = settled(staffedDeathsWard());
+    const p = inpatient(state, bedIn(state, "ward"));
+    die(state, p, false, false);
+    expect(deathStatus(state, p)).toMatchObject({ step: "verify", progress: "waiting" });
+    runUntil(state, () => deathStatus(state, p).progress === "underway");
+    expect(deathStatus(state, p).reason).toMatch(/^Junior Doctor .+ (is on the way|is verifying)/);
+    runUntil(state, () => p.stage === "to_mortuary");
+    expect(deathStatus(state, p)).toMatchObject({
+      step: "to_mortuary",
+      progress: "underway",
+      reason: expect.stringMatching(/^Porter .+ is taking them to the mortuary$/),
+    });
+    runUntil(state, () => p.death!.meReviewed !== null);
+    expect(deathStatus(state, p)).toMatchObject({
+      step: "release",
+      reason: expect.stringMatching(/funeral director collects about Day \d+ \d\d:\d\d$/),
+    });
+  });
+
+  it("is blocked without a porter", () => {
+    const state = settled(staffedDeathsWard(1, { nurse: 2, junior_doctor: 1, cleaner: 1 }));
+    const p = inpatient(state, bedIn(state, "ward"));
+    die(state, p, true, true);
+    runUntil(state, () => p.death!.lastOffices !== null);
+    expect(deathStatus(state, p)).toMatchObject({
+      step: "to_mortuary",
+      progress: "blocked",
+      reason: "No Porters on staff",
+    });
+  });
+
+  it("is blocked when a trolley can't get to the mortuary", () => {
+    const state = settled(staffedDeathsWard(1, undefined, { mortuaryDoor: "door_single" }));
+    const p = inpatient(state, bedIn(state, "ward"));
+    die(state, p, true, true);
+    runUntil(state, () => p.death!.lastOffices !== null);
+    for (let i = 0; i < 2 * MIN; i++) tick(state);
+    expect(deathStatus(state, p)).toMatchObject({ step: "to_mortuary", progress: "blocked" });
+    expect(deathStatus(state, p).reason).toMatch(/^No bed-width route/);
+    expect(state.events.map((e) => e.text).join("\n")).toMatch(/no bed-width route/);
   });
 });

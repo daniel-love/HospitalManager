@@ -48,6 +48,14 @@ export interface DebugStats {
   jobs: number;
 }
 
+/** One step of the process after a death. `progress` is set for steps in hand. */
+export interface DeathChecklistItem {
+  label: string;
+  done: boolean;
+  detail?: string;
+  progress?: "underway" | "waiting" | "blocked";
+}
+
 /** A patient or member of staff, for the inspector. */
 export type AgentInfo =
   | {
@@ -67,7 +75,9 @@ export type AgentInfo =
       needs: string[];
       timeline: { label: string; at: string }[];
       /** After a death: each step of the process, and whether it's done. */
-      afterDeath?: { label: string; done: boolean; detail?: string }[];
+      afterDeath?: DeathChecklistItem[];
+      /** After a death: the step in hand, and what (if anything) is holding it up. */
+      deathStatus?: { progress: "underway" | "waiting" | "blocked"; reason: string };
       /** For patients who need monitoring. */
       monitoring?: {
         /** Last set of observations and its early warning score (NEWS2). */

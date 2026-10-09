@@ -23,7 +23,13 @@ import {
 import type { SimState } from "@sim/state";
 import { onTrolley, trolleyStop } from "@sim/systems/admissions";
 import { ambulancesWaiting, parkingSpaces } from "@sim/systems/ambulances";
-import { mortuarySpaces } from "@sim/systems/deaths";
+import {
+  deathStatus,
+  deathSteps,
+  deathStepStatus,
+  mortuarySpaces,
+  type DeathStep,
+} from "@sim/systems/deaths";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { formatWait, inAE } from "@sim/systems/patients";
 import { clockFromTick, TICKS_PER_MINUTE } from "@sim/time";
@@ -31,6 +37,7 @@ import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { roomAt, roomOfObject } from "@sim/world/rooms";
 import type {
   AgentInfo,
+  DeathChecklistItem,
   PatientRow,
   PatientTable,
   ReportData,
@@ -271,62 +278,55 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
     needs,
     timeline,
     ...monitoringInfo(state, p),
-    ...(p.death ? { afterDeath: afterDeathSteps(state, p) } : {}),
+    ...(p.death
+      ? { afterDeath: afterDeathSteps(state, p), deathStatus: deathStatus(state, p) }
+      : {}),
   };
 }
 
-/** The process after a death (GAME_DESIGN §5.6), as a checklist. */
-function afterDeathSteps(
-  state: SimState,
-  p: Patient,
-): { label: string; done: boolean; detail?: string }[] {
+const DEATH_STEP_LABELS: Record<DeathStep, string> = {
+  verify: "Death verified",
+  family: "Family told",
+  last_offices: "Last offices",
+  to_mortuary: "Taken to the mortuary",
+  me_review: "Medical Examiner review",
+  release: "Released to the funeral director",
+};
+
+/**
+ * The process after a death (GAME_DESIGN §5.6), as a checklist: when each
+ * step was done, and how the steps in hand are going (the family is told
+ * alongside last offices, so that step says who's doing it or what's in the way).
+ */
+function afterDeathSteps(state: SimState, p: Patient): DeathChecklistItem[] {
   const d = p.death!;
-  const at = (t: number | null) => (t === null ? undefined : clockAt(t));
-  const step = (label: string, t: number | null, waiting?: string) => ({
-    label,
-    done: t !== null,
-    ...(t !== null ? { detail: at(t)! } : waiting ? { detail: waiting } : {}),
-  });
-  const steps = [
-    step("Death verified", d.verified),
-    ...(d.expected ? [] : [step("Family told", d.familyTold)]),
-    step("Last offices", d.lastOffices),
-    step(
-      "Taken to the mortuary",
-      d.inMortuary,
-      d.lastOffices !== null ? mortuaryWait(state) : undefined,
-    ),
-    step(
-      "Medical Examiner review",
-      d.meReviewed,
-      d.inMortuary !== null ? meWait(state) : undefined,
-    ),
-  ];
-  if (d.coroner) steps.push({ label: "Referred to the coroner", done: true });
-  steps.push({
-    label: "Released to the funeral director",
-    done: false,
-    ...(d.releaseAt !== null
-      ? { detail: `Day ${clockFromTick(d.releaseAt).day} ${clockAt(d.releaseAt)}` }
-      : {}),
-  });
-  return steps;
-}
-
-function mortuaryWait(state: SimState): string | undefined {
-  const m = mortuarySpaces(state);
-  if (m.total === 0) return "No working Mortuary";
-  if (m.taken >= m.total) return "The mortuary is full";
-  if (!Object.values(state.staff).some((s) => s.role === "porter")) return "No porter on staff";
-  return undefined;
-}
-
-function meWait(state: SimState): string | undefined {
-  if (!Object.values(state.staff).some((s) => s.role === "medical_examiner")) {
-    return "No Medical Examiner on staff";
+  const current = deathStatus(state, p).step;
+  const done: Partial<Record<DeathStep, number | null>> = {
+    verify: d.verified,
+    family: d.familyTold,
+    last_offices: d.lastOffices,
+    to_mortuary: d.inMortuary,
+    me_review: d.meReviewed,
+  };
+  const items: DeathChecklistItem[] = [];
+  for (const step of deathSteps(p)) {
+    const label = DEATH_STEP_LABELS[step];
+    const t = done[step] ?? null;
+    if (t !== null) items.push({ label, done: true, detail: clockAt(t) });
+    // The family are told alongside last offices, so it has its own status.
+    // The step in hand's reason is shown above the list, so only its colour here.
+    else if (step === current) {
+      items.push({ label, done: false, progress: deathStepStatus(state, p, step).progress });
+    } else if (step === "family" && d.verified !== null) {
+      const s = deathStepStatus(state, p, step);
+      items.push({ label, done: false, detail: s.reason, progress: s.progress });
+    } else items.push({ label, done: false });
+    // The Medical Examiner decides whether the coroner needs to know.
+    if (step === "me_review" && d.coroner && d.meReviewed !== null) {
+      items.push({ label: "Referred to the coroner", done: true });
+    }
   }
-  if (!Object.values(state.objects).some((o) => o.defId === "desk")) return "No desk to work at";
-  return undefined;
+  return items;
 }
 
 /** Observations and who's watching, for patients whose condition needs monitoring. */

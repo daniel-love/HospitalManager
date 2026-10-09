@@ -141,11 +141,25 @@ function AgentSection({ agent }: { agent: AgentInfo }) {
         <h2>{agent.name}</h2>
         <p class="dim">{agent.condition}</p>
         <p>{agent.status}</p>
+        {agent.deathStatus && (
+          <p class={`death-status ${agent.deathStatus.progress}`}>{agent.deathStatus.reason}</p>
+        )}
         <ul class="checklist">
           {agent.afterDeath.map((s) => (
-            <li key={s.label} class={s.done ? "ok" : "pending"}>
-              <span aria-hidden="true">{s.done ? "✓" : "○"}</span> {s.label}
-              {s.detail && <span class="dim"> ({s.detail})</span>}
+            <li
+              key={s.label}
+              class={s.done ? "ok" : s.progress ? `in-hand ${s.progress}` : "pending"}
+            >
+              <span aria-hidden="true">
+                {s.done ? "✓" : s.progress === "blocked" ? "!" : s.progress ? "●" : "○"}
+              </span>{" "}
+              {s.label}
+              {s.detail &&
+                (s.done ? (
+                  <span class="dim"> ({s.detail})</span>
+                ) : (
+                  <div class="step-detail">{s.detail}</div>
+                ))}
             </li>
           ))}
         </ul>

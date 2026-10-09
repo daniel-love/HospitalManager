@@ -45,6 +45,8 @@ export interface DeathsOptions {
   relativesRoom?: boolean;
   /** Include the mortuary (default true). */
   mortuary?: boolean;
+  /** The mortuary's door: a single door is too narrow for a trolley. */
+  mortuaryDoor?: "door_double" | "door_single";
 }
 
 export function buildDeathsWard(seed = 1, opts: DeathsOptions = {}): SimState {
@@ -84,7 +86,7 @@ export function buildDeathsWard(seed = 1, opts: DeathsOptions = {}): SimState {
           {
             type: "place_object" as const,
             floor: F,
-            defId: "door_double",
+            defId: opts.mortuaryDoor ?? "door_double",
             x: 3,
             y: 12,
             rotation: 0 as Rotation,
