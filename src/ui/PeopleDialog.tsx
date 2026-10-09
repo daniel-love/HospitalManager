@@ -72,9 +72,15 @@ const PATIENT_FILTERS: { id: PatientFilter; label: string }[] = [
   { id: "attention", label: "Needs attention" },
 ];
 
-/** Overdue, over 4 hours, unhappy, or with an unmet need. */
+/**
+ * Something needs doing: a clinical alert, an overdue target, unhappy, or an
+ * unmet need. On a ward only the alerts count: a 4-hour breach or low mood
+ * there is left over from A&E (and mood recovers on the ward).
+ */
 const needsAttention = (r: PatientRow) =>
-  r.overdue || r.breached || r.mood < 30 || r.needs.some((n) => n !== "At the toilet");
+  r.alerts.length > 0 ||
+  (r.group !== "ward" &&
+    (r.overdue || r.breached || r.mood < 30 || r.needs.some((n) => n !== "At the toilet")));
 
 function PatientsTab({ onShow }: { onShow: (id: number) => void }) {
   const [filter, setFilter] = useState<PatientFilter>("all");
@@ -154,7 +160,12 @@ function PatientsTab({ onShow }: { onShow: (id: number) => void }) {
                     <span class="sub">{r.condition}</span>
                   </td>
                   <td>
-                    {r.category ? (
+                    {r.admittedTo ? (
+                      <>
+                        Inpatient
+                        <span class="sub">{r.admittedTo}</span>
+                      </>
+                    ) : r.category ? (
                       <span
                         class="triage-chip"
                         style={{ background: r.category.colour }}
@@ -169,12 +180,26 @@ function PatientsTab({ onShow }: { onShow: (id: number) => void }) {
                   <td>
                     {r.status}
                     <span class="sub">{r.where}</span>
+                    {r.alerts.map((a) => (
+                      <span key={a} class="sub bad-text">
+                        {a}
+                      </span>
+                    ))}
                     {r.reason && <span class="sub warn-text">{r.reason}</span>}
                   </td>
                   <td class={r.overdue ? "bad-text" : r.target === "Seen" ? "ok-text" : ""}>
                     {r.target}
                   </td>
-                  <td class={`num${r.breached ? " bad-text" : ""}`}>{r.inDept}</td>
+                  {r.group === "ward" ? (
+                    <td
+                      class="num dim"
+                      title={r.breached ? "Breached the 4-hour standard in A&E" : undefined}
+                    >
+                      {r.inDept}
+                    </td>
+                  ) : (
+                    <td class={`num${r.breached ? " bad-text" : ""}`}>{r.inDept}</td>
+                  )}
                   <td>
                     <div class="meter small" title={`Mood ${r.mood} / 100`}>
                       <div

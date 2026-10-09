@@ -824,6 +824,45 @@ const STAGE_GROUPS: Record<PatientStage, PatientRow["group"]> = {
   leaving: "leaving",
 };
 
+/** Observations this late are flagged; a few minutes either way is normal. */
+const OBS_LATE_MINS = 15;
+/** How long a ward patient fit to go home waits before it's a delayed discharge. */
+const DISCHARGE_DELAY_MINS = 120;
+
+/**
+ * What a patient needs done now, most critical first, each naming the
+ * intervention. History (a 4-hour breach in A&E before they were admitted)
+ * isn't listed. Deterioration is shown from the sim's truth, as on the map.
+ */
+function patientAlerts(state: SimState, p: Patient): string[] {
+  const alerts: string[] = [];
+  const d = p.deterioration;
+  if (p.stage === "collapsed") {
+    alerts.push("Cardiac arrest: needs resuscitation");
+  } else if (d && state.tick >= d.onset && p.stage !== "leaving") {
+    const condition = conditionById.get(p.conditionId)!;
+    const fix = condition.pathway.find((s, i) => s.stabilises && i >= p.step);
+    const needs = fix ? fix.name.toLowerCase() : "an urgent doctor review";
+    alerts.push(
+      d.noticed !== null
+        ? `Getting worse: escalated, needs ${needs}`
+        : `Getting worse, not yet noticed: needs ${needs}`,
+    );
+  }
+  const every = obsInterval(p);
+  const last = p.obs?.tick ?? p.times.triaged;
+  if (every !== null && last !== null && p.stage !== "collapsed" && p.stage !== "transferring") {
+    const over = minsSince(state, last) - every;
+    if (over > OBS_LATE_MINS) alerts.push(`Observations overdue by ${formatWait(over)}`);
+  }
+  if (p.stage === "on_ward" && p.stayUntil !== null && !p.endOfLife) {
+    const over = minsSince(state, p.stayUntil);
+    if (over > DISCHARGE_DELAY_MINS)
+      alerts.push(`Fit to go home: discharge review overdue by ${formatWait(over)}`);
+  }
+  return alerts;
+}
+
 /** One row per patient still in A&E, most urgent first. */
 export function describePatientTable(state: SimState): PatientTable {
   const rows: PatientRow[] = [];
@@ -893,6 +932,8 @@ export function describePatientTable(state: SimState): PatientTable {
       dueIn: done || onWard ? Infinity : left,
       mood: info.mood,
       needs: short,
+      alerts: patientAlerts(state, p),
+      admittedTo: onWard && p.specialty ? specialtyById.get(p.specialty)!.name : null,
     });
   }
   rows.sort((a, b) => a.dueIn - b.dueIn || b.inDeptMins - a.inDeptMins || a.id - b.id);
@@ -905,7 +946,7 @@ export function describePatientTable(state: SimState): PatientTable {
       arriving: rows.filter((r) => r.group === "arriving").length,
       waiting: rows.filter((r) => r.group === "waiting").length,
       treatment: rows.filter((r) => r.group === "treatment").length,
-      breached: rows.filter((r) => r.breached).length,
+      breached: rows.filter((r) => r.breached && r.group !== "ward").length,
     },
     longestWait: waits.length > 0 ? formatWait(Math.max(...waits)) : null,
   };

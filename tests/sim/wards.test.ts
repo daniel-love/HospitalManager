@@ -15,7 +15,7 @@ import { TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 import { createFloorGrid, FloorType, tileIndex, WallType } from "@sim/world/grid";
 import { findPath } from "@sim/world/pathfinding";
 import { roomOfObject } from "@sim/world/rooms";
-import { waitReason } from "@game/describe";
+import { describePatientTable, waitReason } from "@game/describe";
 import { applyAll, hireRegistrars, type StaffCounts } from "../fixtures/smallAE";
 import {
   buildMajorsAE,
@@ -112,6 +112,25 @@ describe("bed movement", () => {
 });
 
 describe("admission", () => {
+  it("lists an inpatient by what the ward must do, not their A&E breach", () => {
+    const state = quiet();
+    const p = admitted(state);
+    p.specialty = "cardiology"; // As their referral would have set.
+    runUntil(state, () => p.stage === "on_ward");
+    p.times.arrived = p.times.admitted! - 5 * HOUR; // Breached the 4 hours in A&E.
+    p.obs = { tick: state.tick, news: 1 };
+    const row = () => describePatientTable(state).rows.find((r) => r.id === p.id)!;
+    expect(row()).toMatchObject({ breached: true, alerts: [], admittedTo: "Cardiology" });
+    expect(describePatientTable(state).counts.breached).toBe(0);
+
+    p.obs = { tick: state.tick - 5 * HOUR, news: 1 };
+    p.stayUntil = state.tick - 3 * HOUR;
+    expect(row().alerts).toEqual([
+      "Observations overdue by 1h 00m",
+      "Fit to go home: discharge review overdue by 3h 00m",
+    ]);
+  });
+
   it("keeps a ward patient on their bed when it's moved", () => {
     const state = quiet();
     const p = admitted(state);

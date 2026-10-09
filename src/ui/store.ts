@@ -284,6 +284,10 @@ export interface PatientRow {
   dueIn: number;
   mood: number;
   needs: string[];
+  /** Interventions needed now, most critical first (e.g. "Observations overdue by 20m"). */
+  alerts: string[];
+  /** Inpatients: the specialty they're under; null in A&E. */
+  admittedTo: string | null;
 }
 
 export interface PatientTable {
