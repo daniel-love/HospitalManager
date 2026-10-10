@@ -3,6 +3,7 @@
  * When SIM_STATE_VERSION goes from N to N+1, add a `N: (save) => ...` entry
  * that transforms a version-N save into a version-N+1 save.
  */
+import { dateOf } from "@sim/time";
 import { specialtyById } from "@data/catalogue";
 import type { SpecialtyId } from "@data/schema";
 import { SIM_STATE_VERSION } from "@sim/state";
@@ -579,6 +580,50 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
         policies: { gapFill: "bank" },
         today: ledger(state.today),
         history: state.history.map(ledger),
+      },
+    };
+  },
+  // v29: the NHS block contract, planned care on its own line, supplies and
+  // estates costs, monthly statements.
+  28: (save) => {
+    type Day = { day: number; ledger: Record<string, number>; stats: Record<string, number> };
+    const state = save.state as { money: number; tick: number; today: Day; history: Day[] };
+    // Planned operations were in the tariff line; they stay there.
+    const ledger = (d: Day) => ({
+      ...d,
+      ledger: { block: 0, elective: 0, supplies: 0, estates: 0, ...d.ledger },
+    });
+    const history = state.history.map(ledger);
+    // This month so far, from the daily reports kept.
+    const day = Math.floor((state.tick / 10 + 8 * 60) / (24 * 60)) + 1;
+    const monthIndex = dateOf(day).monthIndex;
+    const inMonth = history.filter((d) => dateOf(d.day).monthIndex === monthIndex);
+    const sum = (rows: Record<string, number>[]) => {
+      const out: Record<string, number> = {};
+      for (const r of rows) for (const [k, v] of Object.entries(r)) out[k] = (out[k] ?? 0) + v;
+      return out;
+    };
+    const month = {
+      monthIndex,
+      days: inMonth.length,
+      ledger: { ...ledger(state.today).ledger, ...sum(inMonth.map((d) => d.ledger)) },
+      stats: { ...state.today.stats, ...sum(inMonth.map((d) => d.stats)) },
+      openingCash: state.money,
+      closingCash: state.money,
+    };
+    if (inMonth.length === 0) {
+      for (const k of Object.keys(month.ledger)) (month.ledger as Record<string, number>)[k] = 0;
+      for (const k of Object.keys(month.stats)) (month.stats as Record<string, number>)[k] = 0;
+    }
+    return {
+      ...save,
+      state: {
+        ...state,
+        today: ledger(state.today),
+        history,
+        // (Kept if present: tests upgrade saves written by this version.)
+        month: (state as { month?: unknown }).month ?? month,
+        months: (state as { months?: unknown }).months ?? [],
       },
     };
   },

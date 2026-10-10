@@ -20,6 +20,8 @@ import { dailyDemand } from "@sim/systems/arrivals";
 import { monitorsCovering, observedBeds, stationsSeeing } from "@sim/systems/monitoring";
 import { outpatientDesks } from "@sim/systems/outpatients";
 import { offersClinic, referralsPerDay } from "@sim/systems/referrals";
+import { dailyBlock } from "@sim/systems/funding";
+import { formatMoney } from "./tools";
 import { SLOTS } from "@sim/systems/rota";
 import { operates, runsClinics } from "@sim/systems/staffing";
 import { SHIFTS } from "@data/staff";
@@ -434,6 +436,35 @@ export function describeAdvice(state: SimState): AdviceData {
     ],
   };
 
+  const block = dailyBlock(state);
+  const clinicsRunning = Object.values(state.staff).some(
+    (s) => runsClinics(s) && s.clinicSessions > 0,
+  );
+  const money: AdviceGroup = {
+    heading: "Paying your way",
+    intro: `NHS money comes three ways. A block contract pays for the emergency care you're equipped to provide, sized to your rooms and ward beds and capped by what you actually deliver (worth ${formatMoney(block)} a day now). Each emergency patient earns 30% of their tariff on top, about what their drugs and supplies cost. Planned care, clinics and operations, is paid in full. A&E alone runs at a loss: admissions, clinics and theatres are what pay.`,
+    items: [
+      item(
+        hasRoom("ward") && Object.values(state.staff).some((s) => s.role === "registrar"),
+        "Wards, and doctors to admit to them",
+        "Emergency admissions are most of the block's value: each ward bed adds to it, as long as A&E can get patients to it.",
+        true,
+      ),
+      item(
+        clinicsRunning,
+        "Outpatient clinics",
+        "Each appointment is paid in full, and clinics list patients for surgery.",
+        true,
+      ),
+      item(
+        lists(false) > 0,
+        "Planned operations",
+        "The best-paid work: a day case or planned stay is paid in full, and needs only a theatre list's time.",
+        true,
+      ),
+    ],
+  };
+
   const groups = [
     essentials,
     diagnostics,
@@ -443,6 +474,7 @@ export function describeAdvice(state: SimState): AdviceData {
     theatres,
     afterDeath,
     staffAreas,
+    money,
   ];
   const next = groups.flatMap((g) => g.items).find((i) => i.status === "todo") ?? null;
   const demand = dailyDemand(state);

@@ -1,6 +1,7 @@
 /**
  * Theatres and elective surgery (M4 step 7).
  */
+import { NHS_FUNDING } from "@data/economy";
 import { describe, expect, it } from "vitest";
 import { conditionById } from "@data/catalogue";
 import type { Patient, Referral } from "@sim/agents";
@@ -118,7 +119,7 @@ describe("a planned theatre list", () => {
       7,
       () => {
         if (inTheatre(state, surgeon) && surgeon.jobId !== null) jobsOnList++;
-        income = state.today.ledger.tariff;
+        income = state.today.ledger.elective;
       },
     );
     expect(jobsOnList).toBe(0);
@@ -130,7 +131,7 @@ describe("a planned theatre list", () => {
     expect(stats.dayCases).toBe(1);
     // The day case has gone home with the day-case tariff; the inpatient is on the ward.
     runUntil(state, () => !Object.values(state.patients).some((p) => p.stage === "post_op"), 1);
-    expect(state.today.ledger.tariff + income).toBeGreaterThanOrEqual(1500);
+    expect(state.today.ledger.elective + income).toBeGreaterThanOrEqual(1500);
     const inpatientNow = Object.values(state.patients).find((p) => p.stage === "on_ward")!;
     expect(inpatientNow.elective?.dayCase).toBe(false);
     expect(state.today.stats.departures).toBe(0); // Never counted as A&E.
@@ -218,7 +219,8 @@ describe("emergency surgery", () => {
     runUntil(state, () => p.emergencyOp!.done, 1);
     expect(state.today.stats.emergencyOps).toBe(1);
     expect(state.today.stats.emergencyOnTime).toBe(1);
-    expect(state.today.ledger.tariff).toBe(6000);
+    // An emergency operation is paid at the marginal rate, on top of the block contract.
+    expect(state.today.ledger.tariff).toBeCloseTo(6000 * (1 - NHS_FUNDING.blockShare));
     runUntil(state, () => p.stage === "on_ward", 1);
     // Back from theatre: not a new admission.
     expect(state.today.stats.admissions).toBe(0);

@@ -1784,6 +1784,34 @@ body.planning #game::after {
 .money-swatch.income {
   background: #2a9d8f;
 }
+.money-fill.supplies,
+.money-swatch.supplies {
+  background: #c46c9a;
+}
+.money-fill.estates,
+.money-swatch.estates {
+  background: #8a8f99;
+}
+.money-fill.block,
+.money-swatch.block {
+  background: #4a8fd4;
+}
+.money-fill.elective,
+.money-swatch.elective {
+  background: #9bd46c;
+}
+.report-table.statement th {
+  font-weight: 600;
+  font-size: 12px;
+}
+.report-table.statement th .sub {
+  display: block;
+  font-weight: 400;
+}
+.report-table tr.subtotal td {
+  border-top: 1px solid var(--panel-border);
+  font-weight: 600;
+}
 .money-fill.outpatients,
 .money-swatch.outpatients {
   background: #6cc4b8;

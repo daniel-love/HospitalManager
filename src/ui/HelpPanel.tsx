@@ -103,7 +103,7 @@ function Advice({ data }: { data: AdviceData }) {
         <p class="dim">
           A catchment of {catchment.toLocaleString("en-GB")} people brings about {walkIns} walk-ins
           and {ambulances} ambulances a day, busiest from late morning to early evening. A rough
-          guide for that peak; until shift rotas arrive, everyone works round the clock.
+          guide for that peak. Staff numbers are people to hire, at three shifts a week each.
         </p>
         <table class="capacity-table">
           <thead>
@@ -167,7 +167,7 @@ const GUIDES: Record<Exclude<HelpTab, "advice">, { intro: string; build: () => G
   },
   conditions: {
     intro:
-      "Every walk-in books in and is triaged first; ambulance patients are handed over to a nurse. Then each condition follows its own treatment.",
+      "Every walk-in books in and is triaged first; ambulance patients are handed over to a nurse. Then each condition follows its own treatment. Prices are full NHS tariffs: emergency care is mostly paid through the block contract, sized to what you're equipped to treat, with 30% of the tariff earned per patient on top; planned operations and clinics are paid in full.",
     build: conditionGuide,
   },
 };

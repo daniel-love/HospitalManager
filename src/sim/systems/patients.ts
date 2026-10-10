@@ -64,7 +64,7 @@ import { tileIndex } from "../world/grid";
 import { isStandable } from "../world/objects";
 import { findPath } from "../world/pathfinding";
 import { roomOfObject } from "../world/rooms";
-import { earn } from "./finance";
+import { earnElective, earnEmergency } from "./finance";
 import {
   dirtyCouch,
   ESCALATED_DUE,
@@ -526,12 +526,14 @@ export function leave(state: SimState, p: Patient, outcome: Outcome): void {
   const condition = conditionById.get(p.conditionId)!;
   if (p.times.admitted !== null) {
     stats.wardDischarges++;
-    earn(state, condition.admission?.tariff ?? 0);
+    // A planned inpatient's stay is planned care, paid in full.
+    if (condition.planned) earnElective(state, condition.admission?.tariff ?? 0);
+    else earnEmergency(state, condition.admission?.tariff ?? 0);
     return;
   }
   if (p.elective) {
     // A day case going home: the day-case tariff. They were never in A&E.
-    earn(state, condition.tariff);
+    earnElective(state, condition.tariff);
     return;
   }
   recordDeparture(state, p);
@@ -540,7 +542,7 @@ export function leave(state: SimState, p: Patient, outcome: Outcome): void {
     if (outcome === "transferred") stats.transferred++;
     else if (outcome === "transferred_out") stats.transfersOut++;
     else stats.discharged++;
-    earn(state, condition.tariff);
+    earnEmergency(state, condition.tariff);
   }
 }
 

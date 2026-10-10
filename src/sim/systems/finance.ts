@@ -5,20 +5,84 @@
  * flow are filed as a daily report (the P&L).
  */
 import { equipmentById, staffRoleById } from "@data/catalogue";
-import { DAYS_PER_MONTH } from "@data/economy";
+import { DAYS_PER_MONTH, NHS_FUNDING, RUNNING_COSTS } from "@data/economy";
+import { FloorType } from "../world/grid";
 import { AGENCY, BANK, NURSE_BANDS, ON_CALL, UNSOCIAL } from "@data/staff";
-import { emptyLedger, emptyStats, net, onSite, type DayReport, type Staff } from "../agents";
+import {
+  addInto,
+  costs,
+  emptyLedger,
+  emptyStats,
+  income,
+  net,
+  onSite,
+  type DayReport,
+  type Staff,
+} from "../agents";
 import { emit } from "../events";
-import type { SimState } from "../state";
-import { clockFromTick, MINUTES_PER_DAY, START_MINUTE_OF_DAY, TICKS_PER_MINUTE } from "../time";
+import { emptyMonth, type SimState } from "../state";
+import { dailyBlock } from "./funding";
+import {
+  clockFromTick,
+  dateOf,
+  firstDayOf,
+  formatDate,
+  monthName,
+  MINUTES_PER_DAY,
+  START_MINUTE_OF_DAY,
+  TICKS_PER_MINUTE,
+} from "../time";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
 /** Daily reports kept for the reports screen. */
 export const HISTORY_DAYS = 60;
 
-export function earn(state: SimState, amount: number): void {
+/**
+ * An emergency patient's tariff (an A&E attendance, an emergency admission
+ * or operation): paid at the marginal rate on top of the block contract.
+ */
+export function earnEmergency(state: SimState, tariff: number): void {
+  const amount = tariff * (1 - NHS_FUNDING.blockShare);
   state.money += amount;
   state.today.ledger.tariff += amount;
+  useSupplies(state, tariff * RUNNING_COSTS.suppliesShare);
+}
+
+/** A planned operation's tariff, paid in full. */
+export function earnElective(state: SimState, tariff: number): void {
+  state.money += tariff;
+  state.today.ledger.elective += tariff;
+  useSupplies(state, tariff * RUNNING_COSTS.suppliesShare);
+}
+
+/** An outpatient appointment's tariff, paid in full. */
+export function earnOutpatient(state: SimState, tariff: number): void {
+  state.money += tariff;
+  state.today.ledger.outpatients += tariff;
+  useSupplies(state, tariff * RUNNING_COSTS.outpatientSuppliesShare);
+}
+
+/** Drugs and clinical supplies used in a treatment. */
+function useSupplies(state: SimState, cost: number): void {
+  state.money -= cost;
+  state.today.ledger.supplies += cost;
+}
+
+const floorCache = new WeakMap<SimState, { version: number; tiles: number }>();
+
+/** Tiles of floor built (foundations), on every floor. */
+export function floorTiles(state: SimState): number {
+  const hit = floorCache.get(state);
+  if (hit && hit.version === state.layoutVersion) return hit.tiles;
+  let tiles = 0;
+  for (const g of state.floors) for (const t of g.floorType) if (t === FloorType.Floor) tiles++;
+  floorCache.set(state, { version: state.layoutVersion, tiles });
+  return tiles;
+}
+
+/** Estates and utilities per hour, £. */
+export function hourlyEstates(state: SimState): number {
+  return (floorTiles(state) * RUNNING_COSTS.estatesPerTileYear) / 365 / 24;
 }
 
 /** A role's annual pay with on-costs, by band for nurses. */
@@ -103,6 +167,9 @@ export function updateFinance(state: SimState): void {
   const ledger = state.today.ledger;
   const pay = hourlyPay(state);
   const upkeep = hourlyUpkeep(state);
+  const estates = hourlyEstates(state);
+  ledger.estates += estates;
+  state.money -= estates;
   ledger.salaries += pay.salaries;
   ledger.bank += pay.bank;
   ledger.agency += pay.agency;
@@ -110,7 +177,13 @@ export function updateFinance(state: SimState): void {
   state.money -= pay.salaries + pay.bank + pay.agency + upkeep;
 
   const minuteOfDay = (state.tick / TICKS_PER_MINUTE + START_MINUTE_OF_DAY) % MINUTES_PER_DAY;
-  if (minuteOfDay === 0) closeDay(state);
+  if (minuteOfDay === 0) {
+    // The day's share of the block contract, for what the hospital can do now.
+    const block = dailyBlock(state);
+    ledger.block += block;
+    state.money += block;
+    closeDay(state);
+  }
 }
 
 /** Files today's report (it's just turned midnight) and starts a new day. */
@@ -123,6 +196,14 @@ function closeDay(state: SimState): void {
   state.history.push(report);
   if (state.history.length > HISTORY_DAYS) state.history.shift();
   state.today = { ledger: emptyLedger(), stats: emptyStats() };
+
+  const month = state.month;
+  addInto(month.ledger, report.ledger);
+  addInto(month.stats, report.stats);
+  month.days++;
+  month.closingCash = state.money;
+  const next = dateOf(report.day + 1);
+  if (next.monthIndex !== month.monthIndex) closeMonth(state, next.monthIndex);
 
   const n = net(report.ledger);
   const money = new Intl.NumberFormat("en-GB", {
@@ -140,8 +221,32 @@ function closeDay(state: SimState): void {
     s.departures > 0 ? ` · 4-hour ${Math.round((100 * s.within4h) / s.departures)}%` : "";
   emit(
     state,
-    `Day ${report.day} closed: ${n >= 0 ? "surplus" : "deficit"} ${money.format(Math.abs(n))} · ` +
+    `${formatDate(report.day)} closed: ${n >= 0 ? "surplus" : "deficit"} ${money.format(Math.abs(n))} · ` +
       `${s.discharged} treated, ${s.lwbs} left unseen${fourHour}${clinics}`,
+    n >= 0 ? "info" : "warn",
+  );
+}
+
+/** Months of statements kept. */
+export const HISTORY_MONTHS = 24;
+
+/** Files the month's statement (it's just turned the 1st) and starts the next. */
+function closeMonth(state: SimState, nextIndex: number): void {
+  const m = state.month;
+  state.months.push(m);
+  if (state.months.length > HISTORY_MONTHS) state.months.shift();
+  state.month = emptyMonth(nextIndex, state.money);
+  const n = net(m.ledger);
+  const money = new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    maximumFractionDigits: 0,
+  });
+  emit(
+    state,
+    `${monthName(dateOf(firstDayOf(m.monthIndex)))} statement: income ${money.format(income(m.ledger))}, ` +
+      `costs ${money.format(costs(m.ledger))}, ${n >= 0 ? "surplus" : "deficit"} ${money.format(Math.abs(n))}. ` +
+      `Cash ${money.format(m.closingCash)}. See Reports.`,
     n >= 0 ? "info" : "warn",
   );
 }

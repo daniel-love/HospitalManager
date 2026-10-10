@@ -20,6 +20,7 @@ import {
   type Incident,
   type Job,
   type Ledger,
+  type MonthReport,
   type Patient,
   type SimEvent,
   type Staff,
@@ -30,7 +31,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 28;
+export const SIM_STATE_VERSION = 29;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -148,6 +149,12 @@ export interface SimState {
   /** Money and patient flow so far today, and reports for past days (newest last). */
   today: { ledger: Ledger; stats: FlowStats };
   history: DayReport[];
+  /**
+   * The monthly financial statement: this month so far (filed days only),
+   * and past months (newest last). See systems/finance.ts closeMonth.
+   */
+  month: MonthReport;
+  months: MonthReport[];
   settings: SimSettings;
   /** Tick each kind of warning was last raised, so they aren't repeated constantly. */
   alerts: Record<string, number>;
@@ -205,6 +212,18 @@ export interface NewGameOptions {
 
 export const DEFAULT_MAP_SIZE = 200;
 
+/** A month with nothing in it yet, opening with `cash`. */
+export function emptyMonth(monthIndex: number, cash: number): MonthReport {
+  return {
+    monthIndex,
+    days: 0,
+    ledger: emptyLedger(),
+    stats: emptyStats(),
+    openingCash: cash,
+    closingCash: cash,
+  };
+}
+
 export function createSimState(opts: NewGameOptions): SimState {
   const width = opts.width ?? DEFAULT_MAP_SIZE;
   const height = opts.height ?? DEFAULT_MAP_SIZE;
@@ -243,6 +262,8 @@ export function createSimState(opts: NewGameOptions): SimState {
     policies: { gapFill: "bank" },
     today: { ledger: emptyLedger(), stats: emptyStats() },
     history: [],
+    month: emptyMonth(0, opts.money ?? STARTING_CASH),
+    months: [],
     settings: { catchment: DEFAULT_CATCHMENT, patientVolume: 1, rotas: opts.rotas ?? false },
     alerts: {},
     incidents: [],

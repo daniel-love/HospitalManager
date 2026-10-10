@@ -29,7 +29,7 @@ import { tileIndex, type FloorGrid } from "../world/grid";
 import { isStandable, objectRect } from "../world/objects";
 import { roomOfObject } from "../world/rooms";
 import { isBedPassable, isWalkable } from "../world/pathfinding";
-import { earn } from "./finance";
+import { earnEmergency } from "./finance";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo } from "./movement";
 import { die } from "./deaths";
@@ -387,7 +387,7 @@ function arriveOnWard(state: SimState, p: Patient): void {
     );
   }
   // The A&E attendance is paid now; the inpatient stay when they go home.
-  earn(state, condition.tariff);
+  earnEmergency(state, condition.tariff);
 }
 
 /** Inpatients well enough to go home get a doctor's discharge review. */

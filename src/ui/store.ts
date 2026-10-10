@@ -204,7 +204,7 @@ export const advice = signal<AdviceData | null>(null);
 
 export interface Notification {
   id: number;
-  /** In-game time, e.g. "Day 2  14:05". */
+  /** In-game time, e.g. "Tue 2 Apr  14:05". */
   when: string;
   text: string;
   severity: "info" | "warn" | "bad";
@@ -269,11 +269,28 @@ export interface RosterRole {
   bands: { band: NurseBand; title: string; annualCost: number; count: number }[] | null;
 }
 
+/** A month's statement for the Reports panel. */
+export interface StatementMonth {
+  /** "April", "May Y2". */
+  name: string;
+  days: number;
+  ledger: Ledger;
+  /** Spent on building and equipment (less sales): cash that isn't a running cost. */
+  capital: number;
+  openingCash: number;
+  closingCash: number;
+}
+
 export const roster = signal<RosterData | null>(null);
 
 export interface ReportData {
   today: { ledger: Ledger; stats: FlowStats };
   history: DayReport[];
+  /** Today's share of the block contract, paid at midnight. */
+  blockDue: number;
+  /** This month so far, and last month's statement (if there is one). */
+  month: StatementMonth;
+  lastMonth: StatementMonth | null;
   /** Patients in the department now, by stage label. */
   now: { label: string; count: number }[];
   waitingSeats: { total: number; taken: number };

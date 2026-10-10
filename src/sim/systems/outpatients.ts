@@ -42,6 +42,7 @@ import { sessionsOn, type Session } from "./clinics";
 import { ticksFor, unassignJob } from "./jobBoard";
 import { headTo } from "./movement";
 import { bookAppointments, serviceOf } from "./referrals";
+import { earnOutpatient } from "./finance";
 
 /** Chance of not attending: first appointments, follow-ups (NHS about 7%). */
 export const DNA_CHANCE = { first: 0.06, follow_up: 0.08 };
@@ -343,7 +344,7 @@ function seen(state: SimState, o: Outpatient): void {
   r.booking = null;
   if (r.kind === "first") {
     stats.firstAppointments++;
-    earnOutpatients(state, service.firstTariff);
+    earnOutpatient(state, service.firstTariff);
     if (r.urgent) {
       stats.urgentSeen++;
       if (state.tick - (r.clockStart ?? r.added) <= URGENT_TARGET_DAYS * TICKS_PER_DAY) {
@@ -360,7 +361,7 @@ function seen(state: SimState, o: Outpatient): void {
     }
   } else {
     stats.followUps++;
-    earnOutpatients(state, service.followUpTariff);
+    earnOutpatient(state, service.followUpTariff);
   }
   if (chance(state.rng, service.followUpChance)) {
     // Treatment has started (or it's monitoring): the clock stops.
@@ -373,11 +374,6 @@ function seen(state: SimState, o: Outpatient): void {
     return;
   }
   delete state.referrals[r.id]; // Discharged back to their GP.
-}
-
-function earnOutpatients(state: SimState, amount: number): void {
-  state.money += amount;
-  state.today.ledger.outpatients += amount;
 }
 
 function goHome(state: SimState, o: Outpatient): void {

@@ -56,7 +56,7 @@ import { headTo } from "./movement";
 import { leave, recordDeparture } from "./patients";
 import { bookAppointments } from "./referrals";
 import { callIn, operates } from "./staffing";
-import { earn } from "./finance";
+import { earnEmergency } from "./finance";
 import { inClinic } from "./outpatients";
 
 /** Minutes between cases on a list, for cleaning and setting up: booked into each slot. */
@@ -882,5 +882,5 @@ function startEmergency(state: SimState, p: Patient): void {
   const stats = state.today.stats;
   stats.emergencyOps++;
   if (state.tick <= e.due) stats.emergencyOnTime++;
-  earn(state, emergencyOpOf(p)?.tariff ?? 0);
+  earnEmergency(state, emergencyOpOf(p)?.tariff ?? 0);
 }

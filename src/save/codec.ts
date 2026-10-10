@@ -342,14 +342,24 @@ const collectionSchema = z.object({
 });
 
 const ledgerSchema = z.object({
+  block: num,
   tariff: num,
+  elective: num,
   outpatients: num,
   salaries: num,
   bank: num,
   agency: num,
   upkeep: num,
+  supplies: num,
+  estates: num,
   transfers: num,
 });
+const monthSchemaFields = {
+  monthIndex: int.min(0),
+  days: int.min(0),
+  openingCash: num,
+  closingCash: num,
+};
 const statsSchema = z.object({
   arrivals: int.min(0),
   discharged: int.min(0),
@@ -400,6 +410,11 @@ const statsSchema = z.object({
   emergencyOps: int.min(0),
   emergencyOnTime: int.min(0),
   bumped: int.min(0),
+});
+const monthSchema = z.object({
+  ...monthSchemaFields,
+  ledger: ledgerSchema,
+  stats: statsSchema,
 });
 
 const operationSchema = z.object({
@@ -497,6 +512,8 @@ const saveSchema = z.object({
     policies: z.object({ gapFill: z.enum(["none", "bank", "bank_agency"]) }),
     today: z.object({ ledger: ledgerSchema, stats: statsSchema }),
     history: z.array(z.object({ day: int.positive(), ledger: ledgerSchema, stats: statsSchema })),
+    month: monthSchema,
+    months: z.array(monthSchema),
     settings: z.object({
       catchment: int.min(1_000).max(10_000_000),
       patientVolume: num.min(0).max(10),
@@ -573,6 +590,8 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       policies: state.policies,
       today: state.today,
       history: state.history,
+      month: state.month,
+      months: state.months,
       settings: state.settings,
       alerts: state.alerts,
       incidents: state.incidents,
@@ -639,6 +658,8 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     policies: { ...s.policies },
     today: s.today,
     history: s.history,
+    month: s.month,
+    months: s.months,
     settings: { ...s.settings },
     alerts: { ...s.alerts },
     incidents: s.incidents,

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   clockFromTick,
+  dateOf,
   formatClock,
+  formatDate,
   isWeekday,
   tickAt,
   TICKS_PER_DAY,
@@ -31,7 +33,15 @@ describe("game clock", () => {
   });
 
   it("formats with zero padding", () => {
-    expect(formatClock({ day: 3, weekday: 2, hour: 7, minute: 5 })).toBe("Wed day 3  07:05");
+    expect(formatClock({ day: 3, weekday: 2, hour: 7, minute: 5 })).toBe("Wed 3 Apr  07:05");
+  });
+
+  it("has a calendar from Monday 1 April, the start of the financial year", () => {
+    expect(dateOf(1)).toEqual({ year: 1, month: 0, date: 1, monthIndex: 0 });
+    expect(dateOf(31)).toEqual({ year: 1, month: 1, date: 1, monthIndex: 1 });
+    expect(dateOf(365)).toEqual({ year: 1, month: 11, date: 31, monthIndex: 11 });
+    expect(dateOf(366)).toEqual({ year: 2, month: 0, date: 1, monthIndex: 12 });
+    expect(formatDate(366)).toBe("1 Apr Y2");
   });
 
   it("starts on a Monday and runs through the week", () => {

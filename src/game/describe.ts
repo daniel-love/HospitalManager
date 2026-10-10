@@ -20,6 +20,8 @@ import {
   type Outpatient,
   type Patient,
   type PatientStage,
+  net,
+  type MonthReport,
   type Point,
   type Staff,
 } from "@sim/agents";
@@ -49,7 +51,16 @@ import { canDo, operates, roleTitle, runsClinics, staffTitle } from "@sim/system
 import { describeJobPlan, jobPlan } from "@sim/systems/clinics";
 import { MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS, MAX_THEATRE_SESSIONS } from "@data/outpatients";
 import { analysers, pendingResults } from "@sim/systems/diagnostics";
-import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
+import {
+  clockFromTick,
+  dateOf,
+  firstDayOf,
+  formatDate,
+  monthName,
+  TICKS_PER_DAY,
+  TICKS_PER_MINUTE,
+} from "@sim/time";
+import { dailyBlock } from "@sim/systems/funding";
 import { NURSE_BANDS, SHIFTS } from "@data/staff";
 import { inClinic, liveSessions } from "@sim/systems/outpatients";
 import { describeRota, nextShift, rotaSummary } from "@sim/systems/rota";
@@ -64,6 +75,7 @@ import type {
   PatientRow,
   PatientTable,
   ReportData,
+  StatementMonth,
   RosterData,
   StaffRow,
   StaffTable,
@@ -1017,9 +1029,21 @@ export function describeReport(state: SimState): ReportData {
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   const order = Object.values(STAGE_LABELS);
+  const statement = (m: MonthReport): StatementMonth => ({
+    name: monthName(dateOf(firstDayOf(m.monthIndex))),
+    days: m.days,
+    ledger: m.ledger,
+    capital: m.openingCash + net(m.ledger) - m.closingCash,
+    openingCash: m.openingCash,
+    closingCash: m.closingCash,
+  });
+  const last = state.months[state.months.length - 1];
   return {
     today: state.today,
     history: state.history,
+    blockDue: dailyBlock(state),
+    month: statement(state.month),
+    lastMonth: last ? statement(last) : null,
     now: [...counts]
       .map(([label, count]) => ({ label, count }))
       .sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label)),
@@ -1057,7 +1081,7 @@ export function describeReport(state: SimState): ReportData {
         const c = clockFromTick(i.tick);
         return {
           id: i.id,
-          when: `Day ${c.day} ${clockAt(i.tick)}`,
+          when: `${formatDate(c.day)} ${clockAt(i.tick)}`,
           summary: i.summary,
           patient: `${i.patientName} (${conditionById.get(i.conditionId)?.name ?? "unknown"})`,
           where: i.where,

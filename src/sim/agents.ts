@@ -476,8 +476,15 @@ export interface Job {
 
 /** Money in and out over a period, £. */
 export interface Ledger {
-  /** NHS tariff for A&E attendances and inpatient stays. */
+  /** The NHS block contract for emergency care (systems/funding.ts). */
+  block: number;
+  /**
+   * NHS tariff for emergency care: A&E attendances, emergency admissions and
+   * operations, at the marginal rate on top of the block.
+   */
   tariff: number;
+  /** NHS tariff for planned operations (day cases and inpatient stays). */
+  elective: number;
   /** NHS tariff for outpatient appointments. */
   outpatients: number;
   salaries: number;
@@ -486,6 +493,10 @@ export interface Ledger {
   /** Agency staff filling rota gaps, by the hour. */
   agency: number;
   upkeep: number;
+  /** Drugs and clinical supplies used in treatment. */
+  supplies: number;
+  /** Estates and utilities for the floor area built. */
+  estates: number;
   /** Ambulances taking patients to other hospitals. */
   transfers: number;
 }
@@ -672,8 +683,40 @@ export interface DayReport {
   stats: FlowStats;
 }
 
+/** A calendar month's money and activity so far (or, once filed, the whole month). */
+export interface MonthReport {
+  /** Months since the game began (time.ts dateOf). */
+  monthIndex: number;
+  /** Days counted (fewer than the month's in the month the game began). */
+  days: number;
+  ledger: Ledger;
+  stats: FlowStats;
+  /** Cash at the start of the month, and at the end (or now, if still running). */
+  openingCash: number;
+  closingCash: number;
+}
+
+/** Adds one set of numeric fields into another (ledgers, flow stats). */
+export function addInto<T extends object>(into: T, from: T): void {
+  const a = into as Record<string, number>;
+  const b = from as Record<string, number>;
+  for (const k of Object.keys(b)) a[k] = (a[k] ?? 0) + b[k]!;
+}
+
 export function emptyLedger(): Ledger {
-  return { tariff: 0, outpatients: 0, salaries: 0, bank: 0, agency: 0, upkeep: 0, transfers: 0 };
+  return {
+    block: 0,
+    tariff: 0,
+    elective: 0,
+    outpatients: 0,
+    salaries: 0,
+    bank: 0,
+    agency: 0,
+    upkeep: 0,
+    supplies: 0,
+    estates: 0,
+    transfers: 0,
+  };
 }
 
 export function emptyStats(): FlowStats {
@@ -731,7 +774,15 @@ export function emptyStats(): FlowStats {
 }
 
 export function net(l: Ledger): number {
-  return l.tariff + l.outpatients - l.salaries - l.bank - l.agency - l.upkeep - l.transfers;
+  return income(l) - costs(l);
+}
+
+export function income(l: Ledger): number {
+  return l.block + l.tariff + l.elective + l.outpatients;
+}
+
+export function costs(l: Ledger): number {
+  return l.salaries + l.bank + l.agency + l.upkeep + l.supplies + l.estates + l.transfers;
 }
 
 /**

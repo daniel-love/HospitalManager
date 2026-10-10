@@ -97,7 +97,7 @@ describe("save codec", () => {
     expect(save.meta).toMatchObject({
       name: "My A&E",
       savedAt: "2026-10-08T12:00:00.000Z",
-      gameTime: "Mon day 1  08:00",
+      gameTime: "Mon 1 Apr  08:00",
     });
   });
 

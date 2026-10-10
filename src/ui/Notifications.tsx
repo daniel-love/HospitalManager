@@ -27,7 +27,7 @@ export function Notifications({ game }: { game: Game }) {
                 else if (n.at) game.focus(n.at);
               }}
             >
-              <span class="when">{n.when.replace(/^\w{3} day \d+\s+/, "")}</span>
+              <span class="when">{n.when.replace(/^\w{3} \d+ \w{3}( Y\d+)?\s+/, "")}</span>
               {n.text}
             </button>
           </li>

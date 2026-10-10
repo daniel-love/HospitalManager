@@ -71,7 +71,8 @@ src/
       jobBoard.ts         # post/remove jobs
       jobs.ts             # job board: assign, run, complete
       movement.ts         # route following, re-planning after layout changes
-      finance.ts          # tariff, salaries, upkeep, daily reports
+      finance.ts          # tariff (emergency at the marginal rate, planned in full), pay, supplies, estates, daily reports, monthly statements
+      funding.ts          # the NHS block contract: sized to rooms and beds, capped by delivered activity
       alerts.ts           # bottleneck warnings; tidies after layout changes
       monitoring.ts       # nurse stations, coverage (cached per layout), obs rounds
       deterioration.ts    # NEWS2, noticing and escalation, cardiac arrest, incidents
@@ -104,6 +105,7 @@ src/
     migrations.ts
 tests/
   sim/                    # headless simulation tests
+  balance/                # slow economy checks, run with `npm run balance` (not part of `npm test`)
 ```
 
 ## 4. Simulation model

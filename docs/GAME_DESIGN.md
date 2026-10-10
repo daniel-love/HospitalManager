@@ -51,6 +51,8 @@ Terminology, roles and targets follow UK practice: A&E, Majors/Minors/Resus, con
 
 So there are three modes at game start: **NHS Trust**, **Private Hospital** and **Hybrid**.
 
+**NHS income as built (M5 step 3, modelled on the NHS payment scheme's aligned payment and incentive):** urgent and emergency care is mostly paid by a **block contract**, 70% of the expected full-tariff value of the emergency care the hospital is equipped to provide for its catchment. That's the attendances it can treat, as far as its rooms have time for them (a patient holds a room about three times as long as their treatment), plus the emergency admissions and operations that follow, as far as its ward beds can take them. It's capped at 120% of the emergency care actually delivered over the last four weeks (commissioners claw back the rest), and paid as a daily share at midnight. Each emergency patient then earns 30% of their tariff (the marginal rate). Planned care (clinics, day cases and planned stays) is paid in full. Running costs besides pay: drugs and clinical supplies (18% of each treated episode's full tariff, 5% for clinic appointments) and estates and utilities by floor area. The result is realistic margins: emergency care roughly pays its way at the margin, the block pays for being ready, and planned care makes the surplus.
+
 ### 2.3 Game modes
 
 - **Sandbox:** you pick the funding model, budget, map size, difficulty and event frequency.
@@ -376,7 +378,7 @@ The admin interface is a set of full-screen panels opened from the toolbar.
 - **Costs:** salaries, agency premiums, equipment upkeep, utilities (scale with floor area and powered equipment), consumables (per treatment), fines, transfer costs, loan interest.
 - **Loans:** choose amount and term. Interest rate depends on your financial rating. Missed repayments lead to a rating downgrade, then administration (game over in campaign).
 - **Grants:** offered or available for specific builds, with conditions (e.g. "£500k Stroke Unit grant: build a stroke unit with CT within 30 tiles of Resus and a stroke consultant within 6 months; repay if not met").
-- **Reports:** P&L by month, cost per department, income per department, cash-flow forecast.
+- **Reports:** P&L by month, cost per department, income per department, cash-flow forecast. The **monthly statement** (built in M5 step 3) is filed at the end of each calendar month: income and costs line by line, the surplus or deficit, building and equipment spending kept apart from running costs, and cash at the month's end. The game's calendar starts on Monday 1 April, the first day of the NHS financial year.
 
 ### 8.2 Staffing
 

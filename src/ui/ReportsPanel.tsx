@@ -4,7 +4,8 @@
  * last fortnight, outpatient waiting lists, incidents and the daily reports.
  */
 import { formatMoney } from "@game/tools";
-import { net, type DayReport, type FlowStats, type Ledger } from "@sim/agents";
+import { costs, income, net, type DayReport, type FlowStats, type Ledger } from "@sim/agents";
+import { formatDate } from "@sim/time";
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { report, sidePanel, type ReportData } from "./store";
@@ -59,7 +60,7 @@ export function ReportsPanel({ onShow }: { onShow: (at: { x: number; y: number }
         <div class="reports-cols">
           <div>
             <h3>Today so far</h3>
-            <MoneySection ledger={today.ledger} />
+            <MoneySection ledger={today.ledger} blockDue={data.blockDue} />
             <FlowSections stats={today.stats} />
           </div>
           <div>
@@ -75,6 +76,13 @@ export function ReportsPanel({ onShow }: { onShow: (at: { x: number; y: number }
             )}
           </div>
         </div>
+
+        <h3>Monthly statement</h3>
+        <p class="dim small-note">
+          Filed at the end of each month. Today counts once it's filed at midnight. The block
+          contract is worth {formatMoney(data.blockDue)} a day for what you can treat now.
+        </p>
+        <Statement data={data} />
 
         {data.waitingLists.length > 0 && (
           <>
@@ -124,7 +132,7 @@ function Headlines({ data }: { data: ReportData }) {
   const l = data.today.ledger;
   const four = share(s.within4h, s.departures);
   const fourStatus = fourHourStatus(four);
-  const n = net(l);
+  const n = net(l) + data.blockDue;
   const harm = s.incidents + s.unexpectedDeaths + s.complaints;
   return (
     <div class="kpis">
@@ -153,7 +161,8 @@ function Headlines({ data }: { data: ReportData }) {
         label="Net today"
         value={formatMoney(n)}
         status={n < 0 ? "bad" : n > 0 ? "ok" : "none"}
-        note={`${formatMoney(l.tariff + l.outpatients)} in · ${formatMoney(l.salaries + l.bank + l.agency + l.upkeep + l.transfers)} out`}
+        title="Including today's block contract, paid at midnight"
+        note={`${formatMoney(income(l) + data.blockDue)} in · ${formatMoney(costs(l))} out`}
       />
       <RttTile lists={data.waitingLists} />
       <Tile
@@ -270,70 +279,86 @@ function Tile(props: {
 
 /* ---------- Today ---------- */
 
-function MoneySection({ ledger }: { ledger: Ledger }) {
-  const n = net(ledger);
-  const pay = ledger.salaries + ledger.bank + ledger.agency;
-  const costs = pay + ledger.upkeep + ledger.transfers;
-  const income = ledger.tariff + ledger.outpatients;
-  const scale = Math.max(income, costs, 1);
+/** Income and cost lines in a statement, in order. */
+const INCOME_LINES: { key: keyof Ledger; kind: string; label: string; title: string }[] = [
+  {
+    key: "block",
+    kind: "block",
+    label: "NHS block contract",
+    title:
+      "A fixed share of the expected value of the emergency care you're equipped to provide for your catchment, paid daily at midnight",
+  },
+  {
+    key: "tariff",
+    kind: "income",
+    label: "Emergency tariff",
+    title:
+      "Each A&E attendance, emergency admission and operation, at the marginal rate on top of the block",
+  },
+  {
+    key: "elective",
+    kind: "elective",
+    label: "Planned operations",
+    title: "Day cases and planned inpatient stays, at full tariff",
+  },
+  {
+    key: "outpatients",
+    kind: "outpatients",
+    label: "Outpatient tariff",
+    title: "Clinic appointments, at full tariff",
+  },
+];
+const COST_LINES: { key: keyof Ledger; kind: string; label: string }[] = [
+  { key: "salaries", kind: "salaries", label: "Salaries" },
+  { key: "bank", kind: "salaries", label: "Bank staff" },
+  { key: "agency", kind: "salaries", label: "Agency staff" },
+  { key: "upkeep", kind: "upkeep", label: "Equipment upkeep" },
+  { key: "supplies", kind: "supplies", label: "Drugs and supplies" },
+  { key: "estates", kind: "estates", label: "Estates and utilities" },
+  { key: "transfers", kind: "transport", label: "Transfer ambulances" },
+];
+
+/**
+ * Today's money. The block contract is paid at midnight, so until then it's
+ * shown as due (`blockDue`) and counted in the net.
+ */
+function MoneySection({ ledger, blockDue }: { ledger: Ledger; blockDue: number }) {
+  const l = { ...ledger, block: ledger.block + blockDue };
+  const n = net(l);
+  const scale = Math.max(income(l), costs(l), 1);
+  const bar = (lines: typeof COST_LINES) =>
+    lines.map((line) => (
+      <span
+        key={line.key}
+        class={`money-fill ${line.kind}`}
+        style={{ width: `${(100 * l[line.key]) / scale}%` }}
+      />
+    ));
   return (
     <div class="report-group">
       <h4>Finance</h4>
       <div class="money-bars" aria-hidden="true">
-        <div class="money-bar">
-          <span class="money-fill income" style={{ width: `${(100 * ledger.tariff) / scale}%` }} />
-          <span
-            class="money-fill outpatients"
-            style={{ width: `${(100 * ledger.outpatients) / scale}%` }}
-          />
-        </div>
-        <div class="money-bar">
-          <span class="money-fill salaries" style={{ width: `${(100 * pay) / scale}%` }} />
-          <span class="money-fill upkeep" style={{ width: `${(100 * ledger.upkeep) / scale}%` }} />
-          <span
-            class="money-fill transport"
-            style={{ width: `${(100 * ledger.transfers) / scale}%` }}
-          />
-        </div>
+        <div class="money-bar">{bar(INCOME_LINES)}</div>
+        <div class="money-bar">{bar(COST_LINES)}</div>
       </div>
       <table class="report-table">
         <tbody>
-          <Row
-            label={<Swatch kind="income">A&E and inpatient tariff</Swatch>}
-            value={formatMoney(ledger.tariff)}
-          />
-          {ledger.outpatients > 0 && (
+          {INCOME_LINES.filter((line) => l[line.key] > 0 || line.key === "tariff").map((line) => (
             <Row
-              label={<Swatch kind="outpatients">Outpatient tariff</Swatch>}
-              value={formatMoney(ledger.outpatients)}
+              key={line.key}
+              title={line.title}
+              label={<Swatch kind={line.kind}>{line.label}</Swatch>}
+              value={formatMoney(l[line.key])}
+              extra={line.key === "block" && blockDue > 0 ? "due at midnight" : undefined}
             />
-          )}
-          <Row
-            label={<Swatch kind="salaries">Salaries</Swatch>}
-            value={`−${formatMoney(ledger.salaries)}`}
-          />
-          {ledger.bank > 0 && (
+          ))}
+          {COST_LINES.filter((line) => l[line.key] > 0 || line.key === "salaries").map((line) => (
             <Row
-              label={<Swatch kind="salaries">Bank staff</Swatch>}
-              value={`−${formatMoney(ledger.bank)}`}
+              key={line.key}
+              label={<Swatch kind={line.kind}>{line.label}</Swatch>}
+              value={`−${formatMoney(l[line.key])}`}
             />
-          )}
-          {ledger.agency > 0 && (
-            <Row
-              label={<Swatch kind="salaries">Agency staff</Swatch>}
-              value={`−${formatMoney(ledger.agency)}`}
-            />
-          )}
-          <Row
-            label={<Swatch kind="upkeep">Equipment upkeep</Swatch>}
-            value={`−${formatMoney(ledger.upkeep)}`}
-          />
-          {ledger.transfers > 0 && (
-            <Row
-              label={<Swatch kind="transport">Transfer ambulances</Swatch>}
-              value={`−${formatMoney(ledger.transfers)}`}
-            />
-          )}
+          ))}
           <tr class="total">
             <td>Net</td>
             <td class={`num ${n < 0 ? "bad" : "ok"}`}>{formatMoney(n)}</td>
@@ -341,6 +366,108 @@ function MoneySection({ ledger }: { ledger: Ledger }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * The monthly financial statement: this month so far beside last month, line
+ * by line, with the net and cash at each month's end.
+ */
+function Statement({ data }: { data: ReportData }) {
+  const cols = [
+    { title: `${data.month.name} so far`, m: data.month },
+    ...(data.lastMonth ? [{ title: data.lastMonth.name, m: data.lastMonth }] : []),
+  ];
+  const used = (key: keyof Ledger) => cols.some((c) => c.m.ledger[key] > 0);
+  return (
+    <table class="report-table statement">
+      <thead>
+        <tr>
+          <th />
+          {cols.map((c) => (
+            <th key={c.title} class="num">
+              {c.title}
+              <span class="dim sub">
+                {c.m.days} {c.m.days === 1 ? "day" : "days"}
+              </span>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {INCOME_LINES.filter((line) => used(line.key)).map((line) => (
+          <tr key={line.key}>
+            <td title={line.title}>
+              <Swatch kind={line.kind}>{line.label}</Swatch>
+            </td>
+            {cols.map((c) => (
+              <td key={c.title} class="num">
+                {formatMoney(c.m.ledger[line.key])}
+              </td>
+            ))}
+          </tr>
+        ))}
+        <tr class="subtotal">
+          <td>Income</td>
+          {cols.map((c) => (
+            <td key={c.title} class="num">
+              {formatMoney(income(c.m.ledger))}
+            </td>
+          ))}
+        </tr>
+        {COST_LINES.filter((line) => used(line.key)).map((line) => (
+          <tr key={line.key}>
+            <td>
+              <Swatch kind={line.kind}>{line.label}</Swatch>
+            </td>
+            {cols.map((c) => (
+              <td key={c.title} class="num">
+                −{formatMoney(c.m.ledger[line.key])}
+              </td>
+            ))}
+          </tr>
+        ))}
+        <tr class="subtotal">
+          <td>Costs</td>
+          {cols.map((c) => (
+            <td key={c.title} class="num">
+              −{formatMoney(costs(c.m.ledger))}
+            </td>
+          ))}
+        </tr>
+        <tr class="total">
+          <td>Surplus or deficit</td>
+          {cols.map((c) => {
+            const n = net(c.m.ledger);
+            return (
+              <td key={c.title} class={`num ${n < 0 ? "bad" : "ok"}`}>
+                {formatMoney(n)}
+              </td>
+            );
+          })}
+        </tr>
+        <tr>
+          <td title="Building work and equipment bought, less anything sold: paid from cash, not a running cost">
+            Building and equipment
+          </td>
+          {cols.map((c) => (
+            <td key={c.title} class="num">
+              {Math.abs(c.m.capital) < 1
+                ? "—"
+                : `${c.m.capital > 0 ? "−" : ""}${formatMoney(Math.abs(c.m.capital))}`}
+            </td>
+          ))}
+        </tr>
+        <tr>
+          <td>Cash at the end</td>
+          {cols.map((c) => (
+            <td key={c.title} class="num">
+              {formatMoney(c.m.closingCash)}
+            </td>
+          ))}
+        </tr>
+      </tbody>
+    </table>
   );
 }
 
@@ -742,7 +869,7 @@ function Trends(props: {
   return (
     <div class="trends" onMouseLeave={() => onHover(null)}>
       <div class="trend-readout">
-        <strong>Day {focus.day}</strong>
+        <strong>{formatDate(focus.day)}</strong>
         <span>4-hr {four === null ? "—" : `${Math.round(four * 100)}%`}</span>
         <span class={n < 0 ? "bad-text" : "ok-text"}>{formatMoney(n)}</span>
         <span class="dim">
