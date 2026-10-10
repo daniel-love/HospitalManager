@@ -242,6 +242,8 @@ export interface RotaRow {
   /** Fewest rostered on any day shift and any night shift. */
   minDay: number;
   minNight: number;
+  /** Rostered on each of the week's 14 shifts: Monday day, Monday night, … */
+  filled: number[];
   /** Shifts a week short of the cover. */
   gaps: number;
   /** People needed to meet the cover on contracted hours alone. */

@@ -999,6 +999,7 @@ export function describeRoster(state: SimState): RosterData {
         avgNight: sum(nights) / 7,
         minDay: Math.min(...days),
         minNight: Math.min(...nights),
+        filled: g.filled,
         gaps: g.gaps,
         needed: Math.ceil(((cover.day + cover.night) * 7) / SHIFTS.perWeek),
         onNow: g.onNow,

@@ -822,12 +822,206 @@ body.planning #game::after {
 .room-specialty select {
   align-self: flex-start;
 }
-.rota-row {
+.meter-note {
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* ---------- Staff panel ---------- */
+.staff-panel .side-scroll h2 {
+  margin-bottom: 8px;
+}
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.stat-tile {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 0;
+  flex-direction: column;
+  padding: 6px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.stat-label {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.small-note {
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+.gap-banner {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  background: rgba(242, 201, 76, 0.1);
+  border: 1px solid rgba(242, 201, 76, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.staff-tabs {
+  margin: 12px 0 10px;
   border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 6px;
+}
+.tab-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 16px;
+  border-radius: 8px;
+  color: #1a1a1a;
+  background: #f2c94c;
+}
+.hire-buttons .small-button {
+  white-space: nowrap;
+}
+.hire-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.hire-name .chevron {
+  width: 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.count-badge,
+.chip-count {
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 16px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.chip-count {
+  margin-left: 4px;
+}
+.hire-row .hire-info > .dim,
+.hire-row .hire-info > .hire-desc,
+.hire-row .hire-info > .chips,
+.hire-row .hire-info > select {
+  margin-left: 14px;
+}
+.hire-row .hire-info > .chips,
+.hire-row .hire-info > select {
+  margin-top: 4px;
+  align-self: flex-start;
+}
+.chips.band-chips,
+.chips.gap-chips {
+  flex-wrap: nowrap;
+}
+.chips.band-chips button,
+.chips.gap-chips button {
+  font-size: 12px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.rota-how {
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.rota-how summary {
+  cursor: pointer;
+  color: var(--text-dim);
+}
+.rota-how p {
+  margin: 6px 0 0;
+}
+.gap-chips {
+  margin-bottom: 4px;
+}
+.rota-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.cell-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+.rota-card {
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.rota-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.rota-card-head .dim {
+  font-size: 12px;
+}
+.rota-card-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rota-grid {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.rota-grid th {
+  font-weight: 400;
+  color: var(--text-dim);
+  padding: 0 2px;
+}
+.rota-grid .cell {
+  width: 18px;
+  height: 18px;
+  text-align: center;
+  border-radius: 3px;
+}
+.cell.met,
+.cell-swatch.met {
+  background: rgba(111, 208, 140, 0.35);
+}
+.cell.short,
+.cell-swatch.short {
+  background: rgba(242, 201, 76, 0.4);
+}
+.cell.empty,
+.cell-swatch.empty {
+  background: rgba(255, 138, 128, 0.3);
+}
+.cell.spare,
+.cell-swatch.spare {
+  background: rgba(255, 255, 255, 0.12);
 }
 .rota-cover {
   display: flex;
@@ -835,33 +1029,25 @@ body.planning #game::after {
   gap: 4px;
   font-size: 13px;
 }
-.rota-cover .stepper .dim {
-  width: 44px;
-  font-size: 12px;
+.cover-stepper {
+  gap: 4px;
 }
-.rota-cover .stepper span:not(.dim) {
+.cover-stepper button {
+  min-width: 22px;
+}
+.cover-icon {
+  width: 14px;
+  color: var(--text-dim);
+}
+.cover-value {
   min-width: 16px;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
-.meter-note {
+.rota-status {
   display: block;
   font-size: 12px;
-  margin-top: 2px;
-}
-.gap-fill {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--panel-border);
-}
-.gap-fill .setting-choice {
-  padding: 1px 0;
-  font-size: 13px;
-}
-.rota-gaps {
-  font-size: 12px;
+  margin-top: 6px;
 }
 .hire-buttons {
   display: flex;
