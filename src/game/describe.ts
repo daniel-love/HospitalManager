@@ -15,6 +15,7 @@ import {
 import { specialtyIds } from "@data/schema";
 import { FOUR_HOUR_MINS, TRIAGE_CATEGORIES, TRIAGE_TARGET_MINS } from "@data/patients";
 import {
+  onDuty,
   onSite,
   type Job,
   type Outpatient,
@@ -50,7 +51,9 @@ import { describeJobPlan, jobPlan } from "@sim/systems/clinics";
 import { MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS, MAX_THEATRE_SESSIONS } from "@data/outpatients";
 import { analysers, pendingResults } from "@sim/systems/diagnostics";
 import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
-import { liveSessions } from "@sim/systems/outpatients";
+import { SHIFTS } from "@data/staff";
+import { inClinic, liveSessions } from "@sim/systems/outpatients";
+import { describeRota, nextShift, rotaSummary } from "@sim/systems/rota";
 import { emergencyOpOf, inTheatre } from "@sim/systems/theatres";
 import { waitingLists } from "@sim/systems/referrals";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
@@ -160,7 +163,7 @@ export function waitReason(state: SimState, p: Patient): string | null {
 
   const reasons: string[] = [];
   const able = Object.values(state.staff).filter((s) => canDo(s, job));
-  const qualified = able.filter(onSite);
+  const qualified = able.filter(onDuty);
   const team = job.specialty ? specialtyById.get(job.specialty)! : null;
   const coming = able.find((s) => s.onCall?.state === "called");
   if (coming) {
@@ -172,7 +175,9 @@ export function waitReason(state: SimState, p: Patient): string | null {
     reasons.push(
       team
         ? `Nobody from ${team.team} in the hospital`
-        : `No ${roleNames(job.roles, true)} on staff`,
+        : able.length > 0
+          ? `No ${roleNames(job.roles, true)} on duty`
+          : `No ${roleNames(job.roles, true)} on staff`,
     );
   }
   if (job.objectId === null) {
@@ -626,6 +631,17 @@ export function staffState(state: SimState, s: Staff): StaffState {
   if (s.onCall?.state === "leaving" && s.jobId === null) {
     return { status: "on_the_way", activity: "Going home: nothing more for them", ...none };
   }
+  if (s.duty === "off" && !s.onCall) {
+    const next = nextShift(state, s);
+    return {
+      status: "off_site",
+      activity: next ? `Off duty: next at work ${next}` : "Off duty",
+      ...none,
+    };
+  }
+  if (s.duty === "leaving" && s.jobId === null && !inClinic(state, s) && !inTheatre(state, s)) {
+    return { status: "on_the_way", activity: "Going home: end of their shift", ...none };
+  }
   const theatre = theatreActivity(state, s);
   if (theatre && s.jobId === null) return theatre;
   const clinic = liveSessions(state).get(s.id);
@@ -865,8 +881,9 @@ export function describeStaff(state: SimState, s: Staff): AgentInfo {
     role: staffTitle(s),
     activity: staffActivity(state, s),
     annualCost: annualCost(s),
+    rota: describeRota(state, s),
     morale: Math.round(s.morale),
-    ...(s.role === "consultant" && !s.onCall ? { meDuty: s.meDuty } : {}),
+    ...(s.role === "consultant" && s.contract === "resident" ? { meDuty: s.meDuty } : {}),
     ...(runsClinics(s) ? { clinics: clinicPlan(state, s) } : {}),
     ...(operates(s) ? { theatre: theatrePlan(state, s) } : {}),
   };
@@ -915,6 +932,7 @@ export function describeRoster(state: SimState): RosterData {
         description: r.description,
         annualCost: r.annualCost,
         count: staff.filter((s) => s.role === r.id).length,
+        atWork: staff.filter((s) => s.role === r.id && onSite(s)).length,
         specialist: r.specialist,
         bySpecialty: r.specialist
           ? Object.fromEntries(
@@ -937,6 +955,26 @@ export function describeRoster(state: SimState): RosterData {
       activity: staffActivity(state, s),
     })),
     payroll: staff.reduce((sum, s) => sum + annualCost(s), 0),
+    rotas: state.settings.rotas,
+    rota: rotaSummary(state).map((g) => {
+      const days = g.filled.filter((_, i) => i % 2 === 0);
+      const nights = g.filled.filter((_, i) => i % 2 === 1);
+      const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+      const cover = g.cover ?? { day: 0, night: 0 };
+      return {
+        key: g.key,
+        name: g.name,
+        people: g.people,
+        cover,
+        avgDay: sum(days) / 7,
+        avgNight: sum(nights) / 7,
+        minDay: Math.min(...days),
+        minNight: Math.min(...nights),
+        gaps: g.gaps,
+        needed: Math.ceil(((cover.day + cover.night) * 7) / SHIFTS.perWeek),
+        onNow: g.onNow,
+      };
+    }),
   };
 }
 
@@ -1184,7 +1222,7 @@ export function describeStaffTable(state: SimState): StaffTable {
       activity: st.activity,
       progress: st.progress,
       patient: patient ? { id: patient.id, name: patient.name } : null,
-      where: onSite(s) ? whereIs(state, s) : "Away from the hospital",
+      where: onSite(s) ? whereIs(state, s) : s.onCall ? "On call at home" : "At home",
     };
   });
   const busy = rows.filter(

@@ -5,8 +5,8 @@
  * Change bands, resident doctor scale) plus about 28% employer on-costs
  * (National Insurance and pension).
  *
- * Until shifts and rotas arrive (M5), each person hired works around the
- * clock, so staffing is cheaper than it really would be.
+ * Each person works a full-time contract of 37.5 hours a week (see SHIFTS),
+ * so keeping a post filled around the clock takes about five people.
  */
 import type { StaffGroup, StaffRoleInput } from "./schema";
 
@@ -28,6 +28,42 @@ export const ON_CALL = {
   homeAfterIdleMins: 60,
 };
 
+/**
+ * Shifts (GAME_DESIGN §6.3): NHS long days and nights of 12.5 hours, with
+ * half an hour's handover where they overlap. A full-time contract is three
+ * a week. Consultants, and registrars with clinics or theatre lists in their
+ * job plan, work weekdays instead, and consultants take turns on call from
+ * home out of hours. Times are minutes after midnight.
+ */
+export const SHIFTS = {
+  dayStart: 7 * 60 + 30,
+  nightStart: 19 * 60 + 30,
+  lengthMins: 12 * 60 + 30,
+  perWeek: 3,
+  /** Shifts a week someone can be rostered for at most (the Working Time Directive's 48 hours). */
+  maxPerWeek: 4,
+  /** Doctors working weekdays: Monday to Friday, these hours. */
+  weekdayStart: 8 * 60,
+  weekdayEnd: 18 * 60,
+  /** With no cover levels set, the share of each group's shifts that are days. */
+  defaultDayShare: 0.6,
+};
+
+/**
+ * Unsocial hours pay (Agenda for Change, bands 3 and up): extra on top of
+ * basic pay for hours worked between 20:00 and 06:00 or on a Saturday, and
+ * more on a Sunday. Resident doctors' night enhancement is similar.
+ */
+export const UNSOCIAL = {
+  night: 0.3,
+  saturday: 0.3,
+  sunday: 0.6,
+  nightFrom: 20,
+  nightTo: 6,
+  /** Paid hours in a year at 37.5 a week: an hour's basic pay is the salary divided by this. */
+  hoursPerYear: 37.5 * 52.14,
+};
+
 export const staffRoles: StaffRoleInput[] = [
   {
     id: "consultant",
@@ -37,7 +73,7 @@ export const staffRoles: StaffRoleInput[] = [
     annualCost: 160_000,
     specialist: true,
     description:
-      "The senior doctor of a specialty. Reviews A&E patients referred to the specialty and decides to admit them, like a registrar. Can be resident (always in the hospital) or on call from home: much cheaper, but called in only when nobody from the specialty is in the hospital, and takes 20 to 40 minutes to arrive. A resident consultant can be given the Medical Examiner duty (in their inspector): they review deaths at a desk, Monday to Friday 09:00 to 17:00, but never a death of a patient they treated.",
+      "The senior doctor of a specialty. Reviews A&E patients referred to the specialty and decides to admit them, like a registrar. Can be resident, working weekdays 08:00 to 18:00 and taking turns with the specialty's other resident consultants to be on call from home out of hours, or purely on call from home: much cheaper, but called in only when nobody from the specialty is in the hospital, and takes 20 to 40 minutes to arrive. A resident consultant can be given the Medical Examiner duty (in their inspector): they review deaths at a desk, Monday to Friday 09:00 to 17:00, but never a death of a patient they treated.",
   },
   {
     id: "registrar",

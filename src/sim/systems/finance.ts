@@ -6,7 +6,7 @@
  */
 import { equipmentById, staffRoleById } from "@data/catalogue";
 import { DAYS_PER_MONTH } from "@data/economy";
-import { ON_CALL } from "@data/staff";
+import { ON_CALL, UNSOCIAL } from "@data/staff";
 import { emptyLedger, emptyStats, net, onSite, type DayReport, type Staff } from "../agents";
 import { emit } from "../events";
 import type { SimState } from "../state";
@@ -23,18 +23,42 @@ export function earn(state: SimState, amount: number): void {
 
 /** What someone costs a year: their role's pay, or an on-call consultant's retainer. */
 export function annualCost(s: Staff): number {
-  return s.onCall ? ON_CALL.retainer : staffRoleById.get(s.role)!.annualCost;
+  return s.contract === "on_call" ? ON_CALL.retainer : staffRoleById.get(s.role)!.annualCost;
 }
 
-/** Staff costs per hour, £: on-call consultants are also paid for hours in the hospital. */
+/**
+ * The unsocial hours enhancement for an hour's work starting at `hour` on
+ * `weekday` (0 Monday): a share of basic pay.
+ */
+export function unsocialRate(weekday: number, hour: number): number {
+  if (weekday === 6) return UNSOCIAL.sunday;
+  if (weekday === 5) return Math.max(UNSOCIAL.saturday, UNSOCIAL.night);
+  return hour >= UNSOCIAL.nightFrom || hour < UNSOCIAL.nightTo ? UNSOCIAL.night : 0;
+}
+
+/**
+ * Staff costs for the hour just gone, £: salaries, plus on-call
+ * consultants' hours in the hospital, plus unsocial hours pay for anyone
+ * who was at work on a shift.
+ */
 export function hourlySalaries(state: SimState): number {
   let annual = 0;
   let hourly = 0;
+  const c = clockFromTick(Math.max(0, state.tick - 1));
+  const rate = unsocialRate(c.weekday, c.hour);
   for (const s of Object.values(state.staff)) {
     annual += annualCost(s);
-    if (s.onCall && onSite(s)) hourly += ON_CALL.hourly;
+    if (s.contract === "on_call" && onSite(s)) hourly += ON_CALL.hourly;
+    else if (rate > 0 && onShift(state, s)) {
+      hourly += (rate * staffRoleById.get(s.role)!.annualCost) / UNSOCIAL.hoursPerYear;
+    }
   }
   return annual / 365 / 24 + hourly;
+}
+
+/** At work on a rota shift (or staying on after one): what earns unsocial hours pay. */
+function onShift(state: SimState, s: Staff): boolean {
+  return state.settings.rotas && s.role !== "consultant" && onSite(s) && s.onCall === null;
 }
 
 /** Equipment upkeep per hour, £. */

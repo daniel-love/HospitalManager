@@ -12,7 +12,7 @@ import { MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS, MAX_THEATRE_SESSIONS } from "@
 import { FIRST_NAMES, SURNAMES } from "@data/names";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import { ON_CALL } from "@data/staff";
-import { onSite, type Job, type Staff } from "../agents";
+import { onDuty, onSite, type Job, type Staff } from "../agents";
 import { emit } from "../events";
 import {
   deskStaffSpot,
@@ -33,6 +33,7 @@ import { inTheatre } from "./theatres";
 import { removeJob, ticksFor, unassignJob } from "./jobBoard";
 import { nurseStations, stationSpot } from "./monitoring";
 import { headTo } from "./movement";
+import { nextShift, startOnRota, updateShifts } from "./rota";
 
 export type StaffCommand =
   | {
@@ -55,8 +56,9 @@ export type StaffResult = { ok: true; staff: Staff } | { ok: false; error: strin
 
 /**
  * Hiring is instant until recruitment arrives (M5): the new starter walks in
- * from the site entrance. Dismissal takes effect at once; any job they were
- * doing goes back on the board.
+ * from the site entrance, at once or (with rotas on) at their first shift.
+ * Dismissal takes effect at once; any job they were doing goes back on the
+ * board.
  */
 export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResult {
   if (cmd.type === "hire_staff") {
@@ -75,7 +77,10 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
       name: `${pick(state.rng, FIRST_NAMES)} ${pick(state.rng, SURNAMES)}`,
       role: cmd.role,
       specialty: role.specialist ? cmd.specialty! : null,
+      contract: cmd.onCall ? "on_call" : "resident",
       onCall: cmd.onCall ? { state: "home", at: state.tick } : null,
+      duty: "on",
+      shiftEnd: null,
       meDuty: false,
       clinicSessions: 0,
       theatreSessions: 0,
@@ -93,18 +98,20 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
       morale: MORALE_START,
     };
     state.staff[staff.id] = staff;
+    startOnRota(state, staff);
+    const first = onSite(staff) || staff.onCall ? null : nextShift(state, staff);
     emit(
       state,
-      `${staff.name} joined as ${staffTitle(staff)}`,
+      `${staff.name} joined as ${staffTitle(staff)}${first ? `: first shift ${first}` : ""}`,
       "info",
-      staff.onCall ? undefined : at,
+      onSite(staff) ? at : undefined,
     );
     return { ok: true, staff };
   }
   const staff = state.staff[cmd.id];
   if (!staff) return { ok: false, error: "No such member of staff" };
   if (cmd.type === "set_me_duty") {
-    if (cmd.on && (staff.role !== "consultant" || staff.onCall)) {
+    if (cmd.on && (staff.role !== "consultant" || staff.contract === "on_call")) {
       return { ok: false, error: "Only resident consultants can be Medical Examiners" };
     }
     staff.meDuty = cmd.on;
@@ -151,7 +158,8 @@ const clamp = (n: number, max: number) => Math.max(0, Math.min(max, Math.round(n
  * of a surgical specialty, or of Anaesthetics.
  */
 export function operates(s: Staff): boolean {
-  if ((s.role !== "consultant" && s.role !== "registrar") || s.onCall || !s.specialty) return false;
+  if ((s.role !== "consultant" && s.role !== "registrar") || s.contract === "on_call") return false;
+  if (!s.specialty) return false;
   return s.specialty === "anaesthetics" || !!specialtyById.get(s.specialty)?.surgery;
 }
 
@@ -159,7 +167,9 @@ export function operates(s: Staff): boolean {
 export function runsClinics(s: Staff): boolean {
   const specialty = s.specialty && specialtyById.get(s.specialty);
   return (
-    (s.role === "consultant" || s.role === "registrar") && !s.onCall && !!specialty?.outpatients
+    (s.role === "consultant" || s.role === "registrar") &&
+    s.contract === "resident" &&
+    !!specialty?.outpatients
   );
 }
 
@@ -167,13 +177,18 @@ export function runsClinics(s: Staff): boolean {
 export function staffTitle(s: Staff): string {
   const role = staffRoleById.get(s.role)!.name;
   const specialty = s.specialty ? `${specialtyById.get(s.specialty)!.name} ` : "";
-  return `${specialty}${role}${s.onCall ? " (on call)" : ""}${s.meDuty ? ", Medical Examiner" : ""}`;
+  const onCall = s.contract === "on_call" ? " (on call)" : "";
+  return `${specialty}${role}${onCall}${s.meDuty ? ", Medical Examiner" : ""}`;
 }
 
 export function updateStaff(state: SimState): void {
+  updateShifts(state);
   for (const s of Object.values(state.staff)) {
     if (s.jobId !== null) s.lastActiveTick = state.tick;
-    if (s.role === "receptionist") staffDesk(state, s);
+    if (s.duty === "off") continue;
+    if (s.duty === "leaving") {
+      if (s.jobId === null && !inClinic(state, s) && !inTheatre(state, s)) goHome(state, s);
+    } else if (s.role === "receptionist") staffDesk(state, s);
     else if (s.onCall?.state === "leaving") {
       if (s.jobId !== null) s.onCall = { state: "in", at: state.tick };
       else walkHome(state, s);
@@ -223,7 +238,7 @@ function updateOnCall(state: SimState): void {
   for (const job of open) {
     // A colleague in clinic isn't free to come: the on-call consultant is.
     const here = (s: Staff) =>
-      (onSite(s) && !inClinic(state, s) && !inTheatre(state, s)) || s.onCall?.state === "called";
+      (onDuty(s) && !inClinic(state, s) && !inTheatre(state, s)) || s.onCall?.state === "called";
     if (staff.some((s) => canDo(s, job) && here(s))) continue;
     const home = onCall.find((s) => s.onCall!.state === "home" && canDo(s, job));
     if (home) callIn(state, home);
@@ -258,6 +273,21 @@ function updateOnCall(state: SimState): void {
         s.onCall = { state: "in", at: state.tick };
       }
     }
+  }
+}
+
+/** At the end of a shift: off their desk or nurse station, out of the site, off the map. */
+function goHome(state: SimState, s: Staff): void {
+  if (s.desk !== null) {
+    release(state, s.desk, "staff", s.id);
+    s.desk = null;
+  }
+  const exit = siteEntrance(state) ?? fallbackEntrance(state);
+  const arrival = headTo(state, s, exit);
+  if (arrival === "arrived" || arrival === "no_route") {
+    s.duty = "off";
+    s.path = [];
+    s.dest = null;
   }
 }
 

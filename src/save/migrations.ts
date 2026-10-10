@@ -525,6 +525,26 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v27: shifts and rotas. Old hospitals were staffed for everyone working
+  // around the clock, so rotas start off (Settings can turn them on).
+  26: (save) => {
+    type Staff = { onCall: object | null };
+    const state = save.state as { staff: Staff[]; settings: object };
+    return {
+      ...save,
+      state: {
+        ...state,
+        staff: state.staff.map((s) => ({
+          ...s,
+          contract: s.onCall ? "on_call" : "resident",
+          duty: "on",
+          shiftEnd: null,
+        })),
+        cover: {},
+        settings: { ...state.settings, rotas: false },
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

@@ -258,8 +258,24 @@ export interface Staff extends AgentBase {
   role: StaffRoleId;
   /** Consultants and registrars; null for everyone else. */
   specialty: SpecialtyId | null;
-  /** On-call consultants; null for staff resident in the hospital. */
+  /**
+   * Resident staff work in the hospital (on shifts, once rotas are on);
+   * on-call consultants are only ever on call from home.
+   */
+  contract: "resident" | "on_call";
+  /**
+   * While someone is on call from home: on-call consultants always, and
+   * resident consultants out of hours on their turn (systems/rota.ts).
+   * Null for everyone else.
+   */
   onCall: OnCall | null;
+  /**
+   * on: at work (or on call). leaving: their shift is over; they finish
+   * what they're doing and go home. off: at home, off the map.
+   */
+  duty: "on" | "leaving" | "off";
+  /** The tick their current shift ends, or null (no shift under way, or rotas are off). */
+  shiftEnd: number | null;
   /** Resident consultants: does Medical Examiner reviews in office-hours sessions. */
   meDuty: boolean;
   /**
@@ -723,7 +739,13 @@ export interface SimEvent {
   at?: Point;
 }
 
-/** In the hospital: everyone except on-call consultants at home or on their way in. */
+/** In the hospital: not off duty at home, nor on call at home or on the way in. */
 export function onSite(s: Staff): boolean {
-  return s.onCall === null || s.onCall.state === "in" || s.onCall.state === "leaving";
+  if (s.onCall) return s.onCall.state === "in" || s.onCall.state === "leaving";
+  return s.duty !== "off";
+}
+
+/** In the hospital and able to take on work: not on their way home at the end of a shift. */
+export function onDuty(s: Staff): boolean {
+  return onSite(s) && s.duty === "on";
 }

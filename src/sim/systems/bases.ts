@@ -11,7 +11,7 @@
  * where they are.
  */
 import type { StaffRoleId } from "@data/schema";
-import type { Point, Staff } from "../agents";
+import { onSite, type Point, type Staff } from "../agents";
 import { equipmentById } from "@data/catalogue";
 import { deskStaffSpot, seatApproach, seatTile } from "../places";
 import type { Room, SimState } from "../state";
@@ -105,7 +105,7 @@ function takenSpots(state: SimState, self: Staff): Set<number> {
   const grid = state.floors[0]!;
   const out = new Set<number>();
   for (const o of Object.values(state.staff)) {
-    if (o.id === self.id) continue;
+    if (o.id === self.id || !onSite(o)) continue;
     const p = o.dest ?? { x: Math.round(o.x), y: Math.round(o.y) };
     out.add(tileIndex(grid, p.x, p.y));
   }

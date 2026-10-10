@@ -20,7 +20,9 @@ import { dailyDemand } from "@sim/systems/arrivals";
 import { monitorsCovering, observedBeds, stationsSeeing } from "@sim/systems/monitoring";
 import { outpatientDesks } from "@sim/systems/outpatients";
 import { offersClinic, referralsPerDay } from "@sim/systems/referrals";
+import { SLOTS } from "@sim/systems/rota";
 import { operates, runsClinics } from "@sim/systems/staffing";
+import { SHIFTS } from "@data/staff";
 import { PRACTITIONERS, TURNAROUND_MINS } from "@sim/systems/theatres";
 import { CLINIC_SESSIONS } from "@data/outpatients";
 
@@ -510,6 +512,14 @@ export function capacityGuide(
     Object.values(state.staff).filter((s) => s.role === role).length;
   const valid = (type: string) => state.rooms.filter((r) => r.valid && r.typeId === type).length;
 
+  /**
+   * A staff row: the guide works out how many are needed at work at once;
+   * with rotas, each person works three shifts a week, so it takes about
+   * 14 ÷ 3 times as many people to have that many on every shift.
+   */
+  const staffRow = (label: string, role: StaffRoleId, perShift: number, note: string) =>
+    rotaRow(state, { label, have: count(role), recommended: perShift, note });
+
   const majorsBays = Math.max(1, rooms("majors_bay"));
   const resusBays = Math.max(1, rooms("resus_bay"));
   const wardBeds = state.rooms
@@ -541,42 +551,56 @@ export function capacityGuide(
       recommended: resusBays,
       note: "Always keep one free for the next arrest.",
     },
-    {
-      label: "Receptionists",
-      have: count("receptionist"),
-      recommended: Math.max(1, people("receptionist")),
-      note: "One per desk at the busiest time.",
-    },
-    {
-      label: "Staff nurses",
-      have: count("nurse"),
-      recommended: Math.max(1, nurses),
-      note: `Triage, handovers and nursing steps, plus 1 per ${PLANNING.majorsBedsPerNurse} Majors trolleys and 1 per ${PLANNING.resusBedsPerNurse} Resus trolleys.`,
-    },
-    {
-      label: "Junior doctors",
-      have: count("junior_doctor"),
-      recommended: Math.max(1, people("junior_doctor")),
-      note: "Assessing and reviewing every illness, and Majors and Resus patients.",
-    },
-    {
-      label: "Nurse practitioners",
-      have: count("nurse_practitioner"),
-      recommended: people("nurse_practitioner"),
-      note: "Minor injuries. Without them, the doctors see these too.",
-    },
+    staffRow(
+      "Receptionists",
+      "receptionist",
+      Math.max(1, people("receptionist")),
+      "One per desk at the busiest time.",
+    ),
+    staffRow(
+      "Staff nurses",
+      "nurse",
+      Math.max(1, nurses),
+      `Triage, handovers and nursing steps, plus 1 per ${PLANNING.majorsBedsPerNurse} Majors trolleys and 1 per ${PLANNING.resusBedsPerNurse} Resus trolleys.`,
+    ),
+    staffRow(
+      "Junior doctors",
+      "junior_doctor",
+      Math.max(1, people("junior_doctor")),
+      "Assessing and reviewing every illness, and Majors and Resus patients.",
+    ),
+    staffRow(
+      "Nurse practitioners",
+      "nurse_practitioner",
+      people("nurse_practitioner"),
+      "Minor injuries. Without them, the doctors see these too.",
+    ),
     ...clinicCapacity(state),
     ...theatreCapacity(state),
-    {
-      label: "Cleaners",
-      have: count("cleaner"),
-      recommended: Math.max(
+    staffRow(
+      "Cleaners",
+      "cleaner",
+      Math.max(
         1,
         Math.ceil((minors + majorsBays + resusBays + wardBeds) / PLANNING.bedsPerCleaner),
       ),
-      note: `About 1 per ${PLANNING.bedsPerCleaner} cubicles, trolleys and ward beds.`,
-    },
+      `About 1 per ${PLANNING.bedsPerCleaner} cubicles, trolleys and ward beds.`,
+    ),
   ];
+}
+
+/**
+ * With rotas on, turns a row's people needed at once into people to hire,
+ * saying how many that is on each shift.
+ */
+function rotaRow(state: SimState, row: CapacityRow): CapacityRow {
+  const perShift = row.recommended;
+  if (!state.settings.rotas || !perShift) return row;
+  return {
+    ...row,
+    recommended: Math.ceil((perShift * SLOTS) / SHIFTS.perWeek),
+    note: `${perShift} on each shift, day and night, takes about ${Math.ceil((perShift * SLOTS) / SHIFTS.perWeek)} people on three shifts a week. ${row.note}`,
+  };
 }
 
 /**
@@ -648,14 +672,16 @@ function theatreCapacity(state: SimState): CapacityRow[] {
     recommended: surgeonLists,
     note: "One for every surgeon's list. A list without an anaesthetist doesn't run.",
   });
-  rows.push({
-    label: "Theatre practitioners",
-    have: Object.values(state.staff).filter((s) => s.role === "theatre_practitioner").length,
-    recommended:
-      PRACTITIONERS *
-      Math.max(1, state.rooms.filter((r) => r.valid && r.typeId === "theatre").length),
-    note: `${PRACTITIONERS} for each theatre that may be in use at once.`,
-  });
+  rows.push(
+    rotaRow(state, {
+      label: "Theatre practitioners",
+      have: Object.values(state.staff).filter((s) => s.role === "theatre_practitioner").length,
+      recommended:
+        PRACTITIONERS *
+        Math.max(1, state.rooms.filter((r) => r.valid && r.typeId === "theatre").length),
+      note: `${PRACTITIONERS} for each theatre that may be in use at once.`,
+    }),
+  );
   return rows;
 }
 

@@ -1,7 +1,8 @@
 /**
- * Hiring (GAME_DESIGN §8.2, first version): hire by role and see the payroll.
- * The People dialog shows what everyone is doing and handles dismissals. Recruitment pools, pay bands and rotas come in
- * M5; for now hiring is instant and everyone works around the clock.
+ * Hiring (GAME_DESIGN §8.2): hire by role, see the payroll, and set the
+ * rota's cover levels (systems/rota.ts). The People dialog shows what
+ * everyone is doing and handles dismissals. Hiring is instant until
+ * recruitment pools arrive.
  */
 import { useState } from "preact/hooks";
 import type { SpecialtyId } from "@data/schema";
@@ -9,7 +10,14 @@ import { ON_CALL } from "@data/staff";
 import type { Game } from "@game/game";
 import { formatMoney } from "@game/tools";
 import { ListSection } from "./ListSection";
-import { peopleDialog, roster, sidePanel, type RosterData, type RosterRole } from "./store";
+import {
+  peopleDialog,
+  roster,
+  sidePanel,
+  type RosterData,
+  type RosterRole,
+  type RotaRow,
+} from "./store";
 
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
@@ -25,8 +33,12 @@ export function StaffPanel({ game }: { game: Game }) {
         <h2>Hire staff</h2>
         <p class="dim">
           Payroll {formatMoney(data.payroll)} a year ({formatMoney(data.payroll / 365)} a day),
-          including employer costs. Until rotas arrive, everyone works around the clock.
+          including employer costs
+          {data.rotas
+            ? ", plus unsocial hours pay for nights and weekends. Each person works three 12½-hour shifts a week, so a post filled around the clock takes about five people."
+            : ". Rotas are off for this hospital (Settings), so everyone works around the clock."}
         </p>
+        {data.rotas && <RotaSection game={game} rows={data.rota} />}
         {data.groups.map((g) => (
           <ListSection key={g.name} title={g.name}>
             {g.roles.map((r) =>
@@ -38,6 +50,7 @@ export function StaffPanel({ game }: { game: Game }) {
                     <strong>{r.name}</strong>
                     <span class="dim">
                       {formatMoney(r.annualCost)}/yr · {r.count} on staff
+                      {data.rotas && r.count > 0 && `, ${r.atWork} at work now`}
                     </span>
                     <span class="hire-desc">{r.description}</span>
                   </div>
@@ -67,6 +80,89 @@ export function StaffPanel({ game }: { game: Game }) {
         </p>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Cover levels: how many of each group the rota should put on every day
+ * and night shift, and how well the people hired meet it.
+ */
+function RotaSection({ game, rows }: { game: Game; rows: RotaRow[] }) {
+  return (
+    <ListSection title="Rota">
+      <p class="hire-desc">
+        Long days 07:30–20:00 and nights 19:30–08:00, with half an hour to hand over. Set how many
+        you want on each shift; everyone hired is rostered to meet it as far as they can, and any
+        shifts left over go where they help most. Consultants work weekdays 08:00–18:00 and take
+        turns on call from home out of hours, as do registrars with clinics or theatre lists
+        (without the on call).
+      </p>
+      {rows.length === 0 && <p class="dim">Hire staff to see their rota here.</p>}
+      {rows.map((r) => (
+        <div key={r.key} class="rota-row">
+          <div class="hire-info">
+            <strong>{r.name}</strong>
+            <span class="dim">
+              {r.people} on staff · {r.onNow} at work now · rostered{" "}
+              {describeSpread(r.minDay, r.avgDay)} by day, {describeSpread(r.minNight, r.avgNight)}{" "}
+              at night
+            </span>
+            {r.gaps > 0 ? (
+              <span class="rota-gaps warn-text">
+                {r.gaps} {r.gaps === 1 ? "shift" : "shifts"} a week short: about {r.needed} people
+                needed for this cover
+              </span>
+            ) : (
+              r.cover.day + r.cover.night === 0 && (
+                <span class="hire-desc">No cover set: shifts are shared 60:40 days to nights.</span>
+              )
+            )}
+          </div>
+          <div class="rota-cover">
+            <CoverStepper
+              label="Days"
+              value={r.cover.day}
+              onChange={(n) => game.setCover(r.key, n, r.cover.night)}
+            />
+            <CoverStepper
+              label="Nights"
+              value={r.cover.night}
+              onChange={(n) => game.setCover(r.key, r.cover.day, n)}
+            />
+          </div>
+        </div>
+      ))}
+    </ListSection>
+  );
+}
+
+/** "2", or "1–2" when shifts differ. */
+function describeSpread(min: number, avg: number): string {
+  const max = Math.ceil(avg);
+  return min >= max ? String(min) : `${min}–${max}`;
+}
+
+function CoverStepper(props: { label: string; value: number; onChange: (n: number) => void }) {
+  return (
+    <div class="stepper">
+      <span class="dim">{props.label}</span>
+      <button
+        disabled={props.value <= 0}
+        onMouseDown={noFocus}
+        onClick={() => props.onChange(props.value - 1)}
+        aria-label={`Fewer on ${props.label.toLowerCase()}`}
+      >
+        −
+      </button>
+      <span>{props.value}</span>
+      <button
+        onMouseDown={noFocus}
+        onClick={() => props.onChange(props.value + 1)}
+        aria-label={`More on ${props.label.toLowerCase()}`}
+      >
+        +
+      </button>
+    </div>
   );
 }
 

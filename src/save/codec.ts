@@ -237,9 +237,12 @@ const staffSchema = z.object({
   ...agentFields,
   role: z.enum(staffRoleIds),
   specialty: z.enum(specialtyIds).nullable(),
+  contract: z.enum(["resident", "on_call"]),
   onCall: z
     .object({ state: z.enum(["home", "called", "in", "leaving"]), at: int.min(0) })
     .nullable(),
+  duty: z.enum(["on", "leaving", "off"]),
+  shiftEnd: nullableInt,
   meDuty: z.boolean(),
   clinicSessions: int.min(0),
   theatreSessions: int.min(0),
@@ -479,11 +482,16 @@ const saveSchema = z.object({
     dirt: z.record(z.string(), int.min(0)),
     roomSpecialties: z.record(z.string().regex(/^\d+:\d+$/), z.enum(specialtyIds)),
     emergencyTheatres: z.record(z.string().regex(/^\d+:\d+$/), z.literal(true)),
+    cover: z.record(
+      z.string().regex(/^[a-z_]+(:[a-z_]+)?$/),
+      z.object({ day: int.min(0).max(99), night: int.min(0).max(99) }),
+    ),
     today: z.object({ ledger: ledgerSchema, stats: statsSchema }),
     history: z.array(z.object({ day: int.positive(), ledger: ledgerSchema, stats: statsSchema })),
     settings: z.object({
       catchment: int.min(1_000).max(10_000_000),
       patientVolume: num.min(0).max(10),
+      rotas: z.boolean(),
     }),
     alerts: z.record(z.string(), int),
     incidents: z.array(
@@ -552,6 +560,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       dirt: state.dirt,
       roomSpecialties: state.roomSpecialties,
       emergencyTheatres: state.emergencyTheatres,
+      cover: state.cover,
       today: state.today,
       history: state.history,
       settings: state.settings,
@@ -616,6 +625,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     dirt: Object.fromEntries(Object.entries(s.dirt).map(([k, v]) => [Number(k), v])),
     roomSpecialties: { ...s.roomSpecialties },
     emergencyTheatres: { ...s.emergencyTheatres },
+    cover: { ...s.cover },
     today: s.today,
     history: s.history,
     settings: { ...s.settings },

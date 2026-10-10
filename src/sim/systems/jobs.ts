@@ -9,7 +9,7 @@
  * that finds nobody free pulls the nearest qualified person off other work.
  */
 import { conditionById } from "@data/catalogue";
-import { onSite, type Job, type Patient, type Point, type Staff } from "../agents";
+import { onDuty, type Job, type Patient, type Point, type Staff } from "../agents";
 import {
   bedside,
   freeCouches,
@@ -87,7 +87,7 @@ export function assignJobs(state: SimState): void {
     (s) =>
       s.jobId === null &&
       s.role !== "receptionist" &&
-      onSite(s) &&
+      onDuty(s) &&
       !inClinic(state, s) &&
       !inTheatre(state, s),
   );

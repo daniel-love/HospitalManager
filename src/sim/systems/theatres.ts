@@ -28,7 +28,7 @@ import { CLINIC_SESSIONS, type SessionHalf } from "@data/outpatients";
 import { PLANNED_PREFIX } from "@data/conditions";
 import type { SpecialtyId } from "@data/schema";
 import type { Operation, Patient, Referral, Staff } from "../agents";
-import { onSite } from "../agents";
+import { onDuty } from "../agents";
 import { warn } from "../events";
 import {
   bedside,
@@ -345,7 +345,7 @@ export function preOpChecked(p: Patient): void {
 function freePractitioners(state: SimState): Staff[] {
   const busy = new Set(Object.values(state.operations).flatMap((o) => o.practitionerIds));
   return Object.values(state.staff).filter(
-    (s) => s.role === "theatre_practitioner" && onSite(s) && s.jobId === null && !busy.has(s.id),
+    (s) => s.role === "theatre_practitioner" && onDuty(s) && s.jobId === null && !busy.has(s.id),
   );
 }
 
@@ -718,7 +718,7 @@ function doctorFor(state: SimState, specialty: SpecialtyId, call: boolean): Staf
     (s) => s.specialty === specialty && (s.role === "consultant" || s.role === "registrar"),
   );
   const free = all.find((s) => {
-    if (!onSite(s) || inTheatre(state, s) || inClinic(state, s)) return false;
+    if (!onDuty(s) || inTheatre(state, s) || inClinic(state, s)) return false;
     const job = s.jobId === null ? undefined : state.jobs[s.jobId];
     return !job || job.state !== "working";
   });

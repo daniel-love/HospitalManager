@@ -222,6 +222,7 @@ function AgentSection({
           {agent.role} · {formatMoney(agent.annualCost)}/yr
         </p>
         <p>{agent.activity}</p>
+        <p class="dim">Works: {agent.rota}</p>
         {agent.meDuty !== undefined && (
           <label class="duty-toggle">
             <input

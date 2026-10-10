@@ -1,5 +1,6 @@
 /**
- * Settings: the hospital's catchment (saved with the game), and how often to
+ * Settings: the hospital's catchment (saved with the game), shifts for
+ * hospitals saved before rotas, and how often to
  * autosave and whether to smooth edges (kept in this browser for every
  * game). A fuller menu comes later.
  */
@@ -76,6 +77,8 @@ function SettingsBody({ game }: { game: Game }) {
           </p>
         </fieldset>
 
+        {!game.state.settings.rotas && <RotasSetting game={game} />}
+
         <fieldset class="setting">
           <legend>Autosave</legend>
           <p class="dim">
@@ -123,5 +126,34 @@ function SettingsBody({ game }: { game: Game }) {
         </fieldset>
       </div>
     </div>
+  );
+}
+
+/**
+ * Hospitals saved before rotas had everyone working around the clock. This
+ * starts shifts for them; there's no going back, since real staff don't work
+ * around the clock.
+ */
+function RotasSetting({ game }: { game: Game }) {
+  const [on, setOn] = useState(false);
+  if (on) return null;
+  return (
+    <fieldset class="setting">
+      <legend>Shifts and rotas</legend>
+      <p class="dim">
+        This hospital was saved before rotas, so everyone works around the clock. With shifts, each
+        person works three 12½-hour shifts a week, so you'll need about five people for every post
+        you want filled day and night (set cover levels in the Hire panel). There's no switching
+        back.
+      </p>
+      <button
+        onClick={() => {
+          game.setRotas(true);
+          setOn(true);
+        }}
+      >
+        Start shifts and rotas
+      </button>
+    </fieldset>
   );
 }

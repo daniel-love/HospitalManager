@@ -30,7 +30,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 26;
+export const SIM_STATE_VERSION = 27;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -136,6 +136,12 @@ export interface SimState {
   roomSpecialties: Record<string, SpecialtyId>;
   /** Operating theatres kept for emergencies, pinned to a tile like roomSpecialties. */
   emergencyTheatres: Record<string, true>;
+  /**
+   * Cover levels (systems/rota.ts): how many of each rota group the player
+   * wants on each day and night shift, keyed by group ("nurse",
+   * "registrar:cardiology"). Groups with none set share shifts out evenly.
+   */
+  cover: Record<string, Cover>;
 
   /** Money and patient flow so far today, and reports for past days (newest last). */
   today: { ledger: Ledger; stats: FlowStats };
@@ -161,6 +167,17 @@ export interface SimSettings {
   catchment: number;
   /** Multiplies arrival rates on top of the catchment's: 1 = real-world per-person rates. */
   patientVolume: number;
+  /**
+   * Staff work shifts and rotas (systems/rota.ts). Off, everyone hired works
+   * around the clock: saves from before rotas, and test fixtures.
+   */
+  rotas: boolean;
+}
+
+/** People wanted on each day shift and each night shift. */
+export interface Cover {
+  day: number;
+  night: number;
 }
 
 export interface NewGameOptions {
@@ -170,6 +187,8 @@ export interface NewGameOptions {
   money?: number;
   /** Lay out the public road (world/site.ts). Off for blank test maps. */
   site?: boolean;
+  /** Staff work shifts. Off for test maps, where everyone works around the clock. */
+  rotas?: boolean;
 }
 
 export const DEFAULT_MAP_SIZE = 200;
@@ -208,9 +227,10 @@ export function createSimState(opts: NewGameOptions): SimState {
     dirt: {},
     roomSpecialties: {},
     emergencyTheatres: {},
+    cover: {},
     today: { ledger: emptyLedger(), stats: emptyStats() },
     history: [],
-    settings: { catchment: DEFAULT_CATCHMENT, patientVolume: 1 },
+    settings: { catchment: DEFAULT_CATCHMENT, patientVolume: 1, rotas: opts.rotas ?? false },
     alerts: {},
     incidents: [],
     nextIncidentId: 1,

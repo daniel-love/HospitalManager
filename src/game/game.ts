@@ -23,6 +23,7 @@ import { tick } from "@sim/sim";
 import { createSimState, type SimState } from "@sim/state";
 import { siteView } from "@sim/world/site";
 import { coverageView, stationsSeeing, bedCover } from "@sim/systems/monitoring";
+import { setCover } from "@sim/systems/rota";
 import { applyStaffCommand, type StaffCommand } from "@sim/systems/staffing";
 import {
   clockFromTick,
@@ -235,6 +236,18 @@ export class Game {
     if (cmd.type !== "hire_staff" && cmd.type !== "dismiss_staff") this.publishInspector();
   }
 
+  /** Sets a rota group's cover levels; the rota changes from the next shift. */
+  setCover(group: string, day: number, night: number): void {
+    setCover(this.state, group, { day, night });
+    this.refreshPanels();
+  }
+
+  /** Turns shifts and rotas on or off (a setting saved with the game). */
+  setRotas(on: boolean): void {
+    this.state.settings.rotas = on;
+    this.refreshPanels();
+  }
+
   /**
    * Gives the selected ward or clinic room to a specialty (null: any). Like
    * staffing, a setting for the real hospital, even in plan mode.
@@ -378,7 +391,7 @@ export class Game {
 
   newGame(): void {
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
-    const state = createSimState({ seed, site: true });
+    const state = createSimState({ seed, site: true, rotas: true });
     this.loadState(state);
     if (state.site) this.focus(siteView(state.site));
     // Until it's saved, a reload starts afresh rather than resuming the old hospital.

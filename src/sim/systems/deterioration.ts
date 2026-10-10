@@ -33,7 +33,7 @@ import {
   ROSC_MIN_CHANCE,
 } from "@data/deaths";
 import { debrief, die } from "./deaths";
-import type { Incident, Patient, Point, Staff } from "../agents";
+import { onDuty, type Incident, type Patient, type Point, type Staff } from "../agents";
 import { emit } from "../events";
 import { couchStatus, frontOf, release, seatApproach } from "../places";
 import { chance } from "../rng";
@@ -364,7 +364,7 @@ function incidentCauses(state: SimState, p: Patient): string[] {
     );
   }
 
-  const nurses = Object.values(state.staff).filter((s) => s.role === "nurse").length;
+  const nurses = Object.values(state.staff).filter((s) => s.role === "nurse" && onDuty(s)).length;
   const inDept = Object.values(state.patients).filter(inAE).length;
   causes.push(
     `${nurses === 1 ? "1 staff nurse" : `${nurses} staff nurses`} on duty for ${inDept === 1 ? "1 patient" : `${inDept} patients`} in A&E`,
@@ -378,8 +378,10 @@ function delayReason(state: SimState, p: Patient): string {
     (j) => (j.kind === "treat" || j.kind === "handover") && j.state === "open",
   );
   if (!job) return "";
-  const qualified = Object.values(state.staff).filter((s) => job.roles.includes(s.role));
-  if (qualified.length === 0) return `: there are no ${roleNames(job.roles, true)}`;
+  const hired = Object.values(state.staff).filter((s) => job.roles.includes(s.role));
+  if (hired.length === 0) return `: there are no ${roleNames(job.roles, true)}`;
+  const qualified = hired.filter(onDuty);
+  if (qualified.length === 0) return `: there were no ${roleNames(job.roles, true)} on duty`;
   if (qualified.every((s) => s.jobId !== null)) {
     return qualified.length === 1
       ? `: the only ${roleNames(job.roles)} was busy`

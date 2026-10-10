@@ -20,6 +20,7 @@ async function main(): Promise<void> {
   const state = createSimState({
     seed: seed ?? crypto.getRandomValues(new Uint32Array(1))[0]!,
     site: true,
+    rotas: true,
   });
   const renderer = await Renderer.create(document.getElementById("game")!, state, {
     antialias: wantAntialias(),

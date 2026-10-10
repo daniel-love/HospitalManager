@@ -64,7 +64,8 @@ src/
       ambulances.ts       # parking spaces, driving in, queueing on the road, handover
       admissions.ts       # decision to admit, porter transfers (bed-width routes), wards
       deaths.ts           # verification, family, last offices, mortuary, Medical Examiner, morale
-      staffing.ts         # hire/dismiss; receptionists staff desks (shifts in M5)
+      staffing.ts         # hire/dismiss; receptionists staff desks; on-call callouts
+      rota.ts             # cover levels, the weekly rota, shift changes, consultants' on-call turns
       patients.ts         # A&E lifecycle, needs (seat, toilet), mood, LWBS
       jobBoard.ts         # post/remove jobs
       jobs.ts             # job board: assign, run, complete

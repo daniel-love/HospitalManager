@@ -108,6 +108,8 @@ export type AgentInfo =
       role: string;
       activity: string;
       annualCost: number;
+      /** Their working pattern: rota shifts, weekdays, or on call. */
+      rota: string;
       /** 0–100. */
       morale: number;
       /** Resident consultants: whether they have the Medical Examiner duty. */
@@ -212,6 +214,29 @@ export interface RosterData {
   staff: { id: number; name: string; role: string; activity: string }[];
   /** Total staff cost per year. */
   payroll: number;
+  /** Whether staff work shifts (a setting; off in saves from before rotas). */
+  rotas: boolean;
+  /** Each rota group's cover and how the rota meets it. */
+  rota: RotaRow[];
+}
+
+export interface RotaRow {
+  key: string;
+  name: string;
+  people: number;
+  /** Wanted on each day and night shift; zeros when none set. */
+  cover: { day: number; night: number };
+  /** Average rostered on a day shift and on a night shift. */
+  avgDay: number;
+  avgNight: number;
+  /** Fewest rostered on any day shift and any night shift. */
+  minDay: number;
+  minNight: number;
+  /** Shifts a week short of the cover. */
+  gaps: number;
+  /** People needed to meet the cover on contracted hours alone. */
+  needed: number;
+  onNow: number;
 }
 
 export interface RosterRole {
@@ -220,6 +245,8 @@ export interface RosterRole {
   description: string;
   annualCost: number;
   count: number;
+  /** At work now (or in on call). */
+  atWork: number;
   /** Hired into a specialty (consultants, registrars). */
   specialist: boolean;
   /** For specialists: how many of each specialty are on staff. */

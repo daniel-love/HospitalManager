@@ -338,7 +338,7 @@ Skill (affects step duration and outcome), specialty (doctors), **fatigue** (ris
 
 - Each department has **minimum staffing** per shift (e.g. A&E: 1 consultant or on-call, 2 doctors, 4 nurses, 1 HCA, 1 receptionist). Below the minimum, the department runs **unsafe**: slower, with incident risk and inspection penalties.
 - **Nurse-to-patient ratios** (e.g. ward 1:8, HDU 1:2, ICU 1:1).
-- **Shifts & rotas:** day, night and long-day patterns. Rota gaps can be filled with bank or agency staff.
+- **Shifts & rotas:** NHS long days (07:30–20:00) and nights (19:30–08:00), with half an hour's handover; a full-time contract is three a week, so a post filled around the clock takes about five people. The player sets **cover levels** (how many of each role on every day and night shift) and the game rosters everyone hired to meet them, showing the gaps. Consultants work weekdays 08:00–18:00 and take turns on call from home out of hours (weeknights in turn, a whole weekend at a time), as do registrars with clinics or theatre lists (without the on call). Nights and weekends earn unsocial hours pay. Rota gaps can be filled with bank or agency staff.
 - **Hospital-wide** roles (e.g. a single on-call consultant cardiologist) serve all departments, but can only be in one place at a time. That's a source of pressure.
 - **Attrition:** low morale leads to resignations. High workload leads to sickness. Strikes are an event.
 

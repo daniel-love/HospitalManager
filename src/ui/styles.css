@@ -822,6 +822,30 @@ body.planning #game::after {
 .room-specialty select {
   align-self: flex-start;
 }
+.rota-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--panel-border);
+}
+.rota-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.rota-cover .stepper .dim {
+  width: 44px;
+  font-size: 12px;
+}
+.rota-cover .stepper span:not(.dim) {
+  min-width: 16px;
+  text-align: center;
+}
+.rota-gaps {
+  font-size: 12px;
+}
 .hire-buttons {
   display: flex;
   flex-direction: column;
