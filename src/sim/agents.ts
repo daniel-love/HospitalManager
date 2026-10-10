@@ -400,7 +400,10 @@ export interface Job {
 
 /** Money in and out over a period, £. */
 export interface Ledger {
+  /** NHS tariff for A&E attendances and inpatient stays. */
   tariff: number;
+  /** NHS tariff for outpatient appointments. */
+  outpatients: number;
   salaries: number;
   upkeep: number;
   /** Ambulances taking patients to other hospitals. */
@@ -465,6 +468,84 @@ export interface FlowStats {
   triageWaitMins: number;
   /** Sum of arrival-to-departure times. */
   timeInDeptMins: number;
+  /** GP referrals to outpatient clinics received. */
+  gpReferrals: number;
+  /** Outpatient appointments attended: first, and follow-up. */
+  firstAppointments: number;
+  followUps: number;
+  /** Appointments missed by the patient (did not attend). */
+  dnas: number;
+  /** Booked appointments the hospital cancelled (the clinic no longer running). */
+  clinicCancellations: number;
+  /** Urgent (suspected cancer) referrals seen at a first appointment, and how many within 2 weeks. */
+  urgentSeen: number;
+  urgentWithin2w: number;
+  /** Added to the admitted waiting list from clinic: a decision to operate. */
+  listedForSurgery: number;
+}
+
+/**
+ * Someone coming in for an outpatient appointment (systems/outpatients.ts):
+ * they book in at Outpatients Reception, wait, and are called into clinic.
+ * Their place on the waiting list is `referralId`.
+ */
+export interface Outpatient extends AgentBase {
+  referralId: number;
+  specialty: SpecialtyId;
+  stage: "arriving" | "booking" | "waiting" | "called" | "in_clinic" | "leaving";
+  seat: Seat | null;
+  /** The reception desk they're booking in at. */
+  desk: number | null;
+  /** Ticks of booking in (or of the consultation, in clinic) left. */
+  left: number;
+  /** Their appointment time. */
+  appointment: number;
+  /** The clinician whose clinic it is. */
+  staffId: number;
+  /** When they booked in, and were called in; null until then. */
+  bookedIn: number | null;
+  seen: number | null;
+}
+
+/**
+ * A booked outpatient appointment: the clinician's session (a day and
+ * half-day) and when in it, as a tick.
+ */
+export interface Booking {
+  day: number;
+  half: "am" | "pm";
+  staffId: number;
+  at: number;
+  /** Booked slot length, minutes. */
+  mins: number;
+}
+
+/**
+ * Someone on a waiting list (GAME_DESIGN §5.1): referred by their GP for a
+ * first outpatient appointment, due a follow-up, or (after a decision to
+ * operate) waiting for surgery. They're only a record until the day they
+ * come in.
+ */
+export interface Referral {
+  id: number;
+  name: string;
+  specialty: SpecialtyId;
+  kind: "first" | "follow_up" | "surgery";
+  /** Referred as suspected cancer: to be seen within 2 weeks. */
+  urgent: boolean;
+  /**
+   * When their 18-week referral-to-treatment clock started (the GP
+   * referral), or null if it isn't running: it stops at the first
+   * appointment unless they're listed for surgery, and follow-ups are off it.
+   */
+  clockStart: number | null;
+  /** When they joined this list. */
+  added: number;
+  /** Follow-ups: when they're due to be seen. */
+  due: number | null;
+  /** Appointments missed so far on this pathway. */
+  dnas: number;
+  booking: Booking | null;
 }
 
 export interface DayReport {
@@ -474,7 +555,7 @@ export interface DayReport {
 }
 
 export function emptyLedger(): Ledger {
-  return { tariff: 0, salaries: 0, upkeep: 0, transfers: 0 };
+  return { tariff: 0, outpatients: 0, salaries: 0, upkeep: 0, transfers: 0 };
 }
 
 export function emptyStats(): FlowStats {
@@ -514,11 +595,19 @@ export function emptyStats(): FlowStats {
     triaged: 0,
     triageWaitMins: 0,
     timeInDeptMins: 0,
+    gpReferrals: 0,
+    firstAppointments: 0,
+    followUps: 0,
+    dnas: 0,
+    clinicCancellations: 0,
+    urgentSeen: 0,
+    urgentWithin2w: 0,
+    listedForSurgery: 0,
   };
 }
 
 export function net(l: Ledger): number {
-  return l.tariff - l.salaries - l.upkeep - l.transfers;
+  return l.tariff + l.outpatients - l.salaries - l.upkeep - l.transfers;
 }
 
 /**

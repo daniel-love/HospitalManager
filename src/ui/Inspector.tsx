@@ -218,6 +218,17 @@ function AgentSection({
       </section>
     );
   }
+  if (agent.kind === "outpatient") {
+    return (
+      <section>
+        <h2>{agent.name}</h2>
+        <p class="dim">Outpatient · {agent.visit}</p>
+        <p>{agent.status}</p>
+        <p class="dim">Appointment {agent.appointment}</p>
+        {agent.rtt && <p class="dim">{agent.rtt}</p>}
+      </section>
+    );
+  }
   if (agent.afterDeath) {
     return (
       <section>

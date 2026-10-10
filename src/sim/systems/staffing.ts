@@ -28,6 +28,7 @@ import { pick } from "../rng";
 import type { SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
 import { waitAtBase } from "./bases";
+import { inClinic, outpatientDesks } from "./outpatients";
 import { removeJob, ticksFor, unassignJob } from "./jobBoard";
 import { nurseStations, stationSpot } from "./monitoring";
 import { headTo } from "./movement";
@@ -148,7 +149,7 @@ export function updateStaff(state: SimState): void {
     else if (s.onCall?.state === "leaving") {
       if (s.jobId !== null) s.onCall = { state: "in", at: state.tick };
       else walkHome(state, s);
-    } else if (onSite(s)) {
+    } else if (onSite(s) && !inClinic(state, s)) {
       if (s.role === "nurse") waitAtStation(state, s);
       if (s.desk === null) waitAtBase(state, s);
     }
@@ -180,7 +181,9 @@ function updateOnCall(state: SimState): void {
   const open = Object.values(state.jobs).filter((j) => j.state === "open" && j.specialty !== null);
 
   for (const job of open) {
-    if (staff.some((s) => canDo(s, job) && (onSite(s) || s.onCall!.state === "called"))) continue;
+    // A colleague in clinic isn't free to come: the on-call consultant is.
+    const here = (s: Staff) => (onSite(s) && !inClinic(state, s)) || s.onCall?.state === "called";
+    if (staff.some((s) => canDo(s, job) && here(s))) continue;
     const home = onCall.find((s) => s.onCall!.state === "home" && canDo(s, job));
     if (!home) continue;
     const mins = ticksFor(state.rng, ON_CALL.calloutMins) / TICKS_PER_MINUTE;
@@ -265,13 +268,20 @@ function waitAtStation(state: SimState, s: Staff): void {
 }
 
 /** Receptionists find a free desk in a valid A&E reception and sit behind it. */
+/** Receptionists staff A&E's desks first, then Outpatients'. */
 function staffDesk(state: SimState, s: Staff): void {
-  if (s.desk !== null && !inValidRoom(state, s.desk, "ae_reception")) {
+  const valid =
+    s.desk !== null &&
+    (inValidRoom(state, s.desk, "ae_reception") ||
+      inValidRoom(state, s.desk, "outpatients_reception"));
+  if (s.desk !== null && !valid) {
     release(state, s.desk, "staff", s.id);
     s.desk = null;
   }
   if (s.desk === null) {
-    const desk = receptionDesks(state).find((d) => holder(state, d.id, "staff") === undefined);
+    const desk = [...receptionDesks(state), ...outpatientDesks(state)].find(
+      (d) => holder(state, d.id, "staff") === undefined,
+    );
     if (!desk) return;
     reserve(state, desk.id, "staff", s.id);
     s.desk = desk.id;

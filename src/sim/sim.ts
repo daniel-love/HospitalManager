@@ -17,13 +17,17 @@ import { moveAgents } from "./systems/movement";
 import { updatePatients } from "./systems/patients";
 import { updateStaff } from "./systems/staffing";
 import { updateTransfers } from "./systems/transfers";
+import { updateReferrals } from "./systems/referrals";
+import { updateOutpatients } from "./systems/outpatients";
 
 export function tick(state: SimState): void {
   state.tick++;
   updateArrivals(state);
+  updateReferrals(state);
   updateAmbulances(state);
   updateStaff(state);
   updatePatients(state);
+  updateOutpatients(state);
   updateTransfers(state);
   updateDeterioration(state);
   updateWards(state);

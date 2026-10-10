@@ -66,6 +66,8 @@ export const ROLE_COLOURS: Record<StaffRoleId, number> = {
 /** Patients wear white until triaged, then show their triage colour as a ring. */
 export const PATIENT_COLOUR = 0xf4f1ea;
 export const UNTRIAGED_RING = 0x8a929c;
+/** Outpatients in for a clinic appointment: not triaged, so a ring of their own. */
+export const OUTPATIENT_RING = 0x3fa7a0;
 export const SELECTED_RING = 0xffe066;
 
 /** Coverage overlay (GAME_DESIGN §7): beds watched, in sight of an empty station, or out of sight. */

@@ -308,7 +308,13 @@ const collectionSchema = z.object({
   leaveAt: nullableInt,
 });
 
-const ledgerSchema = z.object({ tariff: num, salaries: num, upkeep: num, transfers: num });
+const ledgerSchema = z.object({
+  tariff: num,
+  outpatients: num,
+  salaries: num,
+  upkeep: num,
+  transfers: num,
+});
 const statsSchema = z.object({
   arrivals: int.min(0),
   discharged: int.min(0),
@@ -345,6 +351,49 @@ const statsSchema = z.object({
   triaged: int.min(0),
   triageWaitMins: num,
   timeInDeptMins: num,
+  gpReferrals: int.min(0),
+  firstAppointments: int.min(0),
+  followUps: int.min(0),
+  dnas: int.min(0),
+  clinicCancellations: int.min(0),
+  urgentSeen: int.min(0),
+  urgentWithin2w: int.min(0),
+  listedForSurgery: int.min(0),
+});
+
+const outpatientSchema = z.object({
+  ...agentFields,
+  referralId: int.positive(),
+  specialty: z.enum(specialtyIds),
+  stage: z.enum(["arriving", "booking", "waiting", "called", "in_clinic", "leaving"]),
+  seat: z.object({ objectId: int.positive(), slot: int.min(0) }).nullable(),
+  desk: nullableInt,
+  left: int,
+  appointment: int,
+  staffId: int.positive(),
+  bookedIn: nullableInt,
+  seen: nullableInt,
+});
+
+const referralSchema = z.object({
+  id: int.positive(),
+  name: z.string(),
+  specialty: z.enum(specialtyIds),
+  kind: z.enum(["first", "follow_up", "surgery"]),
+  urgent: z.boolean(),
+  clockStart: nullableInt,
+  added: int,
+  due: nullableInt,
+  dnas: int.min(0),
+  booking: z
+    .object({
+      day: int.positive(),
+      half: z.enum(["am", "pm"]),
+      staffId: int.positive(),
+      at: int,
+      mins: int.positive(),
+    })
+    .nullable(),
 });
 
 const saveSchema = z.object({
@@ -376,6 +425,9 @@ const saveSchema = z.object({
     nextAmbulanceId: int.positive(),
     collections: z.array(collectionSchema),
     nextCollectionId: int.positive(),
+    referrals: z.array(referralSchema),
+    nextReferralId: int.positive(),
+    outpatients: z.array(outpatientSchema),
     reserved: z.record(z.string(), int.positive()),
     dirt: z.record(z.string(), int.min(0)),
     roomSpecialties: z.record(z.string().regex(/^\d+:\d+$/), z.enum(specialtyIds)),
@@ -442,6 +494,9 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       ambulances: Object.values(state.ambulances),
       nextAmbulanceId: state.nextAmbulanceId,
       collections: Object.values(state.collections),
+      referrals: Object.values(state.referrals),
+      nextReferralId: state.nextReferralId,
+      outpatients: Object.values(state.outpatients),
       nextCollectionId: state.nextCollectionId,
       reserved: state.reserved,
       dirt: state.dirt,
@@ -500,6 +555,9 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     ambulances: byId(s.ambulances, "ambulance"),
     nextAmbulanceId: s.nextAmbulanceId,
     collections: byId(s.collections, "collection"),
+    referrals: byId(s.referrals, "referral"),
+    nextReferralId: s.nextReferralId,
+    outpatients: byId(s.outpatients, "outpatient"),
     nextCollectionId: s.nextCollectionId,
     reserved: { ...s.reserved },
     dirt: Object.fromEntries(Object.entries(s.dirt).map(([k, v]) => [Number(k), v])),

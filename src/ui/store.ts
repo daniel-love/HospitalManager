@@ -90,6 +90,18 @@ export type AgentInfo =
       };
     }
   | {
+      kind: "outpatient";
+      id: number;
+      name: string;
+      /** e.g. "Cardiology: first appointment (urgent)". */
+      visit: string;
+      status: string;
+      /** e.g. "14:20 with Dr …". */
+      appointment: string;
+      /** Weeks on the 18-week clock, if it's running. */
+      rtt: string | null;
+    }
+  | {
       kind: "staff";
       id: number;
       name: string;

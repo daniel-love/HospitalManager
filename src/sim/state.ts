@@ -10,6 +10,8 @@ import { DEFAULT_CATCHMENT } from "@data/patients";
 import {
   type Ambulance,
   type Collection,
+  type Outpatient,
+  type Referral,
   emptyLedger,
   emptyStats,
   type DayReport,
@@ -27,7 +29,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 22;
+export const SIM_STATE_VERSION = 23;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -106,6 +108,14 @@ export interface SimState {
   collections: Record<number, Collection>;
   nextCollectionId: number;
   /**
+   * Outpatient waiting lists (systems/referrals.ts): GP referrals waiting
+   * for a first appointment, follow-ups, and patients waiting for surgery.
+   */
+  referrals: Record<number, Referral>;
+  nextReferralId: number;
+  /** People in for an outpatient appointment today, keyed by id (agent ids). */
+  outpatients: Record<number, Outpatient>;
+  /**
    * Who has claimed what: "objectId:slot" → agent id. Slots are seats on a
    * bench, 0 for a couch or toilet, "staff" for the staff side of a desk.
    */
@@ -180,6 +190,9 @@ export function createSimState(opts: NewGameOptions): SimState {
     ambulances: {},
     nextAmbulanceId: 1,
     collections: {},
+    referrals: {},
+    nextReferralId: 1,
+    outpatients: {},
     nextCollectionId: 1,
     reserved: {},
     dirt: {},

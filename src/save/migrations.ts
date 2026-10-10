@@ -425,6 +425,37 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v23: outpatient waiting lists, with their own income line and day stats.
+  22: (save) => {
+    type Day = { ledger: object; stats: object };
+    const state = save.state as { today: Day; history: (Day & { day: number })[] };
+    const day = <T extends Day>(d: T): T => ({
+      ...d,
+      ledger: { ...d.ledger, outpatients: 0 },
+      stats: {
+        ...d.stats,
+        gpReferrals: 0,
+        firstAppointments: 0,
+        followUps: 0,
+        dnas: 0,
+        clinicCancellations: 0,
+        urgentSeen: 0,
+        urgentWithin2w: 0,
+        listedForSurgery: 0,
+      },
+    });
+    return {
+      ...save,
+      state: {
+        ...state,
+        referrals: [],
+        nextReferralId: 1,
+        outpatients: [],
+        today: day(state.today),
+        history: state.history.map(day),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

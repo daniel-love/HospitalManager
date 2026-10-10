@@ -65,6 +65,7 @@ import { autosaveOption, settings, settingsOpen } from "@ui/settings";
 import { describeAdvice } from "./advice";
 import { BuildController } from "./buildController";
 import {
+  describeOutpatient,
   describePatient,
   describePatientTable,
   describeReport,
@@ -245,7 +246,7 @@ export class Game {
 
   /** Selects someone and moves the camera to them (e.g. from the People dialog). */
   showAgent(id: number): void {
-    const a = this.state.patients[id] ?? this.state.staff[id];
+    const a = this.state.patients[id] ?? this.state.staff[id] ?? this.state.outpatients[id];
     if (!a) return;
     this.selectAgent(id);
     this.focus({ x: Math.round(a.x), y: Math.round(a.y) });
@@ -572,7 +573,12 @@ export class Game {
     let best: number | null = null;
     let bestD = AGENT_PICK_RADIUS;
     const here = Object.values(this.state.staff).filter(onSite);
-    for (const a of [...here, ...Object.values(this.state.patients)]) {
+    const people = [
+      ...here,
+      ...Object.values(this.state.patients),
+      ...Object.values(this.state.outpatients),
+    ];
+    for (const a of people) {
       // In the mortuary they're shown as a label on their fridge drawer.
       const at = "stage" in a && a.stage === "in_mortuary" ? tagSpot(this.state, a) : a;
       const d = Math.hypot(at.x - x, at.y - y);
@@ -645,10 +651,16 @@ export class Game {
       const id = this.selectedAgent;
       const patient = this.state.patients[id];
       const staff = this.state.staff[id];
-      if (patient || staff) {
+      const outpatient = this.state.outpatients[id];
+      const who = patient ?? staff ?? outpatient;
+      if (who) {
         inspector.value = {
-          tile: { x: Math.round((patient ?? staff)!.x), y: Math.round((patient ?? staff)!.y) },
-          agent: patient ? describePatient(this.state, patient) : describeStaff(this.state, staff!),
+          tile: { x: Math.round(who.x), y: Math.round(who.y) },
+          agent: patient
+            ? describePatient(this.state, patient)
+            : staff
+              ? describeStaff(this.state, staff)
+              : describeOutpatient(this.state, outpatient!),
         };
         this.renderer.setSelection(null);
         return;

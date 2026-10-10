@@ -12,7 +12,7 @@ import type { SimState } from "@sim/state";
 export function invariantProblems(state: SimState): string[] {
   const problems: string[] = [];
   const grid = state.floors[0]!;
-  const agents = { ...state.patients, ...state.staff };
+  const agents = { ...state.patients, ...state.staff, ...state.outpatients };
   for (const [key, id] of Object.entries(state.reserved)) {
     if (!agents[id]) problems.push(`reservation ${key} held by missing agent ${id}`);
   }

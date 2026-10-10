@@ -17,6 +17,7 @@ import { FOUR_HOUR_MINS, TRIAGE_CATEGORIES, TRIAGE_TARGET_MINS } from "@data/pat
 import {
   onSite,
   type Job,
+  type Outpatient,
   type Patient,
   type PatientStage,
   type Point,
@@ -48,7 +49,8 @@ import { canDo, runsClinics, staffTitle } from "@sim/systems/staffing";
 import { describeJobPlan, jobPlan } from "@sim/systems/clinics";
 import { MAX_CLINIC_SESSIONS } from "@data/outpatients";
 import { analysers, pendingResults } from "@sim/systems/diagnostics";
-import { clockFromTick, TICKS_PER_MINUTE } from "@sim/time";
+import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
+import { liveSessions } from "@sim/systems/outpatients";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { roomAt, roomOfObject } from "@sim/world/rooms";
 import { porterJob } from "@sim/systems/escorts";
@@ -289,6 +291,40 @@ function escortStatus(state: SimState, p: Patient, porter: Job): string {
   if (porter.staffId === null) return `Waiting for a porter to take them ${where}`;
   if (nurse && nurse.state !== "working") return `Waiting for a nurse to go with them ${where}`;
   return `A porter is coming to take them ${where}`;
+}
+
+/** Someone in for an outpatient appointment, for the inspector. */
+export function describeOutpatient(state: SimState, o: Outpatient): AgentInfo {
+  const r = state.referrals[o.referralId];
+  const specialty = specialtyById.get(o.specialty)?.name ?? "Outpatients";
+  const kind = r?.kind === "follow_up" ? "follow-up" : "first appointment";
+  const clinician = state.staff[o.staffId];
+  const c = clockFromTick(o.appointment);
+  const time = `${String(c.hour).padStart(2, "0")}:${String(c.minute).padStart(2, "0")}`;
+  const waited =
+    r?.clockStart != null
+      ? `On the 18-week clock for ${Math.floor((state.tick - r.clockStart) / TICKS_PER_DAY / 7)} weeks`
+      : null;
+  const late = state.tick > o.appointment && o.stage === "waiting";
+  const status = {
+    arriving: "Arriving: heading for Outpatients Reception",
+    booking: "Booking in at Outpatients Reception",
+    waiting: late
+      ? `Waiting to be called (the clinic is running ${formatWait(Math.ceil((state.tick - o.appointment) / TICKS_PER_MINUTE))} late)`
+      : "Waiting to be called",
+    called: "Called in: going to the clinic room",
+    in_clinic: "In their appointment",
+    leaving: "Going home",
+  }[o.stage];
+  return {
+    kind: "outpatient",
+    id: o.id,
+    name: o.name,
+    visit: `${specialty}: ${kind}${r?.urgent && r.kind === "first" ? " (urgent)" : ""}`,
+    status,
+    appointment: clinician ? `${time} with ${clinician.name}` : time,
+    rtt: waited,
+  };
 }
 
 export function describePatient(state: SimState, p: Patient): AgentInfo {
@@ -574,9 +610,37 @@ export function staffState(state: SimState, s: Staff): StaffState {
   if (s.onCall?.state === "leaving" && s.jobId === null) {
     return { status: "on_the_way", activity: "Going home: nothing more for them", ...none };
   }
+  const clinic = liveSessions(state).get(s.id);
+  if (clinic && s.jobId === null) {
+    const name = specialtyById.get(s.specialty!)?.name ?? "Outpatient";
+    if (walking)
+      return { status: "on_the_way", activity: `Going to their ${name} clinic`, ...none };
+    const seeing = Object.values(state.outpatients).find(
+      (o) => o.staffId === s.id && (o.stage === "called" || o.stage === "in_clinic"),
+    );
+    return seeing
+      ? {
+          status: "working",
+          activity: `${name} clinic: seeing ${seeing.name}`,
+          progress: null,
+          patientId: null,
+        }
+      : { status: "at_desk", activity: `${name} clinic: waiting for the next patient`, ...none };
+  }
   if (s.role === "receptionist") {
     if (s.desk === null) return { status: "no_desk", activity: "No free reception desk", ...none };
     if (walking) return { status: "on_the_way", activity: "Going to the reception desk", ...none };
+    const outpatient = Object.values(state.outpatients).find(
+      (o) => o.stage === "booking" && o.desk === s.desk,
+    );
+    if (outpatient) {
+      return {
+        status: "working",
+        activity: `Booking in ${outpatient.name} for clinic`,
+        progress: null,
+        patientId: null,
+      };
+    }
     const booking = Object.values(state.patients).find(
       (p) => p.stage === "booking" && p.desk === s.desk && p.path.length === 0,
     );

@@ -44,6 +44,7 @@ import {
   ATTENDED_RING,
   CATEGORY_COLOURS,
   DETERIORATING_MARK,
+  OUTPATIENT_RING,
   PARAMEDIC_COLOUR,
   PATIENT_COLOUR,
   ROLE_COLOURS,
@@ -121,6 +122,11 @@ export class AgentLayer {
         const pos = this.views.get(s.id)!.g.position;
         pos.set(pos.x + push.x * TILE_SIZE, pos.y + push.y * TILE_SIZE);
       }
+    }
+    for (const o of Object.values(state.outpatients)) {
+      live.add(o.id);
+      const selected = o.id === this.selectedId;
+      this.place(o, alpha, `outpatient|${selected}`, (g) => drawOutpatient(g, selected));
     }
     for (const c of Object.values(state.collections)) {
       if (!crewOnFoot(c)) continue;
@@ -374,6 +380,12 @@ function drawPatient(
     g.rect(-7, -11, 2, 4).fill(0x1d232b);
     g.rect(-7, -6, 2, 1.5).fill(0x1d232b);
   }
+}
+
+/** Someone in for an outpatient appointment: a patient with a teal ring. */
+function drawOutpatient(g: Graphics, selected: boolean): void {
+  if (selected) g.circle(0, 0, PATIENT_RADIUS + 5).stroke({ width: 2.5, color: SELECTED_RING });
+  g.circle(0, 0, PATIENT_RADIUS).fill(PATIENT_COLOUR).stroke({ width: 3, color: OUTPATIENT_RING });
 }
 
 function drawStaff(g: Graphics, s: Staff, selected: boolean): void {

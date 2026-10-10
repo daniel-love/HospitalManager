@@ -41,6 +41,7 @@ import { MOOD_LIFT_SEEN, MOOD_LIFT_STEP } from "@data/patients";
 import { canDo } from "./staffing";
 import { transferArranged } from "./transfers";
 import { escortSpot, isEscorted, runEscort, sendForScan } from "./escorts";
+import { inClinic } from "./outpatients";
 import {
   claimDiagnosticPlace,
   DIAGNOSTIC_JOBS,
@@ -80,7 +81,7 @@ function atPatient(job: Job): boolean {
 
 export function assignJobs(state: SimState): void {
   const idle = Object.values(state.staff).filter(
-    (s) => s.jobId === null && s.role !== "receptionist" && onSite(s),
+    (s) => s.jobId === null && s.role !== "receptionist" && onSite(s) && !inClinic(state, s),
   );
   if (idle.length === 0) return;
   const open = Object.values(state.jobs)
