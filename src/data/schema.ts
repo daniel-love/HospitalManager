@@ -393,6 +393,23 @@ export const conditionDefSchema = z.object({
        * They should have a side room, and die (expectedly) on the ward.
        */
       endOfLife: z.number().min(0).max(1).default(0),
+      /**
+       * Share of admissions who need an emergency operation (M4 step 7): by
+       * the condition's specialty unless another is named, within
+       * `withinHours` of the decision to admit (an NCEPOD urgency, or a
+       * national standard like 36 hours for a hip fracture), taking `mins`
+       * in theatre, and paying `tariff` on top of the inpatient stay.
+       */
+      operation: z
+        .object({
+          chance: z.number().min(0).max(1),
+          specialty: z.enum(specialtyIds).optional(),
+          name: z.string().min(1),
+          mins: minutesRange,
+          withinHours: z.number().positive(),
+          tariff: z.number().int().nonnegative(),
+        })
+        .optional(),
     })
     .optional(),
   /**

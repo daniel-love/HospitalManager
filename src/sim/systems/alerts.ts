@@ -257,7 +257,8 @@ export function updateAlerts(state: SimState): void {
   }
 
   // Exit block: admitted patients stuck on A&E trolleys.
-  const forBed = patients.filter((p) => p.stage === "awaiting_bed");
+  // In A&E: not back from theatre waiting for their bed.
+  const forBed = patients.filter((p) => p.stage === "awaiting_bed" && inAE(p));
   if (forBed.length > 0 && !hasStaff("porter")) {
     warn(
       state,

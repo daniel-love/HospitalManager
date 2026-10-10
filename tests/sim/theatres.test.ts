@@ -3,14 +3,16 @@
  */
 import { describe, expect, it } from "vitest";
 import { conditionById } from "@data/catalogue";
-import type { Referral } from "@sim/agents";
-import { reserve } from "@sim/places";
+import type { Patient, Referral } from "@sim/agents";
+import { holder, reserve, restPoint } from "@sim/places";
+import { decideToAdmit } from "@sim/systems/admissions";
+import { inAE } from "@sim/systems/patients";
 import { tick } from "@sim/sim";
 import type { SimState } from "@sim/state";
 import { newPatient } from "@sim/systems/arrivals";
 import { bookAppointments, refer } from "@sim/systems/referrals";
 import { inTheatre } from "@sim/systems/theatres";
-import { TICKS_PER_DAY } from "@sim/time";
+import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 import { invariantProblems } from "./simHelpers";
 import { decodeSave, encodeSave } from "@save/codec";
 import { applyStaffCommand } from "@sim/systems/staffing";
@@ -173,5 +175,111 @@ describe("a planned theatre list", () => {
     const loaded = decodeSave(JSON.parse(JSON.stringify(encodeSave(state, "op")))).state;
     expect(Object.values(loaded.operations)).toHaveLength(1);
     runUntil(loaded, () => loaded.today.stats.electiveOps > 0, 1);
+  });
+});
+
+/** An admitted patient on a ward bed (or, `ae`, on a Recovery trolley standing in for A&E's) who needs an operation. */
+function needsOperation(state: SimState, dueHours: number, ae = false): Patient {
+  const room = state.rooms.find((r) => r.typeId === (ae ? "recovery" : "ward"))!;
+  const bed = room.objectIds
+    .map((id) => state.objects[id]!)
+    .find((o) => o.defId === (ae ? "trolley" : "hospital_bed") && !holder(state, o.id, 0))!;
+  const p = newPatient(
+    state,
+    restPoint(bed),
+    conditionById.get("elderly_fall")!,
+    ae ? "awaiting_bed" : "on_ward",
+  );
+  p.bed = bed.id;
+  reserve(state, bed.id, 0, p.id);
+  p.specialty = "general_medicine";
+  p.category = 3;
+  p.times.decided = state.tick;
+  if (!ae) {
+    p.times.admitted = state.tick;
+    p.stayUntil = state.tick + 5 * TICKS_PER_DAY;
+  }
+  p.emergencyOp = {
+    specialty: "trauma_orthopaedics",
+    due: state.tick + dueHours * 60 * TICKS_PER_MINUTE,
+    from: null,
+    done: false,
+  };
+  state.patients[p.id] = p;
+  return p;
+}
+
+describe("emergency surgery", () => {
+  it("uses a theatre kept for emergencies straight away, then back to a ward", () => {
+    const state = quiet();
+    setEmergencyTheatre(state, roomAt(state, 0, THEATRE_B.x, THEATRE_B.y)!, true);
+    const p = needsOperation(state, 36);
+    runUntil(state, () => p.emergencyOp!.done, 1);
+    expect(state.today.stats.emergencyOps).toBe(1);
+    expect(state.today.stats.emergencyOnTime).toBe(1);
+    expect(state.today.ledger.tariff).toBe(6000);
+    runUntil(state, () => p.stage === "on_ward", 1);
+    // Back from theatre: not a new admission.
+    expect(state.today.stats.admissions).toBe(0);
+  });
+
+  it("takes the next slot on a running list of its specialty, cancelling a planned patient", () => {
+    const state = quiet();
+    listed(state, 2, 0);
+    const first = Object.values(state.referrals)
+      .map((r) => r.booking!)
+      .sort((a, b) => a.at - b.at)[0]!;
+    // The morning of the list, before it starts.
+    while (state.tick < first.at - 70 * TICKS_PER_MINUTE) tick(state);
+    const p = needsOperation(state, 36);
+    runUntil(state, () => p.emergencyOp!.done, 1);
+    expect(state.today.stats.bumped).toBe(1);
+    expect(state.today.stats.cancelledOnDay).toBeGreaterThanOrEqual(1);
+  });
+
+  it("is done in any free theatre out of hours once it's nearly due", () => {
+    const state = quiet();
+    // Overnight, with no list running.
+    while (clockFromTick(state.tick).hour !== 22) tick(state);
+    const later = needsOperation(state, 30);
+    const soon = needsOperation(state, 4);
+    runUntil(state, () => soon.emergencyOp!.done, 1);
+    expect(later.emergencyOp!.done).toBe(false);
+  });
+
+  it("counts an A&E patient as leaving A&E when they go to theatre", () => {
+    const state = quiet();
+    setEmergencyTheatre(state, roomAt(state, 0, THEATRE_B.x, THEATRE_B.y)!, true);
+    const p = needsOperation(state, 24, true);
+    runUntil(state, () => p.stage === "to_theatre", 1);
+    expect(state.today.stats.departures).toBe(1);
+    expect(inAE(p)).toBe(false);
+    runUntil(state, () => p.stage === "on_ward", 1);
+    expect(state.today.stats.departures).toBe(1);
+    expect(state.today.stats.admissions).toBe(1);
+  });
+
+  it("means a transfer out when the hospital can't operate", () => {
+    const state = quiet();
+    const anaesthetist = Object.values(state.staff).find((s) => s.specialty === "anaesthetics")!;
+    applyStaffCommand(state, { type: "dismiss_staff", id: anaesthetist.id });
+    const op = conditionById.get("broken_ankle")!.admission!.operation!;
+    const chanceWas = op.chance;
+    op.chance = 1;
+    try {
+      const p = newPatient(
+        state,
+        { x: 13, y: 20 },
+        conditionById.get("broken_ankle")!,
+        "in_cubicle",
+      );
+      p.specialty = "trauma_orthopaedics";
+      state.patients[p.id] = p;
+      decideToAdmit(state, p);
+      expect(p.transfer?.reason).toMatch(/no anaesthetist/);
+      expect(p.emergencyOp).toBeNull();
+    } finally {
+      op.chance = chanceWas;
+    }
   });
 });

@@ -229,6 +229,18 @@ export interface Patient extends AgentBase {
     checked: boolean;
     wardBed: number | null;
   } | null;
+  /**
+   * Admitted from A&E needing an emergency operation (systems/theatres.ts):
+   * the specialty that operates, when it's due by, and once it's under way,
+   * where they came from (an A&E trolley or a ward bed). Kept once done, so
+   * their return to the ward isn't counted as a new admission.
+   */
+  emergencyOp: {
+    specialty: SpecialtyId;
+    due: number;
+    from: "ae" | "ward" | null;
+    done: boolean;
+  } | null;
   death: Death | null;
   outcome: Outcome | null;
 }
@@ -519,6 +531,8 @@ export interface FlowStats {
   cancelledOnDay: number;
   /** Emergency operations, and planned ones cancelled to make way for them. */
   emergencyOps: number;
+  /** Of the emergency operations, those started by the time they were due. */
+  emergencyOnTime: number;
   bumped: number;
 }
 
@@ -673,6 +687,7 @@ export function emptyStats(): FlowStats {
     dayCases: 0,
     cancelledOnDay: 0,
     emergencyOps: 0,
+    emergencyOnTime: 0,
     bumped: 0,
   };
 }

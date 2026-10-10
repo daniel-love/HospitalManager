@@ -18,12 +18,7 @@
  * specialty's ward (an "outlier").
  */
 import { conditionById, equipmentById } from "@data/catalogue";
-import {
-  FOUR_HOUR_MINS,
-  MOOD_LIFT_DECISION,
-  REFERRAL_MINS,
-  WARD_DISCHARGE_MINS,
-} from "@data/patients";
+import { MOOD_LIFT_DECISION, REFERRAL_MINS, WARD_DISCHARGE_MINS } from "@data/patients";
 import type { Job, Patient, Point, Staff } from "../agents";
 import { emit, warn } from "../events";
 import { bedside, freeCouches, release, reserve, restPoint } from "../places";
@@ -38,7 +33,8 @@ import { earn } from "./finance";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo } from "./movement";
 import { die } from "./deaths";
-import { leave, lift } from "./patients";
+import { leave, lift, recordDeparture } from "./patients";
+import { cantOperate } from "./theatres";
 import { cantAdmit, decideToTransfer } from "./transfers";
 
 const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
@@ -94,8 +90,25 @@ export function reviewed(state: SimState, p: Patient): void {
 
 /** They stay on their A&E trolley; a porter's job waits for a free ward bed. */
 export function decideToAdmit(state: SimState, p: Patient): void {
-  const endOfLife = conditionById.get(p.conditionId)!.admission?.endOfLife ?? 0;
+  const admission = conditionById.get(p.conditionId)!.admission;
+  const endOfLife = admission?.endOfLife ?? 0;
   if (endOfLife > 0 && chance(state.rng, endOfLife)) p.endOfLife = true;
+  const op = admission?.operation;
+  if (op && !p.endOfLife && chance(state.rng, op.chance)) {
+    // They need an operation too: here if it can be done, or elsewhere.
+    const specialty = op.specialty ?? p.specialty ?? conditionById.get(p.conditionId)!.specialty!;
+    const why = cantOperate(state, specialty);
+    if (why) {
+      decideToTransfer(state, p, `${why}, so they can't have their ${op.name.toLowerCase()} here`);
+      return;
+    }
+    p.emergencyOp = {
+      specialty,
+      due: state.tick + op.withinHours * TICKS_PER_HOUR,
+      from: null,
+      done: false,
+    };
+  }
   p.times.decided = state.tick;
   p.stage = "awaiting_bed";
   lift(p, MOOD_LIFT_DECISION);
@@ -352,16 +365,16 @@ function arriveOnWard(state: SimState, p: Patient): void {
   const [lo, hi] = condition.admission?.stayHours ?? [24, 48];
   p.stayUntil = state.tick + Math.round((lo + (hi - lo) * nextFloat(state.rng)) * TICKS_PER_HOUR);
   // A planned operation's inpatient never came through A&E: no A&E figures,
-  // and the inpatient tariff is paid on discharge.
-  if (p.elective) return;
+  // and the inpatient tariff is paid on discharge. Nor does someone coming
+  // back from an emergency operation they went to from the ward.
+  if (p.elective || p.emergencyOp?.from === "ward") return;
 
   const stats = state.today.stats;
-  const inDept = (state.tick - p.times.arrived) / TICKS_PER_MINUTE;
-  stats.departures++;
-  stats.timeInDeptMins += inDept;
-  if (inDept <= FOUR_HOUR_MINS) stats.within4h++;
+  // Straight from A&E to theatre: they left A&E then (systems/theatres.ts).
+  const viaTheatre = p.emergencyOp?.from === "ae";
+  if (!viaTheatre) recordDeparture(state, p);
   stats.admissions++;
-  const wait = (state.tick - (p.times.decided ?? state.tick)) / TICKS_PER_MINUTE;
+  const wait = viaTheatre ? 0 : (state.tick - (p.times.decided ?? state.tick)) / TICKS_PER_MINUTE;
   stats.bedWaitMins += wait;
   if (wait > 4 * 60) stats.bedWaitsOver4h++;
   if (wait > 12 * 60) {
@@ -382,6 +395,7 @@ export function updateWards(state: SimState): void {
   if (state.tick % TICKS_PER_MINUTE !== 0) return;
   for (const p of Object.values(state.patients)) {
     if (p.stage !== "on_ward" || p.stayUntil === null || state.tick < p.stayUntil) continue;
+    if (p.emergencyOp && !p.emergencyOp.done) continue; // Not before their operation.
     if (p.endOfLife) {
       die(state, p, true, false);
       continue;

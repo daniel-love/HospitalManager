@@ -51,7 +51,7 @@ import { MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS, MAX_THEATRE_SESSIONS } from "@
 import { analysers, pendingResults } from "@sim/systems/diagnostics";
 import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 import { liveSessions } from "@sim/systems/outpatients";
-import { inTheatre } from "@sim/systems/theatres";
+import { emergencyOpOf, inTheatre } from "@sim/systems/theatres";
 import { waitingLists } from "@sim/systems/referrals";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { roomAt, roomOfObject } from "@sim/world/rooms";
@@ -386,6 +386,15 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
     status = "Cardiac arrest: being resuscitated";
   }
 
+  const e = p.emergencyOp;
+  if (e && !e.done && !p.death && (p.stage === "on_ward" || p.stage === "awaiting_bed")) {
+    const op = emergencyOpOf(p)?.name ?? "An operation";
+    const mins = Math.round((e.due - state.tick) / TICKS_PER_MINUTE);
+    status =
+      mins >= 0
+        ? `Waiting for emergency surgery (${op.toLowerCase()}): due within ${formatWait(mins)}`
+        : `Waiting for emergency surgery (${op.toLowerCase()}): ${formatWait(-mins)} overdue`;
+  }
   const porter = p.death ? undefined : porterJob(state, p);
   if (porter && p.stage !== "collapsed") status = escortStatus(state, p, porter);
 

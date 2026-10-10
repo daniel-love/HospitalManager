@@ -26,6 +26,7 @@
 import { conditionById, specialtyById } from "@data/catalogue";
 import { CLINIC_SESSIONS, type SessionHalf } from "@data/outpatients";
 import { PLANNED_PREFIX } from "@data/conditions";
+import type { SpecialtyId } from "@data/schema";
 import type { Operation, Patient, Referral, Staff } from "../agents";
 import { onSite } from "../agents";
 import { warn } from "../events";
@@ -50,11 +51,13 @@ import { roomOfObject } from "../world/rooms";
 import { trolleyStop } from "./admissions";
 import { newPatient } from "./arrivals";
 import { jobPlan } from "./clinics";
-import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
+import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor, unassignJob } from "./jobBoard";
 import { headTo } from "./movement";
-import { leave } from "./patients";
+import { leave, recordDeparture } from "./patients";
 import { bookAppointments } from "./referrals";
-import { operates } from "./staffing";
+import { callIn, operates } from "./staffing";
+import { earn } from "./finance";
+import { inClinic } from "./outpatients";
 
 /** Minutes between cases on a list, for cleaning and setting up: booked into each slot. */
 export const TURNAROUND_MINS = 15;
@@ -250,7 +253,10 @@ export function inTheatre(state: SimState, s: Staff): boolean {
 
 /** Every tick: patients come in, lists run, operations progress. */
 export function updateTheatres(state: SimState): void {
-  if (state.tick % TICKS_PER_MINUTE === 0) setOff(state);
+  if (state.tick % TICKS_PER_MINUTE === 0) {
+    setOff(state);
+    scheduleEmergencies(state);
+  }
   for (const p of Object.values(state.patients)) {
     if (p.elective && (p.stage === "pre_op" || p.stage === "post_op")) inDayUnit(state, p);
   }
@@ -510,14 +516,24 @@ function runOperation(state: SimState, op: Operation): void {
       endOperation(state, op); // Someone left: it'll be rebooked.
       return;
     }
-    const there = headTo(state, p, restPoint(table), bedside(state, table)) === "arrived";
+    const there = op.emergency
+      ? wheelToTheatre(state, op, p, table)
+      : headTo(state, p, restPoint(table), bedside(state, table)) === "arrived";
     if (there && p.stage === "to_theatre") p.stage = "in_theatre";
     let ready = there;
-    for (const [s, spot] of team) if (headTo(state, s!, spot) !== "arrived") ready = false;
+    for (const [i, [s, spot]] of team.entries()) {
+      // The practitioner fetching an emergency patient comes with them.
+      if (op.emergency && !there && i === 3) continue;
+      if (headTo(state, s!, spot) !== "arrived") ready = false;
+    }
     if (!ready) return;
     op.phase = "operating";
-    const service = specialtyById.get(p.specialty!)!.surgery!;
-    op.left = ticksFor(state.rng, service.opMins);
+    if (op.emergency) {
+      startEmergency(state, p);
+      op.left = ticksFor(state.rng, emergencyOpOf(p)!.mins);
+    } else {
+      op.left = ticksFor(state.rng, specialtyById.get(p.specialty!)!.surgery!.opMins);
+    }
     return;
   }
   if (op.phase === "operating") {
@@ -539,6 +555,7 @@ function runOperation(state: SimState, op: Operation): void {
     }
     reserve(state, bed.id, 0, p.id);
     release(state, op.table, 0, p.id);
+    p.bed = bed.id; // Theirs now, though they're still being wheeled to it.
     op.recoveryBed = bed.id;
     op.phase = "to_recovery";
     // The surgeon, anaesthetist and second practitioner are free for the next case.
@@ -586,10 +603,7 @@ function runOperation(state: SimState, op: Operation): void {
 /** The operation is done: the RTT clock stops, and it's counted. */
 function recordOperation(state: SimState, p: Patient, op: Operation): void {
   const stats = state.today.stats;
-  if (op.emergency) {
-    stats.emergencyOps++;
-    return;
-  }
+  if (op.emergency) return; // Counted when it started (startEmergency).
   stats.electiveOps++;
   if (p.elective?.dayCase) stats.dayCases++;
   if (p.elective) delete state.referrals[p.elective.referralId];
@@ -611,6 +625,11 @@ function endOperation(state: SimState, op: Operation): void {
  * take them to their ward bed.
  */
 export function recovered(state: SimState, p: Patient): void {
+  if (p.homeBed !== null) {
+    // Back from theatre to the ward: their bed was kept, so free it for the porter.
+    release(state, p.homeBed, 0, p.id);
+    p.homeBed = null;
+  }
   if (p.elective?.dayCase) {
     if (p.bed !== null) {
       release(state, p.bed, 0, p.id);
@@ -643,4 +662,225 @@ export function recovered(state: SimState, p: Patient): void {
 /** Whether someone is on an operating table or being wheeled from it. */
 export function operationFor(state: SimState, patientId: number): Operation | undefined {
   return Object.values(state.operations).find((o) => o.patientId === patientId);
+}
+
+// ---------- Emergency surgery ----------
+
+/** An emergency is done out of hours (or in any free theatre) once it's this close to due. */
+const EMERGENCY_ANY_THEATRE_HOURS = 6;
+
+/** The emergency operation an admitted patient needs, from their condition. */
+export function emergencyOpOf(p: Patient) {
+  return conditionById.get(p.conditionId)?.admission?.operation;
+}
+
+/**
+ * Why an emergency operation can't be done here at all, or null if it can:
+ * a theatre, a surgeon of the specialty (resident or on call), an
+ * anaesthetist, two theatre practitioners and Recovery.
+ */
+export function cantOperate(state: SimState, specialty: SpecialtyId): string | null {
+  const has = (type: string) => state.rooms.some((r) => r.valid && r.typeId === type);
+  const doctor = (sp: SpecialtyId) =>
+    Object.values(state.staff).some(
+      (s) => s.specialty === sp && (s.role === "consultant" || s.role === "registrar"),
+    );
+  if (!has("theatre")) return "There's no working Operating Theatre";
+  if (!has("recovery")) return "There's no Recovery";
+  if (!doctor(specialty)) {
+    return `There's no ${specialtyById.get(specialty)!.name} surgeon (consultant or registrar)`;
+  }
+  if (!doctor("anaesthetics"))
+    return "There's no anaesthetist (an Anaesthetics consultant or registrar)";
+  const practitioners = Object.values(state.staff).filter((s) => s.role === "theatre_practitioner");
+  if (practitioners.length < PRACTITIONERS) return "There aren't two theatre practitioners";
+  return null;
+}
+
+/** Waiting for an emergency operation, and in a state to go: on their trolley or ward bed. */
+function readyForEmergency(state: SimState, p: Patient): boolean {
+  const e = p.emergencyOp;
+  if (!e || e.done || e.from !== null || p.death || p.transfer || p.bed === null) return false;
+  if (p.path.length > 0 || operationFor(state, p.id)) return false;
+  if (p.stage === "on_ward") return true;
+  if (p.stage !== "awaiting_bed") return false;
+  // Not while a porter is already wheeling them to the ward.
+  return !jobsForPatient(state, p.id).some((j) => j.kind === "transfer" && j.state !== "open");
+}
+
+/**
+ * A doctor of a specialty free to go to theatre now: resident or in, not
+ * already in theatre or clinic, and not in the middle of something. If
+ * there's none, an on-call consultant of it is called in.
+ */
+function doctorFor(state: SimState, specialty: SpecialtyId, call: boolean): Staff | undefined {
+  const all = Object.values(state.staff).filter(
+    (s) => s.specialty === specialty && (s.role === "consultant" || s.role === "registrar"),
+  );
+  const free = all.find((s) => {
+    if (!onSite(s) || inTheatre(state, s) || inClinic(state, s)) return false;
+    const job = s.jobId === null ? undefined : state.jobs[s.jobId];
+    return !job || job.state !== "working";
+  });
+  if (free) return free;
+  if (call && !all.some((s) => s.onCall?.state === "called")) {
+    const home = all.find((s) => s.onCall?.state === "home");
+    if (home) callIn(state, home);
+  }
+  return undefined;
+}
+
+/** Takes a doctor off what they were about to do (it goes back on the board). */
+function freeUp(state: SimState, s: Staff): void {
+  const job = s.jobId === null ? undefined : state.jobs[s.jobId];
+  if (job) unassignJob(state, job);
+}
+
+/** Tables in use by an operation. */
+function busyTables(state: SimState): Set<number> {
+  return new Set(Object.values(state.operations).map((o) => o.table));
+}
+
+/** A working theatre's operating table. */
+function tableIn(state: SimState, roomId: number): PlacedObject | undefined {
+  const room = state.rooms[roomId - 1];
+  return room?.objectIds.map((id) => state.objects[id]!).find((o) => o.defId === "operating_table");
+}
+
+/**
+ * Every minute: patients waiting for an emergency operation go to theatre
+ * when they can. First choice, a theatre kept for emergencies; then the
+ * next slot on a planned list of their specialty that's running (the
+ * planned patient is cancelled); and once they're within a few hours of
+ * due, any free theatre, calling the on-call team in if need be.
+ */
+function scheduleEmergencies(state: SimState): void {
+  const waiting = Object.values(state.patients)
+    .filter((p) => readyForEmergency(state, p))
+    .sort((a, b) => a.emergencyOp!.due - b.emergencyOp!.due);
+  for (const p of waiting) {
+    const e = p.emergencyOp!;
+    const practitioners = freePractitioners(state);
+    if (practitioners.length < PRACTITIONERS) return;
+    const team = practitioners.slice(0, PRACTITIONERS);
+    const busy = busyTables(state);
+    const theatres = state.rooms.filter((r) => r.valid && r.typeId === "theatre");
+
+    // 1. A theatre kept for emergencies.
+    const cepod = theatres
+      .filter((r) => r.emergency)
+      .map((r) => tableIn(state, r.id))
+      .find((t) => t && !busy.has(t.id));
+    if (cepod) {
+      const surgeon = doctorFor(state, e.specialty, true);
+      const anaesthetist = doctorFor(state, "anaesthetics", true);
+      if (surgeon && anaesthetist) {
+        go(state, p, cepod, surgeon, anaesthetist, team);
+        continue;
+      }
+    }
+
+    // 2. The next slot on a planned list of their specialty.
+    const live = liveLists(state).find(
+      (l) =>
+        l.list.surgeon.specialty === e.specialty &&
+        !busy.has(l.table.id) &&
+        !Object.values(state.operations).some((o) => o.surgeonId === l.list.surgeon.id),
+    );
+    if (live) {
+      const next = Object.values(state.referrals)
+        .filter((r) => {
+          const b = r.booking;
+          return (
+            r.kind === "surgery" &&
+            b?.staffId === live.list.surgeon.id &&
+            b.day === live.list.day &&
+            b.half === live.list.half
+          );
+        })
+        .sort((a, b) => a.booking!.at - b.booking!.at)[0];
+      if (next) {
+        state.today.stats.bumped++;
+        cancelOnTheDay(state, next, "an emergency operation took their place");
+      }
+      go(state, p, live.table, live.list.surgeon, live.list.anaesthetist!, team);
+      continue;
+    }
+
+    // 3. Close to due: any free theatre not running a list, with whoever's free or on call.
+    if (state.tick < e.due - EMERGENCY_ANY_THEATRE_HOURS * 60 * TICKS_PER_MINUTE) continue;
+    const listed = new Set(liveLists(state).map((l) => l.table.id));
+    const table = theatres
+      .map((r) => tableIn(state, r.id))
+      .find((t) => t && !busy.has(t.id) && !listed.has(t.id));
+    if (!table) continue;
+    const surgeon = doctorFor(state, e.specialty, true);
+    const anaesthetist = doctorFor(state, "anaesthetics", true);
+    if (surgeon && anaesthetist) go(state, p, table, surgeon, anaesthetist, team);
+  }
+}
+
+function go(
+  state: SimState,
+  p: Patient,
+  table: PlacedObject,
+  surgeon: Staff,
+  anaesthetist: Staff,
+  practitioners: Staff[],
+): void {
+  freeUp(state, surgeon);
+  freeUp(state, anaesthetist);
+  p.emergencyOp!.from = p.stage === "on_ward" ? "ward" : "ae";
+  // A porter on the way to take them to the ward stands down.
+  for (const job of jobsForPatient(state, p.id)) if (job.kind === "transfer") removeJob(state, job);
+  startOperation(state, p, table, surgeon, anaesthetist, practitioners, true);
+}
+
+/**
+ * The second practitioner fetches an emergency patient and wheels them to
+ * the table on their bed or trolley. True once they're on the table.
+ */
+function wheelToTheatre(state: SimState, op: Operation, p: Patient, table: PlacedObject): boolean {
+  if (p.stage === "in_theatre") return true;
+  const porter = state.staff[op.practitionerIds[1] ?? op.practitionerIds[0]!];
+  if (p.stage !== "to_theatre") {
+    const bed = p.bed === null ? undefined : state.objects[p.bed];
+    if (porter && bed && headTo(state, porter, bedside(state, bed)) !== "arrived") return false;
+    // Off they go. A ward bed is kept for their return; an A&E trolley is
+    // left for cleaning, and they've left A&E.
+    if (p.emergencyOp!.from === "ward") p.homeBed = p.bed;
+    else if (p.bed !== null) {
+      release(state, p.bed, 0, p.id);
+      dirtyCouch(state, p.bed);
+      recordDeparture(state, p);
+    }
+    for (const job of jobsForPatient(state, p.id)) if (job.kind === "obs") removeJob(state, job);
+    p.bed = table.id;
+    p.stage = "to_theatre";
+  }
+  const from = { x: Math.round(p.x), y: Math.round(p.y) };
+  const stop = trolleyStop(state, from, table);
+  let arrival = stop
+    ? headTo(state, p, restPoint(table), stop, true)
+    : headTo(state, p, restPoint(table), bedside(state, table));
+  if (arrival === "no_route") arrival = headTo(state, p, restPoint(table), bedside(state, table));
+  if (porter) {
+    porter.prevX = porter.x;
+    porter.prevY = porter.y;
+    porter.x = p.x;
+    porter.y = p.y;
+    porter.path = [];
+    porter.dest = null;
+  }
+  return arrival === "arrived";
+}
+
+/** The emergency operation starts: counted, on time or not, and its tariff earned. */
+function startEmergency(state: SimState, p: Patient): void {
+  const e = p.emergencyOp!;
+  e.done = true;
+  const stats = state.today.stats;
+  stats.emergencyOps++;
+  if (state.tick <= e.due) stats.emergencyOnTime++;
+  earn(state, emergencyOpOf(p)?.tariff ?? 0);
 }

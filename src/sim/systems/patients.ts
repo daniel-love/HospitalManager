@@ -548,6 +548,7 @@ export function leave(state: SimState, p: Patient, outcome: Outcome): void {
 export function inAE(p: Patient): boolean {
   return (
     p.elective === null &&
+    !p.emergencyOp?.done &&
     !SURGICAL_STAGES.has(p.stage) &&
     p.stage !== "leaving" &&
     p.stage !== "on_ward" &&

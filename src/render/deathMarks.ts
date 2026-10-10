@@ -287,7 +287,11 @@ function drawDrawerTag(g: Graphics, state: SimState, p: Patient, selected: boole
 export function pushOffset(state: SimState, s: Staff): Point | null {
   // A theatre practitioner wheeling a patient to Recovery.
   const op = Object.values(state.operations).find(
-    (o) => o.phase === "to_recovery" && o.practitionerIds[0] === s.id,
+    (o) =>
+      (o.phase === "to_recovery" && o.practitionerIds[0] === s.id) ||
+      (o.emergency &&
+        o.practitionerIds[1] === s.id &&
+        state.patients[o.patientId]?.stage === "to_theatre"),
   );
   const wheeled = op && state.patients[op.patientId];
   if (wheeled) {

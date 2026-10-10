@@ -302,6 +302,8 @@ function wheeledPatients(state: SimState): Set<number> {
   const ids = new Set<number>();
   for (const op of Object.values(state.operations)) {
     if (op.phase === "to_recovery") ids.add(op.patientId);
+    // An emergency wheeled to theatre on their bed.
+    if (op.emergency && state.patients[op.patientId]?.stage === "to_theatre") ids.add(op.patientId);
   }
   for (const j of Object.values(state.jobs)) {
     if (j.kind !== "escort" || j.state !== "working" || j.patientId === null) continue;

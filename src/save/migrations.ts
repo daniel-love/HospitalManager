@@ -510,6 +510,21 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v26: emergency surgery.
+  25: (save) => {
+    type Day = { stats: object };
+    const state = save.state as { patients: object[]; today: Day; history: Day[] };
+    const stats = (d: Day) => ({ ...d, stats: { ...d.stats, emergencyOnTime: 0 } });
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients.map((p) => ({ ...p, emergencyOp: null })),
+        today: stats(state.today),
+        history: state.history.map(stats),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

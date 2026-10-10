@@ -195,6 +195,18 @@ export function canDo(s: Staff, job: Job): boolean {
   return job.roles.includes(s.role) && (job.specialty === null || s.specialty === job.specialty);
 }
 
+/** Calls an on-call consultant in from home; they arrive after the callout delay. */
+export function callIn(state: SimState, s: Staff): void {
+  if (s.onCall?.state !== "home") return;
+  const mins = ticksFor(state.rng, ON_CALL.calloutMins) / TICKS_PER_MINUTE;
+  s.onCall = { state: "called", at: state.tick + Math.round(mins) * TICKS_PER_MINUTE };
+  emit(
+    state,
+    `${s.name}, ${staffTitle(s)}, has been called in: about ${Math.round(mins)} minutes away`,
+    "info",
+  );
+}
+
 /**
  * On-call consultants (GAME_DESIGN §6.1). One is called in when a job for
  * their specialty is waiting and nobody who could do it is in the hospital;
@@ -214,14 +226,7 @@ function updateOnCall(state: SimState): void {
       (onSite(s) && !inClinic(state, s) && !inTheatre(state, s)) || s.onCall?.state === "called";
     if (staff.some((s) => canDo(s, job) && here(s))) continue;
     const home = onCall.find((s) => s.onCall!.state === "home" && canDo(s, job));
-    if (!home) continue;
-    const mins = ticksFor(state.rng, ON_CALL.calloutMins) / TICKS_PER_MINUTE;
-    home.onCall = { state: "called", at: state.tick + Math.round(mins) * TICKS_PER_MINUTE };
-    emit(
-      state,
-      `${home.name}, ${staffTitle(home)}, has been called in: about ${Math.round(mins)} minutes away`,
-      "info",
-    );
+    if (home) callIn(state, home);
   }
 
   const exit = siteEntrance(state) ?? fallbackEntrance(state);

@@ -221,6 +221,14 @@ const patientSchema = z.object({
       wardBed: nullableInt,
     })
     .nullable(),
+  emergencyOp: z
+    .object({
+      specialty: z.enum(specialtyIds),
+      due: int,
+      from: z.enum(["ae", "ward"]).nullable(),
+      done: z.boolean(),
+    })
+    .nullable(),
   retriaged: z.object({ tick: int, from: int.min(1).max(5) }).nullable(),
   outcome: z.enum(["discharged", "lwbs", "transferred", "transferred_out", "died"]).nullable(),
 });
@@ -379,6 +387,7 @@ const statsSchema = z.object({
   dayCases: int.min(0),
   cancelledOnDay: int.min(0),
   emergencyOps: int.min(0),
+  emergencyOnTime: int.min(0),
   bumped: int.min(0),
 });
 

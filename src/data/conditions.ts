@@ -91,7 +91,19 @@ export const conditions: ConditionInput[] = [
     tariff: 290,
     // Unstable fractures need surgery (ORIF); the rest go home in a backslab
     // with a fracture clinic appointment.
-    admission: { chance: 0.15, stayHours: [24, 72], tariff: 3600 },
+    admission: {
+      chance: 0.15,
+      stayHours: [24, 72],
+      tariff: 3600,
+      // Unstable fractures are fixed with plates and screws (ORIF).
+      operation: {
+        chance: 0.9,
+        name: "Ankle fixation (ORIF)",
+        mins: [60, 90],
+        withinHours: 48,
+        tariff: 3000,
+      },
+    },
     pathway: [
       { name: "Injury assessment", roles: [...INJURY_ASSESSOR], room: MINORS, mins: [15, 25] },
       scan("xray", "Ankle X-ray"),
@@ -138,7 +150,19 @@ export const conditions: ConditionInput[] = [
     channels: { walk_in: 13 },
     specialty: "general_surgery",
     tariff: 260,
-    admission: { chance: 0.15, stayHours: [24, 72], tariff: 1900 },
+    admission: {
+      chance: 0.15,
+      stayHours: [24, 72],
+      tariff: 1900,
+      // Appendicitis and other surgical abdomens (NCEPOD urgent: within 24 hours).
+      operation: {
+        chance: 0.5,
+        name: "Appendicectomy",
+        mins: [45, 90],
+        withinHours: 24,
+        tariff: 2400,
+      },
+    },
     pathway: [
       { name: "Doctor assessment", roles: [...DOCTOR], room: MINORS, mins: [25, 40] },
       {
@@ -297,7 +321,21 @@ export const conditions: ConditionInput[] = [
     tariff: 340,
     monitoring: "periodic",
     deterioration: { chance: 0.05, onsetMins: [60, 240], warningMins: [60, 120] },
-    admission: { chance: 0.45, stayHours: [72, 192], tariff: 3400, endOfLife: 0.05 },
+    admission: {
+      chance: 0.45,
+      stayHours: [72, 192],
+      tariff: 3400,
+      endOfLife: 0.05,
+      // A broken hip: NICE says operate on the day of admission or the next (36 hours).
+      operation: {
+        chance: 0.3,
+        specialty: "trauma_orthopaedics",
+        name: "Hip fracture surgery",
+        mins: [60, 120],
+        withinHours: 36,
+        tariff: 6000,
+      },
+    },
     pathway: [
       {
         name: "Doctor assessment",

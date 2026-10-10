@@ -280,6 +280,7 @@ export function newPatient(
     investigations: [],
     homeBed: null,
     elective: null,
+    emergencyOp: null,
     death: null,
     outcome: null,
   };
