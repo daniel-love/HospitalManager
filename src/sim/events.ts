@@ -13,8 +13,15 @@ export function emit(
   text: string,
   severity: SimEvent["severity"] = "info",
   at?: Point,
+  staff?: SimEvent["staff"],
 ): void {
-  state.events.push({ tick: state.tick, text, severity, ...(at ? { at: { ...at } } : {}) });
+  state.events.push({
+    tick: state.tick,
+    text,
+    severity,
+    ...(at ? { at: { ...at } } : {}),
+    ...(staff ? { staff } : {}),
+  });
   if (state.events.length > MAX_PENDING) state.events.splice(0, state.events.length - MAX_PENDING);
 }
 

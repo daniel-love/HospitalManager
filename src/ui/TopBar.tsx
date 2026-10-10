@@ -2,7 +2,7 @@ import type { Game } from "@game/game";
 import { SPEEDS, type Speed } from "@game/loop";
 import { formatMoney } from "@game/tools";
 import { settingsOpen } from "./settings";
-import { hud, peopleDialog, saveDialogOpen } from "./store";
+import { hud, saveDialogOpen } from "./store";
 
 const LABELS: Record<Speed, string> = {
   0: "❚❚",
@@ -37,8 +37,7 @@ export function TopBar({ game }: { game: Game }) {
         title="Patients in A&E now: click for the list"
         onMouseDown={noFocus}
         onClick={() => {
-          peopleDialog.value = peopleDialog.value === "patients" ? null : "patients";
-          game.refreshPanels();
+          game.togglePatients();
         }}
       >
         {patients} {patients === 1 ? "patient" : "patients"}

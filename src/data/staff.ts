@@ -1,7 +1,7 @@
 /**
  * Staff roles that can be hired. Each belongs to a group (medical, nursing,
  * support services, administrative), which decides where it's listed in the
- * Hire panel and People dialog; within a group, roles keep this order. Costs are rough 2025/26 NHS pay (Agenda for
+ * Staff screen; within a group, roles keep this order. Costs are rough 2025/26 NHS pay (Agenda for
  * Change bands, resident doctor scale) plus about 28% employer on-costs
  * (National Insurance and pension).
  *
@@ -275,7 +275,7 @@ export const staffRoles: StaffRoleInput[] = [
   },
 ];
 
-/** Headings for each staff group, as the Hire panel shows them. */
+/** Headings for each staff group, as the Staff screen shows them. */
 export const STAFF_GROUP_NAMES: Record<StaffGroup, string> = {
   medical: "Medical",
   nursing: "Nursing & theatres",

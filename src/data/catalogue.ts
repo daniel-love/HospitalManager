@@ -134,7 +134,7 @@ export function baseFootprint(o: ObjectDef): [number, number] {
 }
 
 /**
- * A titled section of a list (the Hire panel, the build palettes). Sections
+ * A titled section of a list (the Staff screen, the build palettes). Sections
  * come from each definition's group, in a fixed order, so new content always
  * lands under the right heading; empty sections are left out.
  */

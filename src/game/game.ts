@@ -49,7 +49,7 @@ import {
   mapHelp,
   notifications,
   patientTable,
-  peopleDialog,
+  patientsOpen,
   planning,
   planSummary,
   report,
@@ -57,7 +57,10 @@ import {
   saveDialogOpen,
   showToast,
   sidePanel,
+  staffHighlight,
+  staffScreen,
   staffTable,
+  type StaffTab,
   tool,
   type InspectorData,
 } from "@ui/store";
@@ -282,7 +285,7 @@ export class Game {
     this.renderer.camera.centreOn((at.x + 0.5) * TILE_SIZE, (at.y + 0.5) * TILE_SIZE);
   }
 
-  /** Selects someone and moves the camera to them (e.g. from the People dialog). */
+  /** Selects someone and moves the camera to them (e.g. from the Patients dialog or Staff screen). */
   showAgent(id: number): void {
     const a = this.state.patients[id] ?? this.state.staff[id] ?? this.state.outpatients[id];
     if (!a) return;
@@ -577,6 +580,7 @@ export class Game {
       text: e.text,
       severity: e.severity,
       ...(e.at ? { at: e.at } : {}),
+      ...(e.staff ? { staff: e.staff } : {}),
     }));
     this.state.events = [];
     notifications.value = [...added.reverse(), ...notifications.value].slice(0, MAX_NOTIFICATIONS);
@@ -590,15 +594,33 @@ export class Game {
     this.refreshPanels();
   }
 
+  /**
+   * Opens the Staff screen at a tab (closing the Patients dialog, which
+   * sits in the same place), optionally picking out one member of staff.
+   */
+  openStaff(tab: StaffTab, highlight: number | null = null): void {
+    staffScreen.value = tab;
+    staffHighlight.value = highlight;
+    patientsOpen.value = false;
+    this.refreshPanels();
+  }
+
+  /** Opens or closes the Patients dialog (closing the Staff screen). */
+  togglePatients(): void {
+    patientsOpen.value = !patientsOpen.value;
+    if (patientsOpen.value) staffScreen.value = null;
+    this.refreshPanels();
+  }
+
   /** Refreshes whichever management panel is open. */
   refreshPanels(): void {
     const panel = sidePanel.value;
-    roster.value = panel === "staff" ? describeRoster(this.state) : null;
+    const staff = staffScreen.value !== null;
+    roster.value = staff ? describeRoster(this.state) : null;
+    staffTable.value = staff ? describeStaffTable(this.state) : null;
     report.value = panel === "reports" ? describeReport(this.state) : null;
     advice.value = panel === "help" ? describeAdvice(this.state) : null;
-    const people = peopleDialog.value;
-    patientTable.value = people === "patients" ? describePatientTable(this.state) : null;
-    staffTable.value = people === "staff" ? describeStaffTable(this.state) : null;
+    patientTable.value = patientsOpen.value ? describePatientTable(this.state) : null;
   }
 
   /** The patient or member of staff nearest the mouse pointer, if close enough. */
@@ -824,7 +846,8 @@ export class Game {
       this.build.rotate();
     } else if (e.code === "Escape") {
       if (this.build.cancel()) return;
-      if (peopleDialog.value) peopleDialog.value = null;
+      if (staffScreen.value) staffScreen.value = null;
+      else if (patientsOpen.value) patientsOpen.value = false;
       else if (inspector.value) this.select(null);
       else sidePanel.value = null;
     } else if (e.code === "F3" || e.code === "Backquote") {

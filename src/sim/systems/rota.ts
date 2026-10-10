@@ -279,7 +279,10 @@ function finish(s: Staff): void {
 function sickFor(state: SimState, s: Staff, until: number, shift: string): boolean {
   if (!callsInSick(state, s)) return false;
   s.sickUntil = until;
-  emit(state, `${s.name}, ${staffTitle(s)}, has called in sick for ${shift}`, "info");
+  emit(state, `${s.name}, ${staffTitle(s)}, has called in sick for ${shift}`, "info", undefined, {
+    tab: "team",
+    id: s.id,
+  });
   return true;
 }
 
@@ -389,7 +392,7 @@ export function setCover(state: SimState, key: string, cover: Cover): void {
   else state.cover[key] = { day, night };
 }
 
-/** A rota group at a glance, for the Hire panel and alerts. */
+/** A rota group at a glance, for the Staff screen. */
 export interface RotaGroupSummary {
   key: string;
   name: string;

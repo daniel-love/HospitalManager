@@ -133,14 +133,19 @@ function resignations(state: SimState): void {
       state,
       `${s.name}, ${staffTitle(s)}, has handed in their notice: low morale. They leave in ${RESIGNATION.noticeDays / 7} weeks.`,
       "warn",
+      undefined,
+      { tab: "team", id: s.id },
     );
   }
 }
 
 /** Their notice is up (or their bank or agency shift is over): gone. */
 export function leave(state: SimState, s: Staff): void {
-  if (s.leavesAt !== null)
-    emit(state, `${s.name}, ${staffTitle(s)}, has left the hospital`, "warn");
+  if (s.leavesAt !== null) {
+    emit(state, `${s.name}, ${staffTitle(s)}, has left the hospital`, "warn", undefined, {
+      tab: "rota",
+    });
+  }
   removeStaff(state, s);
 }
 
@@ -228,6 +233,8 @@ export function fillGaps(state: SimState, shift: ShiftTime): void {
     notes.push(`${name}: ${parts.join(", ")}`);
   }
   if (notes.length > 0) {
-    emit(state, `${slotName(shift.slot)} shift gaps · ${notes.join(" · ")}`, "warn");
+    emit(state, `${slotName(shift.slot)} shift gaps · ${notes.join(" · ")}`, "warn", undefined, {
+      tab: "rota",
+    });
   }
 }

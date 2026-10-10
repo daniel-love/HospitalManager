@@ -1,60 +1,32 @@
 /**
- * The People dialog: everyone in the hospital at a glance. The Patients tab
- * shows each patient's condition, triage category, where they are in their
- * visit and how they're doing against their targets; the Staff tab shows what
- * every member of staff is doing right now. The game keeps running behind it.
- * Clicking a name shows that person on the map and in the inspector.
+ * The Patients dialog: everyone in the hospital as a patient, at a glance:
+ * each patient's condition, triage category, where they are in their visit
+ * and how they're doing against their targets. The game keeps running behind
+ * it. Clicking a name shows that patient on the map and in the inspector.
+ * (Staff have the Staff screen.)
  */
 import type { Game } from "@game/game";
-import { staffRoleSections } from "@data/catalogue";
-import type { StaffRoleId } from "@data/schema";
 import { useState } from "preact/hooks";
-import {
-  patientTable,
-  peopleDialog,
-  sidePanel,
-  staffTable,
-  type PatientRow,
-  type PeopleTab,
-  type StaffRow,
-} from "./store";
+import { patientsOpen, patientTable, type PatientRow } from "./store";
 
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
-export function PeopleDialog({ game }: { game: Game }) {
-  const tab = peopleDialog.value;
-  if (!tab) return null;
-  const setTab = (t: PeopleTab) => {
-    peopleDialog.value = t;
-    game.refreshPanels();
-  };
-  // Show the person, and get the dialog out of the way.
+export function PatientsDialog({ game }: { game: Game }) {
+  if (!patientsOpen.value) return null;
+  // Show the patient, and get the dialog out of the way.
   const show = (id: number) => {
-    peopleDialog.value = null;
+    patientsOpen.value = false;
     game.showAgent(id);
   };
   return (
-    <section class="panel people-dialog" role="dialog" aria-label="People">
+    <section class="panel people-dialog" role="dialog" aria-label="Patients">
       <header class="people-header">
-        <div class="tabs" role="tablist">
-          {(["patients", "staff"] as const).map((t) => (
-            <button
-              key={t}
-              role="tab"
-              aria-selected={tab === t}
-              class={tab === t ? "active" : ""}
-              onMouseDown={noFocus}
-              onClick={() => setTab(t)}
-            >
-              {t === "patients" ? "Patients" : "Staff"}
-            </button>
-          ))}
-        </div>
-        <button class="close" title="Close (Esc)" onClick={() => (peopleDialog.value = null)}>
+        <h2>Patients</h2>
+        <button class="close" title="Close (Esc)" onClick={() => (patientsOpen.value = false)}>
           ×
         </button>
       </header>
-      {tab === "patients" ? <PatientsTab onShow={show} /> : <StaffTab game={game} onShow={show} />}
+      <PatientsTab onShow={show} />
     </section>
   );
 }
@@ -208,140 +180,6 @@ function PatientsTab({ onShow }: { onShow: (id: number) => void }) {
                       />
                     </div>
                     {r.needs.length > 0 && <span class="sub warn-text">{r.needs.join(" · ")}</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </>
-  );
-}
-
-// ---------- Staff ----------
-
-/** "All", then each role in staff-group order. */
-const ROLE_FILTERS: { id: StaffRoleId | "all"; label: string }[] = [
-  { id: "all", label: "All" },
-  ...staffRoleSections().flatMap((s) => s.items.map((r) => ({ id: r.id, label: r.short }))),
-];
-
-const STATUS_LABELS: Record<StaffRow["status"], string> = {
-  free: "Free",
-  on_the_way: "On the way",
-  waiting: "Waiting for patient",
-  working: "Working",
-  at_desk: "At desk",
-  no_desk: "No desk",
-  off_site: "Off site",
-};
-
-function StaffTab({ game, onShow }: { game: Game; onShow: (id: number) => void }) {
-  const [role, setRole] = useState<StaffRoleId | "all">("all");
-  const data = staffTable.value;
-  if (!data) return null;
-  const rows = data.rows.filter((r) => role === "all" || r.roleId === role);
-  return (
-    <>
-      <p class="people-summary">
-        <strong>{data.rows.length}</strong> on staff · {data.busy} busy · {data.free} free or
-        waiting at a desk
-        <button
-          class="small-button summary-action"
-          onMouseDown={noFocus}
-          onClick={() => {
-            peopleDialog.value = null;
-            sidePanel.value = "staff";
-            game.refreshPanels();
-          }}
-        >
-          Hire staff…
-        </button>
-      </p>
-      <div class="people-controls">
-        <div class="chips" role="group" aria-label="Role">
-          {ROLE_FILTERS.map((f) => {
-            const n =
-              f.id === "all" ? data.rows.length : data.rows.filter((r) => r.roleId === f.id).length;
-            return (
-              <button
-                key={f.id}
-                class={role === f.id ? "active" : ""}
-                aria-pressed={role === f.id}
-                onMouseDown={noFocus}
-                onClick={() => setRole(f.id)}
-              >
-                {f.label} <span class="dim">{n}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <div class="people-scroll">
-        {rows.length === 0 ? (
-          <p class="dim empty">
-            {data.rows.length === 0
-              ? "No staff yet. Hire a team to open your A&E."
-              : "No one in this role."}
-          </p>
-        ) : (
-          <table class="people-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Doing</th>
-                <th>Where</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} onClick={() => onShow(r.id)} title="Show on the map">
-                  <td>
-                    <strong>{r.name}</strong>
-                    <span class="sub">{r.role}</span>
-                  </td>
-                  <td>
-                    <span class={`status-pill ${r.status}`}>{STATUS_LABELS[r.status]}</span>
-                  </td>
-                  <td>
-                    {r.activity}
-                    {r.progress !== null && (
-                      <div class="meter small" title={`${Math.round(r.progress * 100)}% done`}>
-                        <div
-                          class="meter-fill"
-                          style={{ width: `${Math.min(100, r.progress * 100)}%` }}
-                        />
-                      </div>
-                    )}
-                    {r.patient && (
-                      <button
-                        class="link"
-                        onMouseDown={noFocus}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onShow(r.patient!.id);
-                        }}
-                      >
-                        Show patient
-                      </button>
-                    )}
-                  </td>
-                  <td>{r.where}</td>
-                  <td>
-                    <button
-                      class="small-button"
-                      onMouseDown={noFocus}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm(`Dismiss ${r.name}?`))
-                          game.applyStaff({ type: "dismiss_staff", id: r.id });
-                      }}
-                    >
-                      Dismiss
-                    </button>
                   </td>
                 </tr>
               ))}

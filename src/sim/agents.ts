@@ -759,6 +759,8 @@ export interface SimEvent {
   severity: "info" | "warn" | "bad";
   /** Where to jump the camera, in tiles. */
   at?: Point;
+  /** A staffing matter: the Staff screen tab to open when clicked, and who it's about. */
+  staff?: { tab: "team" | "rota"; id?: number };
 }
 
 /** In the hospital: not off duty at home, nor on call at home or on the way in. */

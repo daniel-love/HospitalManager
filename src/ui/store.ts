@@ -197,7 +197,7 @@ export const inspector = signal<InspectorData | null>(null);
 export const saveDialogOpen = signal(false);
 
 /** Management panel open on the left (closes the build palette). */
-export type SidePanel = "staff" | "reports" | "help";
+export type SidePanel = "reports" | "help";
 export const sidePanel = signal<SidePanel | null>(null);
 /** Help panel recommendations, while it's open. */
 export const advice = signal<AdviceData | null>(null);
@@ -209,6 +209,8 @@ export interface Notification {
   text: string;
   severity: "info" | "warn" | "bad";
   at?: { x: number; y: number };
+  /** A staffing matter: opens the Staff screen at this tab (and person). */
+  staff?: { tab: "team" | "rota"; id?: number };
 }
 export const notifications = signal<Notification[]>([]);
 
@@ -330,9 +332,14 @@ export const planSummary = signal<{ steps: number; cost: number }>({ steps: 0, c
 /** Map overlay showing which beds nurse stations can see (GAME_DESIGN §7). */
 export const coverageOverlay = signal(false);
 
-/** The People dialog (patients and staff tables), or null when closed. */
-export type PeopleTab = "patients" | "staff";
-export const peopleDialog = signal<PeopleTab | null>(null);
+/** The Patients dialog: every patient's status. */
+export const patientsOpen = signal(false);
+
+/** The Staff screen and its tab: who's working, hiring, and the rota. */
+export type StaffTab = "team" | "hire" | "rota";
+export const staffScreen = signal<StaffTab | null>(null);
+/** A member of staff to pick out in the Team tab (from a notification). */
+export const staffHighlight = signal<number | null>(null);
 
 export interface PatientRow {
   id: number;
@@ -388,12 +395,28 @@ export interface StaffRow {
   progress: number | null;
   patient: { id: number; name: string } | null;
   where: string;
+  /** At work now (on site and not on their way home). */
+  atWork: boolean;
+  morale: number;
+  skill: number;
+  /** Null with rotas off (nobody tires). */
+  fatigue: number | null;
+  /** Bank or agency, off sick, working notice. */
+  flags: { label: string; tone: "info" | "warn" | "bad" }[];
+  /** Off sick, working notice, low morale or very tired. */
+  attention: boolean;
 }
 
 export interface StaffTable {
   rows: StaffRow[];
   busy: number;
   free: number;
+  atWork: number;
+  sick: number;
+  notice: number;
+  bank: number;
+  agency: number;
+  lowMorale: number;
 }
 
 export const patientTable = signal<PatientTable | null>(null);

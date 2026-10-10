@@ -382,6 +382,8 @@ The admin interface is a set of full-screen panels opened from the toolbar.
 
 Hire from a candidate pool (size depends on reputation and region), set pay bands, view rotas, assign home departments, manage on-call rotas, review morale and fatigue, and dismiss staff.
 
+All of it lives on one **Staff screen** (the toolbar's Staff button), with a summary strip (payroll, headcount, at work now, bank and agency in, off sick and leaving) over three tabs: **Team** (everyone on staff, what they're doing, morale, fatigue and skill, flags for off sick, leaving, bank and agency, filters for at work and needs attention, and dismissal), **Hire** (every role by group, descriptions folded away) and **Rota** (gap-filling policy, then a card per rota group with cover steppers and a week's grid of its 14 shifts coloured against the cover). Staffing notifications (sickness, resignations, shift gaps) open the right tab. Patients have their own dialog.
+
 ### 8.3 Departments
 
 For each department:

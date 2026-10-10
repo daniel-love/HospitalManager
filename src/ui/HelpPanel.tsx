@@ -162,7 +162,7 @@ const GUIDES: Record<Exclude<HelpTab, "advice">, { intro: string; build: () => G
     build: roomGuide,
   },
   staff: {
-    intro: "Who does what, and what they need to do it. Hire from the Hire panel.",
+    intro: "Who does what, and what they need to do it. Hire from the Staff screen (Hire tab).",
     build: staffGuide,
   },
   conditions: {

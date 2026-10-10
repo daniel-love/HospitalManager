@@ -1,6 +1,7 @@
 /**
  * The notifications feed (GAME_DESIGN §11): warnings and events from the
- * sim, newest first. Clicking one with a location jumps the camera there.
+ * sim, newest first. Clicking one with a location jumps the camera there;
+ * a staffing one opens the Staff screen.
  */
 import type { Game } from "@game/game";
 import { useState } from "preact/hooks";
@@ -19,9 +20,12 @@ export function Notifications({ game }: { game: Game }) {
         {shown.map((n) => (
           <li key={n.id} class={n.severity}>
             <button
-              disabled={!n.at}
-              title={n.at ? "Show on the map" : undefined}
-              onClick={() => n.at && game.focus(n.at)}
+              disabled={!n.at && !n.staff}
+              title={n.staff ? "Open the Staff screen" : n.at ? "Show on the map" : undefined}
+              onClick={() => {
+                if (n.staff) game.openStaff(n.staff.tab, n.staff.id ?? null);
+                else if (n.at) game.focus(n.at);
+              }}
             >
               <span class="when">{n.when.replace(/^\w{3} day \d+\s+/, "")}</span>
               {n.text}

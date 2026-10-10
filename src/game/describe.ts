@@ -1082,7 +1082,7 @@ export function patientsInDept(state: SimState): number {
   return n;
 }
 
-// ---------- People dialog ----------
+// ---------- Patients dialog and Staff screen ----------
 
 const STAGE_GROUPS: Record<PatientStage, PatientRow["group"]> = {
   awaiting_handover: "arriving",
@@ -1253,10 +1253,58 @@ export function describeStaffTable(state: SimState): StaffTable {
       progress: st.progress,
       patient: patient ? { id: patient.id, name: patient.name } : null,
       where: onSite(s) ? whereIs(state, s) : s.onCall ? "On call at home" : "At home",
+      atWork: onSite(s) && s.duty !== "leaving",
+      morale: Math.round(s.morale),
+      skill: Math.round(s.skill),
+      fatigue: state.settings.rotas ? Math.round(s.fatigue) : null,
+      flags: staffFlags(state, s),
+      attention: needsAttention(state, s),
     };
   });
-  const busy = rows.filter(
+  const atWork = rows.filter((r) => r.atWork);
+  const busy = atWork.filter(
     (r) => r.status !== "free" && r.status !== "at_desk" && r.status !== "off_site",
   ).length;
-  return { rows, busy, free: rows.length - busy };
+  const staff = Object.values(state.staff);
+  return {
+    rows,
+    busy,
+    free: atWork.length - busy,
+    atWork: atWork.length,
+    sick: staff.filter((s) => isOffSick(state, s)).length,
+    notice: staff.filter((s) => s.leavesAt !== null).length,
+    bank: staff.filter((s) => s.contract === "bank").length,
+    agency: staff.filter((s) => s.contract === "agency").length,
+    lowMorale: staff.filter((s) => s.morale < LOW_MORALE).length,
+  };
+}
+
+/** Morale below this is flagged in the Team tab. */
+const LOW_MORALE = 40;
+/** Fatigue above this is flagged in the Team tab. */
+const VERY_TIRED = 75;
+
+const isOffSick = (state: SimState, s: Staff) => s.sickUntil !== null && state.tick < s.sickUntil;
+
+function needsAttention(state: SimState, s: Staff): boolean {
+  return (
+    isOffSick(state, s) ||
+    s.leavesAt !== null ||
+    s.morale < LOW_MORALE ||
+    (state.settings.rotas && s.fatigue > VERY_TIRED)
+  );
+}
+
+/** Short labels for the Team tab: contract, sickness, notice. */
+function staffFlags(state: SimState, s: Staff): StaffRow["flags"] {
+  const flags: StaffRow["flags"] = [];
+  if (s.contract === "bank") flags.push({ label: "Bank", tone: "info" });
+  if (s.contract === "agency") flags.push({ label: "Agency", tone: "warn" });
+  if (s.contract === "on_call") flags.push({ label: "On call", tone: "info" });
+  if (isOffSick(state, s)) flags.push({ label: "Off sick", tone: "warn" });
+  if (s.leavesAt !== null) {
+    const days = Math.max(1, Math.ceil((s.leavesAt - state.tick) / TICKS_PER_DAY));
+    flags.push({ label: `Leaving in ${days}d`, tone: "bad" });
+  }
+  return flags;
 }

@@ -1,5 +1,5 @@
 /**
- * A titled section of a panel list: the Hire panel's staff groups and the
+ * A titled section of a panel list: the Staff screen's staff groups and the
  * build palettes' sections. Every grouped list uses this, so spacing between
  * headings is the same everywhere (see .list-section in styles.css).
  */

@@ -143,8 +143,8 @@ function RotasSetting({ game }: { game: Game }) {
       <p class="dim">
         This hospital was saved before rotas, so everyone works around the clock. With shifts, each
         person works three 12½-hour shifts a week, so you'll need about five people for every post
-        you want filled day and night (set cover levels in the Hire panel). There's no switching
-        back.
+        you want filled day and night (set cover levels in the Staff screen's Rota tab). There's no
+        switching back.
       </p>
       <button
         onClick={() => {

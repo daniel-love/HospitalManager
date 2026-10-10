@@ -828,14 +828,102 @@ body.planning #game::after {
   margin-top: 2px;
 }
 
-/* ---------- Staff panel ---------- */
-.staff-panel .side-scroll h2 {
-  margin-bottom: 8px;
+/* ---------- Staff screen ---------- */
+.staff-screen {
+  /* A steady size, so switching tabs doesn't make it jump. */
+  height: calc(100% - 140px);
+}
+.staff-summary {
+  margin: 8px 0 10px;
 }
 .stat-tiles {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 6px;
+}
+.stat-tile.warn {
+  border-color: rgba(242, 201, 76, 0.5);
+  background: rgba(242, 201, 76, 0.08);
+}
+.stat-tile.quiet .stat-value {
+  color: var(--text-dim);
+}
+.staff-tab-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--panel-border);
+  padding-top: 10px;
+}
+.hire-columns {
+  columns: 2 300px;
+  column-gap: 24px;
+}
+.hire-columns .list-section {
+  break-inside: avoid;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+.rota-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 8px;
+}
+.rota-cards .rota-card {
+  margin-bottom: 0;
+}
+.staff-screen .rota-how {
+  max-width: 70ch;
+}
+.team-table tr.away td {
+  opacity: 0.6;
+}
+.team-table tr.highlight td {
+  background: rgba(59, 130, 196, 0.22);
+}
+.team-table .sub {
+  display: block;
+}
+.flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+.flag {
+  font-size: 10px;
+  padding: 0 5px;
+  line-height: 15px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.flag.warn {
+  background: rgba(242, 201, 76, 0.25);
+  color: #f2c94c;
+}
+.flag.bad {
+  background: rgba(255, 138, 128, 0.22);
+  color: var(--bad);
+}
+.wellbeing {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 90px;
+}
+.wb-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.wb-label {
+  width: 10px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.wellbeing .wb-bar .meter.small {
+  width: 70px;
+  margin: 0;
 }
 .stat-tile {
   display: flex;
@@ -1228,7 +1316,7 @@ body.planning #game::after {
   color: var(--text);
 }
 
-/* ---------- People dialog (patients and staff) ---------- */
+/* ---------- Patients dialog and Staff screen ---------- */
 
 .people-dialog {
   position: absolute;
@@ -1516,7 +1604,7 @@ body.planning #game::after {
   color: var(--bad);
 }
 
-/* ---------- Grouped lists (Hire panel, build palettes) ---------- */
+/* ---------- Grouped lists (Staff screen, build palettes) ---------- */
 .list-section {
   margin-top: 16px;
 }

@@ -14,12 +14,12 @@ import {
   buildTab,
   coverageOverlay,
   paletteHelp,
-  peopleDialog,
+  patientsOpen,
   planning,
   sidePanel,
+  staffScreen,
   tool,
   type BuildTab,
-  type PeopleTab,
   type SidePanel,
 } from "./store";
 
@@ -29,26 +29,22 @@ const TABS: { id: BuildTab; label: string }[] = [
   { id: "equipment", label: "Equipment" },
 ];
 
-/** Management buttons: side panels on the left, or tabs of the People dialog. */
-const PANELS: ({ kind: "side"; id: SidePanel } | { kind: "people"; id: PeopleTab })[] = [
-  { kind: "side", id: "staff" },
-  { kind: "people", id: "staff" },
-  { kind: "people", id: "patients" },
+/**
+ * Management buttons: the Staff screen and Patients dialog (centred), or a
+ * side panel on the left.
+ */
+type PanelButton = { kind: "staff" } | { kind: "patients" } | { kind: "side"; id: SidePanel };
+const PANELS: PanelButton[] = [
+  { kind: "staff" },
+  { kind: "patients" },
   { kind: "side", id: "reports" },
   { kind: "side", id: "help" },
 ];
-const PANEL_LABELS = {
-  side: { staff: "Hire", reports: "Reports", help: "Help" },
-  people: { staff: "Staff", patients: "Patients" },
-} as const;
-const PANEL_HINTS = {
-  side: {
-    staff: "Hire new staff",
-    reports: "Today's money and A&E performance",
-    help: "Help (H): what to build and who to hire next, and how everything works",
-  },
-  people: { staff: "What every member of staff is doing", patients: "Every patient's status" },
-} as const;
+const SIDE_LABELS: Record<SidePanel, string> = { reports: "Reports", help: "Help" };
+const SIDE_HINTS: Record<SidePanel, string> = {
+  reports: "Today's money and A&E performance",
+  help: "Help (H): what to build and who to hire next, and how everything works",
+};
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
 
@@ -65,11 +61,16 @@ export function BuildBar({
   onTogglePlan,
   onToggleCoverage,
   onPanel,
+  onStaff,
+  onPatients,
 }: {
   onTogglePlan: () => void;
   onToggleCoverage: () => void;
-  /** A management panel was opened or closed, so its data needs refreshing. */
+  /** A side panel was opened or closed, so its data needs refreshing. */
   onPanel: () => void;
+  /** Opens the Staff screen (at its Team tab). */
+  onStaff: () => void;
+  onPatients: () => void;
 }) {
   const open = buildTab.value;
   return (
@@ -110,26 +111,42 @@ export function BuildBar({
       ))}
       <span class="buildbar-divider" aria-hidden="true" />
       {PANELS.map((p) => {
-        const active = p.kind === "side" ? sidePanel.value === p.id : peopleDialog.value === p.id;
+        const active =
+          p.kind === "staff"
+            ? staffScreen.value !== null
+            : p.kind === "patients"
+              ? patientsOpen.value
+              : sidePanel.value === p.id;
+        const label =
+          p.kind === "staff" ? "Staff" : p.kind === "patients" ? "Patients" : SIDE_LABELS[p.id];
+        const hint =
+          p.kind === "staff"
+            ? "Staff: who's working, hiring and the rota"
+            : p.kind === "patients"
+              ? "Every patient's status"
+              : SIDE_HINTS[p.id];
         return (
           <button
-            key={`${p.kind}-${p.id}`}
+            key={p.kind === "side" ? p.id : p.kind}
             class={active ? "active" : ""}
             aria-pressed={active}
-            title={p.kind === "side" ? PANEL_HINTS.side[p.id] : PANEL_HINTS.people[p.id]}
+            title={hint}
             onMouseDown={noFocus}
             onClick={() => {
-              if (p.kind === "side") {
+              if (p.kind === "staff") {
+                if (active) staffScreen.value = null;
+                else onStaff();
+              } else if (p.kind === "patients") {
+                onPatients();
+              } else {
                 sidePanel.value = active ? null : p.id;
                 buildTab.value = null;
                 tool.value = null;
-              } else {
-                peopleDialog.value = active ? null : p.id;
+                onPanel();
               }
-              onPanel();
             }}
           >
-            {p.kind === "side" ? PANEL_LABELS.side[p.id] : PANEL_LABELS.people[p.id]}
+            {label}
           </button>
         );
       })}
