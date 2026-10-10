@@ -529,6 +529,11 @@ export function leave(state: SimState, p: Patient, outcome: Outcome): void {
     earn(state, condition.admission?.tariff ?? 0);
     return;
   }
+  if (p.elective) {
+    // A day case going home: the day-case tariff. They were never in A&E.
+    earn(state, condition.tariff);
+    return;
+  }
   recordDeparture(state, p);
   if (outcome === "lwbs") stats.lwbs++;
   else {
@@ -541,8 +546,23 @@ export function leave(state: SimState, p: Patient, outcome: Outcome): void {
 
 /** Still in A&E: not on their way out, admitted to a ward, or deceased. */
 export function inAE(p: Patient): boolean {
-  return p.stage !== "leaving" && p.stage !== "on_ward" && p.death === null;
+  return (
+    p.elective === null &&
+    !SURGICAL_STAGES.has(p.stage) &&
+    p.stage !== "leaving" &&
+    p.stage !== "on_ward" &&
+    p.death === null
+  );
 }
+
+/** In for surgery, or gone from A&E to theatre (systems/theatres.ts). */
+const SURGICAL_STAGES = new Set<Patient["stage"]>([
+  "pre_op",
+  "to_theatre",
+  "in_theatre",
+  "in_recovery",
+  "post_op",
+]);
 
 /** Leaving A&E (home, elsewhere, or died): the 4-hour clock stops. */
 export function recordDeparture(state: SimState, p: Patient): void {

@@ -42,6 +42,7 @@ import { canDo } from "./staffing";
 import { transferArranged } from "./transfers";
 import { escortSpot, isEscorted, runEscort, sendForScan } from "./escorts";
 import { inClinic } from "./outpatients";
+import { inTheatre, preOpChecked, recovered } from "./theatres";
 import {
   claimDiagnosticPlace,
   DIAGNOSTIC_JOBS,
@@ -73,6 +74,8 @@ const DEATH_JOBS = new Set<Job["kind"]>([
 function atPatient(job: Job): boolean {
   return (
     job.kind === "obs" ||
+    job.kind === "pre_op_check" ||
+    job.kind === "recovery" ||
     job.kind === "resus" ||
     job.kind === "arrange_transfer" ||
     (job.kind === "handover" && job.roomType === "")
@@ -81,7 +84,12 @@ function atPatient(job: Job): boolean {
 
 export function assignJobs(state: SimState): void {
   const idle = Object.values(state.staff).filter(
-    (s) => s.jobId === null && s.role !== "receptionist" && onSite(s) && !inClinic(state, s),
+    (s) =>
+      s.jobId === null &&
+      s.role !== "receptionist" &&
+      onSite(s) &&
+      !inClinic(state, s) &&
+      !inTheatre(state, s),
   );
   if (idle.length === 0) return;
   const open = Object.values(state.jobs)
@@ -347,6 +355,7 @@ function patientSpot(state: SimState, p: Patient): Point {
     p.stage === "triage" ||
     p.stage === "collapsed" ||
     p.stage === "awaiting_bed" ||
+    p.stage === "in_recovery" ||
     p.stage === "on_ward";
   if (bed && onBed) return bedside(state, bed);
   const seat = p.seat && state.objects[p.seat.objectId];
@@ -377,6 +386,10 @@ function runAtPatient(state: SimState, job: Job, staff: Staff, p: Patient): void
     handoverDone(state, p, null);
   } else if (job.kind === "arrange_transfer") {
     transferArranged(state, p);
+  } else if (job.kind === "pre_op_check") {
+    preOpChecked(p);
+  } else if (job.kind === "recovery") {
+    recovered(state, p);
   } else if (job.step === 0) {
     // The team leader got there this long after the arrest.
     const startedAfter = (state.tick - job.durationTicks - job.createdTick) / TICKS_PER_MINUTE;

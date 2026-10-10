@@ -3,6 +3,8 @@
  * When SIM_STATE_VERSION goes from N to N+1, add a `N: (save) => ...` entry
  * that transforms a version-N save into a version-N+1 save.
  */
+import { specialtyById } from "@data/catalogue";
+import type { SpecialtyId } from "@data/schema";
 import { SIM_STATE_VERSION } from "@sim/state";
 import { createFloorGrid } from "@sim/world/grid";
 import { fitSite } from "@sim/world/site";
@@ -465,6 +467,46 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
         ...state,
         emergencyTheatres: {},
         staff: state.staff.map((s) => ({ ...s, theatreSessions: 0 })),
+      },
+    };
+  },
+  // v25: elective surgery. Patients already listed are day cases where most
+  // of their specialty's operations are.
+  24: (save) => {
+    type Day = { stats: object };
+    const state = save.state as {
+      patients: object[];
+      referrals: { specialty: string }[];
+      today: Day;
+      history: Day[];
+    };
+    const stats = (d: Day) => ({
+      ...d,
+      stats: {
+        ...d.stats,
+        electiveOps: 0,
+        dayCases: 0,
+        cancelledOnDay: 0,
+        emergencyOps: 0,
+        bumped: 0,
+      },
+    });
+    const dayCase = (sp: string) =>
+      (specialtyById.get(sp as SpecialtyId)?.surgery?.dayCaseShare ?? 0) >= 0.5;
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients.map((p) => ({ ...p, elective: null })),
+        referrals: state.referrals.map((r) => ({
+          ...r,
+          dayCase: dayCase(r.specialty),
+          rebookBy: null,
+        })),
+        operations: [],
+        nextOperationId: 1,
+        today: stats(state.today),
+        history: state.history.map(stats),
       },
     };
   },

@@ -181,8 +181,10 @@ export function walkInPoint(state: SimState): Point | null {
  */
 export function treatableConditions(state: SimState): ConditionDef[] {
   const lab = hasRoomWith(state, "lab", ["pathology"]);
-  return content.conditions.filter((c) =>
-    c.pathway.every((s) => hasRoomWith(state, s.room, s.capabilities) && (lab || !s.sample)),
+  return content.conditions.filter(
+    (c) =>
+      !c.planned &&
+      c.pathway.every((s) => hasRoomWith(state, s.room, s.capabilities) && (lab || !s.sample)),
   );
 }
 
@@ -211,6 +213,26 @@ export function spawnPatient(
     }
   }
   if (conditionId !== undefined) condition = conditionById.get(conditionId)!;
+  const patient = newPatient(
+    state,
+    at,
+    condition,
+    channel === "ambulance" ? "awaiting_handover" : "queueing",
+  );
+  rollDeterioration(state, patient);
+  state.patients[patient.id] = patient;
+  state.today.stats.arrivals++;
+  return patient;
+}
+
+/** A patient record at `at`, not yet in the hospital (the caller adds them). */
+export function newPatient(
+  state: SimState,
+  at: { x: number; y: number },
+  condition: ConditionDef,
+  stage: Patient["stage"],
+): Patient {
+  const rng = state.rng;
   const hours = BLADDER_HOURS * (0.7 + 0.6 * nextFloat(rng));
   const patient: Patient = {
     id: state.nextAgentId++,
@@ -225,7 +247,7 @@ export function spawnPatient(
     conditionId: condition.id,
     category: 0,
     retriaged: null,
-    stage: channel === "ambulance" ? "awaiting_handover" : "queueing",
+    stage,
     step: 0,
     seat: null,
     standing: null,
@@ -257,11 +279,9 @@ export function spawnPatient(
     transfer: null,
     investigations: [],
     homeBed: null,
+    elective: null,
     death: null,
     outcome: null,
   };
-  rollDeterioration(state, patient);
-  state.patients[patient.id] = patient;
-  state.today.stats.arrivals++;
   return patient;
 }

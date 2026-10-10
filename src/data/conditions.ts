@@ -18,6 +18,7 @@
  */
 import { CT_MINS, XRAY_MINS } from "./diagnostics";
 import type { ConditionInput } from "./schema";
+import { specialties } from "./specialties";
 
 const MINORS = "minors_cubicle";
 const MAJORS = "majors_bay";
@@ -392,3 +393,39 @@ export const conditions: ConditionInput[] = [
       "Sepsis with dangerously low blood pressure. Stabilised in Resus, then transferred to intensive care.",
   },
 ];
+
+/**
+ * Planned operations (M4 step 7), one per surgical specialty, from its
+ * `surgery` data: patients from its waiting list come in for a theatre
+ * list. Day cases go home the same day (the day-case tariff); inpatients
+ * stay on a ward (the inpatient tariff, on discharge).
+ */
+export const PLANNED_PREFIX = "elective_";
+for (const sp of specialties) {
+  const s = sp.surgery;
+  if (!s) continue;
+  conditions.push({
+    id: `${PLANNED_PREFIX}${sp.id}`,
+    name: `Planned surgery: ${sp.name}`,
+    acuity: 5,
+    channels: { walk_in: 0 },
+    specialty: sp.id,
+    tariff: s.dayCaseTariff,
+    pathway: [
+      {
+        name: "Operation",
+        roles: ["consultant", "registrar"],
+        room: "theatre",
+        capabilities: ["surgery"],
+        mins: [...s.opMins],
+      },
+    ],
+    admission: {
+      chance: 0,
+      stayHours: [s.stayDays[0] * 24, s.stayDays[1] * 24],
+      tariff: s.inpatientTariff,
+    },
+    planned: true,
+    description: `Planned operations from the ${sp.name} waiting list: ${s.examples}.`,
+  });
+}

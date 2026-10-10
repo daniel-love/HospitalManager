@@ -19,6 +19,7 @@ import { updateStaff } from "./systems/staffing";
 import { updateTransfers } from "./systems/transfers";
 import { updateReferrals } from "./systems/referrals";
 import { updateOutpatients } from "./systems/outpatients";
+import { updateTheatres } from "./systems/theatres";
 
 export function tick(state: SimState): void {
   state.tick++;
@@ -28,6 +29,7 @@ export function tick(state: SimState): void {
   updateStaff(state);
   updatePatients(state);
   updateOutpatients(state);
+  updateTheatres(state);
   updateTransfers(state);
   updateDeterioration(state);
   updateWards(state);

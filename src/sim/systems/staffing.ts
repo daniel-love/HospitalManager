@@ -29,6 +29,7 @@ import type { SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
 import { waitAtBase } from "./bases";
 import { inClinic, outpatientDesks } from "./outpatients";
+import { inTheatre } from "./theatres";
 import { removeJob, ticksFor, unassignJob } from "./jobBoard";
 import { nurseStations, stationSpot } from "./monitoring";
 import { headTo } from "./movement";
@@ -176,7 +177,7 @@ export function updateStaff(state: SimState): void {
     else if (s.onCall?.state === "leaving") {
       if (s.jobId !== null) s.onCall = { state: "in", at: state.tick };
       else walkHome(state, s);
-    } else if (onSite(s) && !inClinic(state, s)) {
+    } else if (onSite(s) && !inClinic(state, s) && !inTheatre(state, s)) {
       if (s.role === "nurse") waitAtStation(state, s);
       if (s.desk === null) waitAtBase(state, s);
     }
@@ -209,7 +210,8 @@ function updateOnCall(state: SimState): void {
 
   for (const job of open) {
     // A colleague in clinic isn't free to come: the on-call consultant is.
-    const here = (s: Staff) => (onSite(s) && !inClinic(state, s)) || s.onCall?.state === "called";
+    const here = (s: Staff) =>
+      (onSite(s) && !inClinic(state, s) && !inTheatre(state, s)) || s.onCall?.state === "called";
     if (staff.some((s) => canDo(s, job) && here(s))) continue;
     const home = onCall.find((s) => s.onCall!.state === "home" && canDo(s, job));
     if (!home) continue;

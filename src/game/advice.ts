@@ -200,6 +200,7 @@ export function describeAdvice(state: SimState): AdviceData {
   // Which specialties are needed: those of conditions this hospital can treat.
   const needed = new Map<SpecialtyId, string[]>();
   for (const c of content.conditions) {
+    if (c.planned) continue;
     const sp = admittingSpecialty(c);
     if (!sp) continue;
     needed.set(sp, [...(needed.get(sp) ?? []), c.name.toLowerCase()]);

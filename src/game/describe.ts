@@ -51,6 +51,7 @@ import { MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS, MAX_THEATRE_SESSIONS } from "@
 import { analysers, pendingResults } from "@sim/systems/diagnostics";
 import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 import { liveSessions } from "@sim/systems/outpatients";
+import { inTheatre } from "@sim/systems/theatres";
 import { waitingLists } from "@sim/systems/referrals";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { roomAt, roomOfObject } from "@sim/world/rooms";
@@ -86,6 +87,11 @@ const STAGE_LABELS: Record<PatientStage, string> = {
   to_mortuary: "Being taken to the mortuary",
   in_mortuary: "In the mortuary",
   with_funeral_director: "Being collected by the funeral director",
+  pre_op: "In the Day Surgery Unit for an operation",
+  to_theatre: "Going to theatre",
+  in_theatre: "In theatre: being operated on",
+  in_recovery: "In Recovery",
+  post_op: "Back in the Day Surgery Unit after an operation",
   leaving: "Leaving",
 };
 
@@ -611,6 +617,8 @@ export function staffState(state: SimState, s: Staff): StaffState {
   if (s.onCall?.state === "leaving" && s.jobId === null) {
     return { status: "on_the_way", activity: "Going home: nothing more for them", ...none };
   }
+  const theatre = theatreActivity(state, s);
+  if (theatre && s.jobId === null) return theatre;
   const clinic = liveSessions(state).get(s.id);
   if (clinic && s.jobId === null) {
     const name = specialtyById.get(s.specialty!)?.name ?? "Outpatient";
@@ -713,6 +721,12 @@ export function staffState(state: SimState, s: Staff): StaffState {
     case "release_body":
       what = `Releasing ${who} to the funeral director`;
       break;
+    case "pre_op_check":
+      what = `Admitting ${who} for their operation`;
+      break;
+    case "recovery":
+      what = `Looking after ${who} in Recovery`;
+      break;
     case "me_review":
       what = `Medical Examiner review: ${who}`;
       break;
@@ -767,6 +781,39 @@ export function staffState(state: SimState, s: Staff): StaffState {
         progress: null,
         patientId,
       };
+}
+
+/** What a member of a theatre team is doing, if they're in theatre. */
+function theatreActivity(state: SimState, s: Staff): StaffState | null {
+  const none = { progress: null, patientId: null };
+  const op = Object.values(state.operations).find(
+    (o) => o.surgeonId === s.id || o.anaesthetistId === s.id || o.practitionerIds.includes(s.id),
+  );
+  if (op && !(op.phase === "to_recovery" && !op.practitionerIds.includes(s.id))) {
+    const p = state.patients[op.patientId];
+    const who = p?.name ?? "a patient";
+    if (op.phase === "to_recovery") {
+      return {
+        status: "working",
+        activity: `Wheeling ${who} to Recovery`,
+        progress: null,
+        patientId: p?.id ?? null,
+      };
+    }
+    const doing =
+      op.surgeonId === s.id
+        ? `Operating on ${who}`
+        : op.anaesthetistId === s.id
+          ? `Anaesthetising ${who}`
+          : `Scrubbed for ${who}'s operation`;
+    return op.phase === "gathering"
+      ? { status: "on_the_way", activity: `${doing} (getting ready)`, ...none }
+      : { status: "working", activity: doing, progress: null, patientId: p?.id ?? null };
+  }
+  if (inTheatre(state, s)) {
+    return { status: "at_desk", activity: "Theatre list: waiting for the next patient", ...none };
+  }
+  return null;
 }
 
 /** "ECG (12-lead)": a piece of shared kit, for activity lines. */
@@ -978,6 +1025,11 @@ const STAGE_GROUPS: Record<PatientStage, PatientRow["group"]> = {
   to_mortuary: "leaving",
   in_mortuary: "leaving",
   with_funeral_director: "leaving",
+  pre_op: "waiting",
+  to_theatre: "treatment",
+  in_theatre: "treatment",
+  in_recovery: "treatment",
+  post_op: "treatment",
   leaving: "leaving",
 };
 

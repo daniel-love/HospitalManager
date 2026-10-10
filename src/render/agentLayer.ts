@@ -297,9 +297,12 @@ export class AgentLayer {
 type Warning = "none" | "unnoticed" | "hidden" | "escalated" | "attended" | "arrest";
 
 /** Patients a doctor or nurse is working with right now. */
-/** Patients a porter is wheeling to a scan or back on their trolley. */
+/** Patients a porter is wheeling to a scan or back, or a practitioner from theatre to Recovery. */
 function wheeledPatients(state: SimState): Set<number> {
   const ids = new Set<number>();
+  for (const op of Object.values(state.operations)) {
+    if (op.phase === "to_recovery") ids.add(op.patientId);
+  }
   for (const j of Object.values(state.jobs)) {
     if (j.kind !== "escort" || j.state !== "working" || j.patientId === null) continue;
     if (!j.roles.includes("porter")) continue;

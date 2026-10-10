@@ -79,6 +79,8 @@ export function sessionsOn(state: SimState, day: number, half: SessionHalf): Ses
       plans += `${s.id}:${s.clinicSessions}:${s.theatreSessions},`;
     }
   }
+  // Room settings don't change the layout version, so they're part of the key.
+  plans += JSON.stringify(state.roomSpecialties);
   const key = `${day}:${half}:${state.layoutVersion}:${plans}`;
   let cache = sessionCache.get(state);
   if (!cache || cache.plans !== plans || cache.layout !== state.layoutVersion) {

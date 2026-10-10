@@ -351,6 +351,9 @@ function arriveOnWard(state: SimState, p: Patient): void {
   }
   const [lo, hi] = condition.admission?.stayHours ?? [24, 48];
   p.stayUntil = state.tick + Math.round((lo + (hi - lo) * nextFloat(state.rng)) * TICKS_PER_HOUR);
+  // A planned operation's inpatient never came through A&E: no A&E figures,
+  // and the inpatient tariff is paid on discharge.
+  if (p.elective) return;
 
   const stats = state.today.stats;
   const inDept = (state.tick - p.times.arrived) / TICKS_PER_MINUTE;

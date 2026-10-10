@@ -151,11 +151,15 @@ export function seatApproach(obj: PlacedObject, slot: number): Point {
   return { x: t.x + dx, y: t.y + dy };
 }
 
-/** The nearest free seat in a valid waiting area. */
-export function freeSeat(state: SimState, from: Point): { objectId: number; slot: number } | null {
+/** The nearest free seat in a valid room of a type (a waiting area unless said). */
+export function freeSeat(
+  state: SimState,
+  from: Point,
+  roomType = "waiting_area",
+): { objectId: number; slot: number } | null {
   let best: { objectId: number; slot: number } | null = null;
   let bestD = Infinity;
-  const seating = objectsIn(state, "waiting_area", (d) => (equipmentById.get(d)?.seats ?? 0) > 0);
+  const seating = objectsIn(state, roomType, (d) => (equipmentById.get(d)?.seats ?? 0) > 0);
   for (const obj of seating) {
     const seats = equipmentById.get(obj.defId)!.seats!;
     for (let slot = 0; slot < seats; slot++) {

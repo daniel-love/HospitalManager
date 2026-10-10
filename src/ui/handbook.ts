@@ -121,6 +121,7 @@ export function staffGuide(): GuideSection[] {
     entries: sec.items.map((role) => {
       const steps = new Set<string>();
       for (const c of content.conditions) {
+        if (c.planned) continue;
         for (const s of c.pathway) {
           if (s.roles.includes(role.id) && !s.specialty) steps.add(s.name);
         }
@@ -202,7 +203,8 @@ export function roomGuide(): GuideSection[] {
 }
 
 export function conditionGuide(): GuideSection[] {
-  const byAcuity = [...content.conditions].sort((a, b) => a.acuity - b.acuity);
+  // A&E conditions, then planned operations on their own.
+  const byAcuity = content.conditions.filter((c) => !c.planned).sort((a, b) => a.acuity - b.acuity);
   // By the most acute area they need: Resus, else Majors, else Minors.
   const uses = (c: ConditionDef, room: string) => c.pathway.some((s) => s.room === room);
   const area = (c: ConditionDef) =>
@@ -211,7 +213,7 @@ export function conditionGuide(): GuideSection[] {
     name,
     test: (c: ConditionDef) => area(c) === name,
   }));
-  return groups.map((g) => ({
+  const sections: GuideSection[] = groups.map((g) => ({
     name: g.name,
     entries: byAcuity.filter(g.test).map((c) => {
       const arrives = [
@@ -268,4 +270,45 @@ export function conditionGuide(): GuideSection[] {
       };
     }),
   }));
+  sections.push({
+    name: "Planned surgery",
+    entries: content.conditions
+      .filter((c) => c.planned)
+      .map((c) => {
+        const sp = specialtyById.get(c.specialty!)!;
+        const op = sp.surgery!;
+        const day = Math.round(op.dayCaseShare * 100);
+        const [lo, hi] = op.stayDays;
+        return {
+          id: c.id,
+          title: c.name,
+          subtitle: `From the ${sp.name} waiting list · day case ${formatMoney(op.dayCaseTariff)}, inpatient ${formatMoney(op.inpatientTariff)}`,
+          body: c.description,
+          sections: [
+            {
+              heading: "Operation",
+              items: [
+                `Admitted by a staff nurse in the Day Surgery Unit`,
+                `${op.opMins[0]}–${op.opMins[1]} minutes in an Operating Theatre: a ${sp.name} surgeon (consultant or registrar), an anaesthetist and two theatre practitioners`,
+                "Then Recovery, with a staff nurse",
+              ],
+            },
+            {
+              heading: "Afterwards",
+              items: [
+                ...(day > 0
+                  ? [`${day}% day cases: home from the Day Surgery Unit the same day`]
+                  : []),
+                ...(day < 100
+                  ? [
+                      `The rest stay ${lo === hi ? lo : `${lo}–${hi}`} ${hi === 1 ? "day" : "days"} on a ward, and are cancelled on the day if there's no bed`,
+                    ]
+                  : []),
+              ],
+            },
+          ],
+        };
+      }),
+  });
+  return sections;
 }

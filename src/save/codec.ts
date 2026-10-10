@@ -146,6 +146,11 @@ const patientSchema = z.object({
     "to_mortuary",
     "in_mortuary",
     "with_funeral_director",
+    "pre_op",
+    "to_theatre",
+    "in_theatre",
+    "in_recovery",
+    "post_op",
     "leaving",
   ]),
   step: int.min(0),
@@ -208,6 +213,14 @@ const patientSchema = z.object({
     }),
   ),
   homeBed: nullableInt,
+  elective: z
+    .object({
+      referralId: int.positive(),
+      dayCase: z.boolean(),
+      checked: z.boolean(),
+      wardBed: nullableInt,
+    })
+    .nullable(),
   retriaged: z.object({ tick: int, from: int.min(1).max(5) }).nullable(),
   outcome: z.enum(["discharged", "lwbs", "transferred", "transferred_out", "died"]).nullable(),
 });
@@ -251,6 +264,8 @@ const jobSchema = z.object({
     "to_mortuary",
     "me_review",
     "release_body",
+    "pre_op_check",
+    "recovery",
     "return_kit",
     "escort",
     "debrief",
@@ -360,6 +375,24 @@ const statsSchema = z.object({
   urgentSeen: int.min(0),
   urgentWithin2w: int.min(0),
   listedForSurgery: int.min(0),
+  electiveOps: int.min(0),
+  dayCases: int.min(0),
+  cancelledOnDay: int.min(0),
+  emergencyOps: int.min(0),
+  bumped: int.min(0),
+});
+
+const operationSchema = z.object({
+  id: int.positive(),
+  patientId: int.positive(),
+  table: int.positive(),
+  surgeonId: int.positive(),
+  anaesthetistId: int.positive(),
+  practitionerIds: z.array(int.positive()),
+  phase: z.enum(["gathering", "operating", "to_recovery"]),
+  left: int,
+  recoveryBed: nullableInt,
+  emergency: z.boolean(),
 });
 
 const outpatientSchema = z.object({
@@ -386,6 +419,8 @@ const referralSchema = z.object({
   added: int,
   due: nullableInt,
   dnas: int.min(0),
+  dayCase: z.boolean(),
+  rebookBy: nullableInt,
   booking: z
     .object({
       day: int.positive(),
@@ -429,6 +464,8 @@ const saveSchema = z.object({
     referrals: z.array(referralSchema),
     nextReferralId: int.positive(),
     outpatients: z.array(outpatientSchema),
+    operations: z.array(operationSchema),
+    nextOperationId: int.positive(),
     reserved: z.record(z.string(), int.positive()),
     dirt: z.record(z.string(), int.min(0)),
     roomSpecialties: z.record(z.string().regex(/^\d+:\d+$/), z.enum(specialtyIds)),
@@ -499,6 +536,8 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       referrals: Object.values(state.referrals),
       nextReferralId: state.nextReferralId,
       outpatients: Object.values(state.outpatients),
+      operations: Object.values(state.operations),
+      nextOperationId: state.nextOperationId,
       nextCollectionId: state.nextCollectionId,
       reserved: state.reserved,
       dirt: state.dirt,
@@ -561,6 +600,8 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     referrals: byId(s.referrals, "referral"),
     nextReferralId: s.nextReferralId,
     outpatients: byId(s.outpatients, "outpatient"),
+    operations: byId(s.operations, "operation"),
+    nextOperationId: s.nextOperationId,
     nextCollectionId: s.nextCollectionId,
     reserved: { ...s.reserved },
     dirt: Object.fromEntries(Object.entries(s.dirt).map(([k, v]) => [Number(k), v])),

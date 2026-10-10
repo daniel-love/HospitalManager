@@ -27,6 +27,7 @@ import { chance, pick } from "../rng";
 import type { SimState } from "../state";
 import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE, tickAt } from "../time";
 import { sessionsOn } from "./clinics";
+import { canRun, listsOn, TURNAROUND_MINS } from "./theatres";
 import { outpatientDesks } from "./outpatients";
 import { runsClinics } from "./staffing";
 
@@ -107,6 +108,8 @@ export function refer(state: SimState, specialty: SpecialtyId, urgent = false): 
     due: null,
     dnas: 0,
     booking: null,
+    dayCase: false,
+    rebookBy: null,
   };
   state.referrals[r.id] = r;
   state.today.stats.gpReferrals++;
@@ -115,6 +118,8 @@ export function refer(state: SimState, specialty: SpecialtyId, urgent = false): 
 
 /** One clinic session's diary over the booking horizon. */
 interface Diary {
+  /** A theatre list rather than a clinic. */
+  theatre: boolean;
   specialty: SpecialtyId;
   staffId: number;
   day: number;
@@ -139,8 +144,24 @@ function diaries(state: SimState, fromDay: number, toDay: number): Map<string, D
         const times = CLINIC_SESSIONS[half];
         const start = tickAt(day, 0) + times.start * TICKS_PER_MINUTE;
         out.set(sessionKey(session.staff.id, day, half), {
+          theatre: false,
           specialty: session.staff.specialty,
           staffId: session.staff.id,
+          day,
+          half,
+          start,
+          end: tickAt(day, 0) + times.end * TICKS_PER_MINUTE,
+          next: start,
+        });
+      }
+      for (const list of listsOn(state, day, half)) {
+        if (!canRun(list) || !list.surgeon.specialty) continue;
+        const times = CLINIC_SESSIONS[half];
+        const start = tickAt(day, 0) + times.start * TICKS_PER_MINUTE;
+        out.set(sessionKey(list.surgeon.id, day, half), {
+          theatre: true,
+          specialty: list.surgeon.specialty,
+          staffId: list.surgeon.id,
           day,
           half,
           start,
@@ -153,17 +174,39 @@ function diaries(state: SimState, fromDay: number, toDay: number): Map<string, D
   return out;
 }
 
-/** Which order the list is booked in: urgent first, follow-ups when due, then longest wait. */
+/**
+ * Which order the lists are booked in. Clinics: urgent first, follow-ups
+ * when due, then the longest wait. Surgery: operations cancelled on the day
+ * (to be done within 28 days), then urgent, then the longest wait.
+ */
 function bookingOrder(a: Referral, b: Referral): number {
   const rank = (r: Referral) =>
-    r.urgent && r.kind === "first" ? 0 : r.kind === "follow_up" ? 1 : 2;
-  const when = (r: Referral) => (r.kind === "follow_up" ? r.due! : (r.clockStart ?? r.added));
+    r.rebookBy !== null
+      ? 0
+      : r.urgent && r.kind !== "follow_up"
+        ? 1
+        : r.kind === "follow_up"
+          ? 2
+          : 3;
+  const when = (r: Referral) =>
+    r.rebookBy ?? (r.kind === "follow_up" ? r.due! : (r.clockStart ?? r.added));
   return rank(a) - rank(b) || when(a) - when(b) || a.id - b.id;
 }
 
+/** How long a booking takes: a clinic slot, or an operation and the turnaround after it. */
+function slotMins(r: Referral): number | null {
+  if (r.kind === "surgery") {
+    const op = specialtyById.get(r.specialty)?.surgery;
+    return op ? Math.round((op.opMins[0] + op.opMins[1]) / 2) + TURNAROUND_MINS : null;
+  }
+  const service = serviceOf(r.specialty);
+  if (!service) return null;
+  return r.kind === "first" ? service.firstSlotMins : service.followUpSlotMins;
+}
+
 /**
- * Books everyone on a list for a clinic appointment who can be, into the
- * earliest session with room for them, and cancels bookings whose session
+ * Books everyone on a list who can be, into the earliest clinic session (or
+ * theatre list) with room for them, and cancels bookings whose session
  * won't run any more.
  */
 export function bookAppointments(state: SimState): void {
@@ -171,7 +214,6 @@ export function bookAppointments(state: SimState): void {
   const sessions = diaries(state, today, today + BOOKING_HORIZON_DAYS);
   const waiting: Referral[] = [];
   for (const r of Object.values(state.referrals)) {
-    if (r.kind === "surgery") continue;
     const b = r.booking;
     if (!b) {
       waiting.push(r);
@@ -179,10 +221,11 @@ export function bookAppointments(state: SimState): void {
     }
     if (b.at < state.tick) continue; // Today's: the clinic deals with it.
     const diary = sessions.get(sessionKey(b.staffId, b.day, b.half));
-    if (!diary || diary.specialty !== r.specialty) {
-      // The session isn't running any more: the hospital cancels.
+    const surgery = r.kind === "surgery";
+    if (!diary || diary.specialty !== r.specialty || diary.theatre !== surgery) {
+      // The session isn't running any more: the hospital cancels and rebooks.
       r.booking = null;
-      state.today.stats.clinicCancellations++;
+      if (!surgery) state.today.stats.clinicCancellations++;
       waiting.push(r);
       continue;
     }
@@ -190,20 +233,20 @@ export function bookAppointments(state: SimState): void {
   }
   if (waiting.length === 0) return;
 
-  const bySpecialty = new Map<SpecialtyId, Diary[]>();
+  const bySpecialty = new Map<string, Diary[]>();
   for (const d of sessions.values()) {
-    if (!bySpecialty.has(d.specialty)) bySpecialty.set(d.specialty, []);
-    bySpecialty.get(d.specialty)!.push(d);
+    const k = `${d.specialty}:${d.theatre}`;
+    if (!bySpecialty.has(k)) bySpecialty.set(k, []);
+    bySpecialty.get(k)!.push(d);
   }
   for (const list of bySpecialty.values()) list.sort((a, b) => a.start - b.start);
 
   // Nothing is booked for today, or before the referral is a day old.
   const tomorrow = tickAt(today + 1, 0);
   for (const r of waiting.sort(bookingOrder)) {
-    const service = serviceOf(r.specialty);
-    const list = bySpecialty.get(r.specialty);
-    if (!service || !list) continue;
-    const mins = r.kind === "first" ? service.firstSlotMins : service.followUpSlotMins;
+    const list = bySpecialty.get(`${r.specialty}:${r.kind === "surgery"}`);
+    const mins = slotMins(r);
+    if (!list || mins === null) continue;
     const earliest =
       r.kind === "follow_up"
         ? Math.max(tomorrow, r.due! - FOLLOW_UP_EARLY_DAYS * TICKS_PER_DAY)

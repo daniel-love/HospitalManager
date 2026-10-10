@@ -19,6 +19,7 @@
  * If the session can't run on the day (the clinician has left, or there's
  * no clinic room), waiting patients are sent home and rebooked.
  */
+import { specialtyById } from "@data/catalogue";
 import { CLINIC_SESSIONS, URGENT_TARGET_DAYS, type SessionHalf } from "@data/outpatients";
 import { BOOKING_MINS } from "@data/patients";
 import type { Outpatient, Referral, Staff } from "../agents";
@@ -350,9 +351,10 @@ function seen(state: SimState, o: Outpatient): void {
       }
     }
     if (chance(state.rng, service.surgeryChance)) {
-      // A decision to operate: the RTT clock runs on until surgery (step 7).
+      // A decision to operate: the RTT clock runs on until surgery.
       r.kind = "surgery";
       r.added = state.tick;
+      r.dayCase = chance(state.rng, specialtyById.get(r.specialty)?.surgery?.dayCaseShare ?? 0);
       stats.listedForSurgery++;
       return;
     }

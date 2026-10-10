@@ -413,6 +413,11 @@ export const conditionDefSchema = z.object({
       warningMins: minutesRange,
     })
     .optional(),
+  /**
+   * A planned operation (M4 step 7), not something that arrives at A&E:
+   * patients come in for their theatre list from the waiting list.
+   */
+  planned: z.boolean().default(false),
   description: z.string(),
 });
 export type ConditionDef = z.infer<typeof conditionDefSchema>;

@@ -66,6 +66,16 @@ export type PatientStage =
   | "in_mortuary"
   /** Released: the funeral director is wheeling them out to their vehicle. */
   | "with_funeral_director"
+  /** In for a planned operation: in the Day Surgery Unit, being admitted or waiting for theatre. */
+  | "pre_op"
+  /** On the way to the operating table (walking, or wheeled from A&E or a ward). */
+  | "to_theatre"
+  /** On the operating table. */
+  | "in_theatre"
+  /** Coming round in Recovery, with a nurse. */
+  | "in_recovery"
+  /** A day case back in the Day Surgery Unit, getting ready to go home. */
+  | "post_op"
   /** Heading out of the building. */
   | "leaving";
 
@@ -208,6 +218,17 @@ export interface Patient extends AgentBase {
   investigations: Investigation[];
   /** Their Majors or Resus trolley, kept for them while they're away being scanned. */
   homeBed: number | null;
+  /**
+   * In for a planned operation (systems/theatres.ts): their place on the
+   * waiting list, whether they go home the same day, whether a nurse has
+   * admitted them, and (inpatients) the ward bed kept for after theatre.
+   */
+  elective: {
+    referralId: number;
+    dayCase: boolean;
+    checked: boolean;
+    wardBed: number | null;
+  } | null;
   death: Death | null;
   outcome: Outcome | null;
 }
@@ -277,6 +298,10 @@ export type JobKind =
   | "last_offices"
   | "to_mortuary"
   | "me_review"
+  /** A nurse admits a planned surgery patient in the Day Surgery Unit (checks, consent, gown). */
+  | "pre_op_check"
+  /** A nurse looks after a patient coming round in Recovery. */
+  | "recovery"
   /** A porter releases the deceased to the funeral director at the mortuary. */
   | "release_body"
   /** Wheeling shared kit (a 12-lead ECG, say) back to where it's kept. */
@@ -487,6 +512,14 @@ export interface FlowStats {
   urgentWithin2w: number;
   /** Added to the admitted waiting list from clinic: a decision to operate. */
   listedForSurgery: number;
+  /** Planned operations done, and of them day cases. */
+  electiveOps: number;
+  dayCases: number;
+  /** Planned operations cancelled on the day by the hospital (no bed, the list overran). */
+  cancelledOnDay: number;
+  /** Emergency operations, and planned ones cancelled to make way for them. */
+  emergencyOps: number;
+  bumped: number;
 }
 
 /**
@@ -551,6 +584,34 @@ export interface Referral {
   /** Appointments missed so far on this pathway. */
   dnas: number;
   booking: Booking | null;
+  /** Surgery: a day case (home the same day) rather than an inpatient. */
+  dayCase: boolean;
+  /**
+   * Surgery cancelled on the day: they must be rebooked by this tick (the
+   * NHS 28-day standard), so they go ahead of the list. Null otherwise.
+   */
+  rebookBy: number | null;
+}
+
+/**
+ * An operation under way (systems/theatres.ts): the patient on the table,
+ * the team, and how far it's got. gathering: the patient and team are on
+ * their way. operating: under anaesthetic. to_recovery: a theatre
+ * practitioner is wheeling them to the Recovery trolley in `recoveryBed`.
+ */
+export interface Operation {
+  id: number;
+  patientId: number;
+  table: number;
+  surgeonId: number;
+  anaesthetistId: number;
+  practitionerIds: number[];
+  phase: "gathering" | "operating" | "to_recovery";
+  /** Ticks of operating left. */
+  left: number;
+  recoveryBed: number | null;
+  /** From A&E or a ward, rather than a planned list. */
+  emergency: boolean;
 }
 
 export interface DayReport {
@@ -608,6 +669,11 @@ export function emptyStats(): FlowStats {
     urgentSeen: 0,
     urgentWithin2w: 0,
     listedForSurgery: 0,
+    electiveOps: 0,
+    dayCases: 0,
+    cancelledOnDay: 0,
+    emergencyOps: 0,
+    bumped: 0,
   };
 }
 
