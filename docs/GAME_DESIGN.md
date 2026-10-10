@@ -334,6 +334,8 @@ Deaths follow the real UK hospital process, because that process is where the op
 
 Skill (affects step duration and outcome), specialty (doctors), **fatigue** (rises on shift; rest in the staff room), **morale** (pay, workload, ambience, incidents), salary, contract type (permanent / bank / **agency locum** at about 2× cost, available instantly).
 
+Built in M5 step 2: skill (0–100) sets work speed from 0.85× to 1.15× and grows with hours worked; fatigue builds through a shift (faster when busy), falls at home, and slows people above half way; morale drifts back to a baseline, falls after busy or short-staffed shifts and deaths, and lifts after quiet ones. Low morale and tiredness raise the chance of calling in sick (about 4.5% of shifts at best); morale below 30 can lead to a resignation with four weeks' notice. Nurses are hired at Band 5, 6 or 7; a Band 7 on duty is the shift's nurse in charge and the nursing team works 10% faster. Rota gaps (against the cover, after sickness) go at the start of each shift to the bank (normal hourly pay, fills about two in three) and then an agency (always fills, 2× cost, 10% slower), as the hospital's gap-filling policy allows.
+
 ### 6.3 Staffing rules
 
 - Each department has **minimum staffing** per shift (e.g. A&E: 1 consultant or on-call, 2 doctors, 4 nurses, 1 HCA, 1 receptionist). Below the minimum, the department runs **unsafe**: slower, with incident risk and inspection penalties.

@@ -48,7 +48,7 @@ const shiftsOf = (mask: number) => [...Array(SLOTS).keys()].filter((s) => mask &
 describe("the weekly rota", () => {
   it("meets cover with five people per post, three shifts each, never back to back", () => {
     const state = withRotas();
-    setCover(state, "nurse", { day: 1, night: 1 });
+    setCover(state, "nurse:band5", { day: 1, night: 1 });
     const nurses = Array.from({ length: 5 }, () => hire(state, "nurse"));
     const plan = rota(state);
     const [g] = rotaSummary(state);
@@ -65,7 +65,7 @@ describe("the weekly rota", () => {
 
   it("shows gaps when there aren't enough people", () => {
     const state = withRotas();
-    setCover(state, "nurse", { day: 2, night: 2 });
+    setCover(state, "nurse:band5", { day: 2, night: 2 });
     hire(state, "nurse");
     hire(state, "nurse");
     const [g] = rotaSummary(state);
@@ -88,7 +88,7 @@ describe("the weekly rota", () => {
 describe("shift changes", () => {
   it("staff come in at the start of their shift and go home at the end", () => {
     const state = withRotas();
-    setCover(state, "nurse", { day: 1, night: 1 });
+    setCover(state, "nurse:band5", { day: 1, night: 1 });
     const nurses = Array.from({ length: 5 }, () => hire(state, "nurse"));
     // The game starts at 08:00 on Monday: the Monday day shift is under way.
     expect(nurses.filter(onDuty).length).toBe(1);
@@ -106,7 +106,7 @@ describe("shift changes", () => {
 
   it("someone hired mid-shift starts at once if the rota puts them on it and it's short", () => {
     const state = withRotas();
-    setCover(state, "nurse", { day: 2, night: 2 });
+    setCover(state, "nurse:band5", { day: 2, night: 2 });
     const a = hire(state, "nurse");
     expect(describeRota(state, a)).toContain("Mon day");
     expect(onDuty(a)).toBe(true);
@@ -116,7 +116,7 @@ describe("shift changes", () => {
 
   it("off-duty staff take no jobs", () => {
     const state = withRotas();
-    setCover(state, "nurse", { day: 1, night: 0 });
+    setCover(state, "nurse:band5", { day: 1, night: 0 });
     hire(state, "nurse");
     const off = Array.from({ length: 4 }, () => hire(state, "nurse")).filter((n) => !onSite(n));
     expect(off.length).toBeGreaterThan(0);
@@ -175,7 +175,7 @@ describe("pay", () => {
     expect(unsocialRate(6, 12)).toBeGreaterThan(unsocialRate(5, 12));
 
     const state = withRotas();
-    setCover(state, "nurse", { day: 1, night: 1 });
+    setCover(state, "nurse:band5", { day: 1, night: 1 });
     for (let i = 0; i < 5; i++) hire(state, "nurse");
     runTo(state, tickAt(1, 14, 0));
     const day = hourlySalaries(state);
@@ -203,6 +203,8 @@ describe("old saves", () => {
           { id: 2, onCall: { state: "home", at: 0 } },
         ],
         settings: { catchment: 80_000, patientVolume: 1 },
+        today: { ledger: {} },
+        history: [],
       },
     };
     const m = migrate(old) as {

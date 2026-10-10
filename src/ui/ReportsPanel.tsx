@@ -153,7 +153,7 @@ function Headlines({ data }: { data: ReportData }) {
         label="Net today"
         value={formatMoney(n)}
         status={n < 0 ? "bad" : n > 0 ? "ok" : "none"}
-        note={`${formatMoney(l.tariff + l.outpatients)} in · ${formatMoney(l.salaries + l.upkeep + l.transfers)} out`}
+        note={`${formatMoney(l.tariff + l.outpatients)} in · ${formatMoney(l.salaries + l.bank + l.agency + l.upkeep + l.transfers)} out`}
       />
       <RttTile lists={data.waitingLists} />
       <Tile
@@ -272,7 +272,8 @@ function Tile(props: {
 
 function MoneySection({ ledger }: { ledger: Ledger }) {
   const n = net(ledger);
-  const costs = ledger.salaries + ledger.upkeep + ledger.transfers;
+  const pay = ledger.salaries + ledger.bank + ledger.agency;
+  const costs = pay + ledger.upkeep + ledger.transfers;
   const income = ledger.tariff + ledger.outpatients;
   const scale = Math.max(income, costs, 1);
   return (
@@ -287,10 +288,7 @@ function MoneySection({ ledger }: { ledger: Ledger }) {
           />
         </div>
         <div class="money-bar">
-          <span
-            class="money-fill salaries"
-            style={{ width: `${(100 * ledger.salaries) / scale}%` }}
-          />
+          <span class="money-fill salaries" style={{ width: `${(100 * pay) / scale}%` }} />
           <span class="money-fill upkeep" style={{ width: `${(100 * ledger.upkeep) / scale}%` }} />
           <span
             class="money-fill transport"
@@ -314,6 +312,18 @@ function MoneySection({ ledger }: { ledger: Ledger }) {
             label={<Swatch kind="salaries">Salaries</Swatch>}
             value={`−${formatMoney(ledger.salaries)}`}
           />
+          {ledger.bank > 0 && (
+            <Row
+              label={<Swatch kind="salaries">Bank staff</Swatch>}
+              value={`−${formatMoney(ledger.bank)}`}
+            />
+          )}
+          {ledger.agency > 0 && (
+            <Row
+              label={<Swatch kind="salaries">Agency staff</Swatch>}
+              value={`−${formatMoney(ledger.agency)}`}
+            />
+          )}
           <Row
             label={<Swatch kind="upkeep">Equipment upkeep</Swatch>}
             value={`−${formatMoney(ledger.upkeep)}`}

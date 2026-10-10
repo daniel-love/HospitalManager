@@ -545,6 +545,43 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v28: nurse bands, skill, fatigue, sickness and resignations, bank and agency.
+  27: (save) => {
+    type Staff = { id: number; role: string; morale: number };
+    type Day = { ledger: object };
+    const state = save.state as {
+      staff: Staff[];
+      cover: Record<string, unknown>;
+      today: Day;
+      history: Day[];
+    };
+    const ledger = (d: Day) => ({ ...d, ledger: { ...d.ledger, bank: 0, agency: 0 } });
+    // Nurses' cover was for all of them; they were all Band 5.
+    const cover = Object.fromEntries(
+      Object.entries(state.cover).map(([k, v]) => [k === "nurse" ? "nurse:band5" : k, v]),
+    );
+    return {
+      ...save,
+      state: {
+        ...state,
+        staff: state.staff.map((s) => ({
+          ...s,
+          band: s.role === "nurse" ? 5 : null,
+          // Settled staff: the middle of the usual range, varied a little by id.
+          // (Kept if present: tests upgrade saves written by this version.)
+          skill: (s as { skill?: number }).skill ?? 50 + ((s.id * 37) % 21) - 10,
+          fatigue: 0,
+          sickUntil: null,
+          leavesAt: null,
+          shiftLoad: null,
+        })),
+        cover,
+        policies: { gapFill: "bank" },
+        today: ledger(state.today),
+        history: state.history.map(ledger),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

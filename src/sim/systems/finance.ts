@@ -6,7 +6,7 @@
  */
 import { equipmentById, staffRoleById } from "@data/catalogue";
 import { DAYS_PER_MONTH } from "@data/economy";
-import { ON_CALL, UNSOCIAL } from "@data/staff";
+import { AGENCY, BANK, NURSE_BANDS, ON_CALL, UNSOCIAL } from "@data/staff";
 import { emptyLedger, emptyStats, net, onSite, type DayReport, type Staff } from "../agents";
 import { emit } from "../events";
 import type { SimState } from "../state";
@@ -21,9 +21,20 @@ export function earn(state: SimState, amount: number): void {
   state.today.ledger.tariff += amount;
 }
 
-/** What someone costs a year: their role's pay, or an on-call consultant's retainer. */
+/** A role's annual pay with on-costs, by band for nurses. */
+export function rolePay(s: Staff): number {
+  const band = s.band === null ? undefined : NURSE_BANDS.find((b) => b.band === s.band);
+  return band ? band.annualCost : staffRoleById.get(s.role)!.annualCost;
+}
+
+/**
+ * What someone costs a year: their pay, or an on-call consultant's
+ * retainer. Bank and agency staff are paid by the hour instead (0 here).
+ */
 export function annualCost(s: Staff): number {
-  return s.contract === "on_call" ? ON_CALL.retainer : staffRoleById.get(s.role)!.annualCost;
+  if (s.contract === "on_call") return ON_CALL.retainer;
+  if (s.contract === "bank" || s.contract === "agency") return 0;
+  return rolePay(s);
 }
 
 /**
@@ -36,27 +47,46 @@ export function unsocialRate(weekday: number, hour: number): number {
   return hour >= UNSOCIAL.nightFrom || hour < UNSOCIAL.nightTo ? UNSOCIAL.night : 0;
 }
 
+/** Staff costs for the hour just gone, £, by ledger line. */
+export interface HourlyPay {
+  salaries: number;
+  bank: number;
+  agency: number;
+}
+
 /**
- * Staff costs for the hour just gone, £: salaries, plus on-call
- * consultants' hours in the hospital, plus unsocial hours pay for anyone
- * who was at work on a shift.
+ * Staff costs for the hour just gone: salaries, plus on-call consultants'
+ * hours in the hospital and unsocial hours pay for anyone at work on a
+ * shift; and bank and agency staff by the hour (with unsocial hours too).
  */
-export function hourlySalaries(state: SimState): number {
+export function hourlyPay(state: SimState): HourlyPay {
   let annual = 0;
-  let hourly = 0;
+  const pay: HourlyPay = { salaries: 0, bank: 0, agency: 0 };
   const c = clockFromTick(Math.max(0, state.tick - 1));
   const rate = unsocialRate(c.weekday, c.hour);
   for (const s of Object.values(state.staff)) {
     annual += annualCost(s);
-    if (s.contract === "on_call" && onSite(s)) hourly += ON_CALL.hourly;
-    else if (rate > 0 && onShift(state, s)) {
-      hourly += (rate * staffRoleById.get(s.role)!.annualCost) / UNSOCIAL.hoursPerYear;
-    }
+    const hour = rolePay(s) / UNSOCIAL.hoursPerYear;
+    const unsocial = onShift(state, s) ? rate * hour : 0;
+    if (s.contract === "on_call") {
+      if (onSite(s)) pay.salaries += ON_CALL.hourly;
+    } else if (s.contract === "bank") {
+      if (onSite(s)) pay.bank += hour * BANK.payFactor + unsocial;
+    } else if (s.contract === "agency") {
+      if (onSite(s)) pay.agency += (hour + unsocial) * AGENCY.payFactor;
+    } else pay.salaries += unsocial;
   }
-  return annual / 365 / 24 + hourly;
+  pay.salaries += annual / 365 / 24;
+  return pay;
 }
 
-/** At work on a rota shift (or staying on after one): what earns unsocial hours pay. */
+/** All staff costs for the hour just gone, £. */
+export function hourlySalaries(state: SimState): number {
+  const p = hourlyPay(state);
+  return p.salaries + p.bank + p.agency;
+}
+
+/** At work on a shift (or staying on after one): what earns unsocial hours pay. */
 function onShift(state: SimState, s: Staff): boolean {
   return state.settings.rotas && s.role !== "consultant" && onSite(s) && s.onCall === null;
 }
@@ -71,11 +101,13 @@ export function hourlyUpkeep(state: SimState): number {
 export function updateFinance(state: SimState): void {
   if (state.tick % TICKS_PER_HOUR !== 0) return;
   const ledger = state.today.ledger;
-  const salaries = hourlySalaries(state);
+  const pay = hourlyPay(state);
   const upkeep = hourlyUpkeep(state);
-  ledger.salaries += salaries;
+  ledger.salaries += pay.salaries;
+  ledger.bank += pay.bank;
+  ledger.agency += pay.agency;
   ledger.upkeep += upkeep;
-  state.money -= salaries + upkeep;
+  state.money -= pay.salaries + pay.bank + pay.agency + upkeep;
 
   const minuteOfDay = (state.tick / TICKS_PER_MINUTE + START_MINUTE_OF_DAY) % MINUTES_PER_DAY;
   if (minuteOfDay === 0) closeDay(state);

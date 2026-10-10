@@ -15,7 +15,7 @@
  * For now every resuscitation ends with a transfer to intensive care. Deaths,
  * with the full UK process (§5.6), come in a later M3 step.
  */
-import { conditionById, roleNames, roomById, staffRoleById } from "@data/catalogue";
+import { conditionById, roleNames, roomById } from "@data/catalogue";
 import {
   ESCALATION_GRACE_MINS,
   MAX_INCIDENTS,
@@ -53,6 +53,7 @@ import {
 import { bedCover, monitorTooFar, nurseStations, obsInterval, watcherOf } from "./monitoring";
 import { stop } from "./movement";
 import { formatWait, inAE, leave, releaseSeat } from "./patients";
+import { roleTitle } from "./staffing";
 
 const mins = (ticks: number) => Math.round(ticks / TICKS_PER_MINUTE);
 
@@ -128,8 +129,7 @@ export function notice(
     if (["treat", "triage", "handover", "arrange_transfer"].includes(job.kind))
       job.dueTick = Math.min(job.dueTick, ESCALATED_DUE);
   }
-  const name =
-    who === "crew" ? "The ambulance crew" : `${staffRoleById.get(who.role)!.name} ${who.name}`;
+  const name = who === "crew" ? "The ambulance crew" : `${roleTitle(who)} ${who.name}`;
   const where =
     how === "station"
       ? " from the nurse station"

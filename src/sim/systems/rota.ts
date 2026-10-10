@@ -29,7 +29,8 @@ import {
   WEEKDAY_NAMES,
   type GameClock,
 } from "../time";
-import { operates, runsClinics } from "./staffing";
+import { operates, runsClinics, staffTitle } from "./staffing";
+import { callsInSick, endOfShift, fillGaps } from "./workforce";
 
 /** A week has 14 shifts: slot 2d is weekday d's day shift, 2d + 1 its night. */
 export const SLOTS = 14;
@@ -66,20 +67,31 @@ export function worksWeekdays(s: Staff): boolean {
 }
 
 /**
- * The rota group someone is rostered in ("nurse", "registrar:cardiology"),
- * or null if they're not on the shift rota.
+ * The group someone's shifts count towards ("porter", "nurse:band6",
+ * "registrar:cardiology"), whoever employs them: bank and agency staff fill
+ * gaps in a group.
  */
-export function rotaGroup(s: Staff): string | null {
-  if (s.contract !== "resident" || worksWeekdays(s)) return null;
+export function groupOf(s: Staff): string {
+  if (s.role === "nurse") return `nurse:band${s.band ?? 5}`;
   return s.role === "registrar" ? `registrar:${s.specialty}` : s.role;
 }
 
-/** "Nurses", "Cardiology registrars". */
+/**
+ * The rota group someone is rostered in, or null if they're not on the
+ * shift rota (doctors working weekdays, on-call consultants, bank and agency).
+ */
+export function rotaGroup(s: Staff): string | null {
+  if (s.contract !== "resident" || worksWeekdays(s)) return null;
+  return groupOf(s);
+}
+
+/** "Porters", "Band 6 nurses", "Cardiology registrars". */
 export function groupName(key: string): string {
-  const [role, specialty] = key.split(":");
+  const [role, rest] = key.split(":");
   const r = staffRoleById.get(role as Staff["role"]);
-  if (!specialty) return r?.short ?? key;
-  return `${specialtyById.get(specialty as never)?.name ?? specialty} ${(r?.short ?? role!).toLowerCase()}`;
+  if (!rest) return r?.short ?? key;
+  if (role === "nurse") return `Band ${rest.replace("band", "")} nurses`;
+  return `${specialtyById.get(rest as never)?.name ?? rest} ${(r?.short ?? role!).toLowerCase()}`;
 }
 
 /** The cover the player wants for a group, if they've set any. */
@@ -186,7 +198,7 @@ function rosterGroup(people: Staff[], cover: Cover | null): Map<number, number> 
 }
 
 /** A shift under way at a tick: its slot and when it started and ends. */
-interface ShiftTime {
+export interface ShiftTime {
   slot: number;
   start: number;
   end: number;
@@ -249,14 +261,29 @@ function comeIn(state: SimState, s: Staff, shiftEnd: number | null): void {
   }
   s.onCall = null;
   s.duty = "on";
+  if (shiftEnd !== null && s.shiftEnd !== shiftEnd)
+    s.shiftLoad = { mins: 0, busy: 0, short: false };
   s.shiftEnd = shiftEnd;
 }
 
 /** Sends someone home at the end of their shift: they finish what they're doing first. */
 function finish(s: Staff): void {
-  if (s.duty === "on") s.duty = onSite(s) ? "leaving" : "off";
+  if (s.duty === "on") {
+    s.duty = onSite(s) ? "leaving" : "off";
+    endOfShift(s);
+  }
   s.shiftEnd = null;
 }
+
+/** Off sick for a shift that's starting: they stay at home, and say so. */
+function sickFor(state: SimState, s: Staff, until: number, shift: string): boolean {
+  if (!callsInSick(state, s)) return false;
+  s.sickUntil = until;
+  emit(state, `${s.name}, ${staffTitle(s)}, has called in sick for ${shift}`, "info");
+  return true;
+}
+
+const isSick = (state: SimState, s: Staff) => s.sickUntil !== null && state.tick < s.sickUntil;
 
 /** Once a minute: shifts start and end, and consultants go on and off call. */
 export function updateShifts(state: SimState): void {
@@ -277,6 +304,8 @@ export function updateShifts(state: SimState): void {
     if (worksWeekdays(s)) weekdayDuty(state, s, c);
     else rosteredDuty(state, s, plan.get(s.id) ?? 0, now);
   }
+  const starting = now.find((t) => t.start === state.tick);
+  if (starting) fillGaps(state, starting);
 }
 
 function rosteredDuty(state: SimState, s: Staff, mask: number, now: ShiftTime[]): void {
@@ -295,15 +324,19 @@ function rosteredDuty(state: SimState, s: Staff, mask: number, now: ShiftTime[])
   }
   if (s.duty !== "on") {
     const starting = now.find((t) => t.start === state.tick && mask & bit(t.slot));
-    if (starting) comeIn(state, s, starting.end);
+    if (starting && !sickFor(state, s, starting.end, `the ${slotName(starting.slot)} shift`)) {
+      comeIn(state, s, starting.end);
+    }
   }
 }
 
 function weekdayDuty(state: SimState, s: Staff, c: GameClock): void {
   if (inWeekdayHours(c)) {
-    if (s.duty !== "on" || s.onCall || s.shiftEnd === null) {
-      comeIn(state, s, tickAt(c.day, 0) + SHIFTS.weekdayEnd * T);
-    }
+    const end = tickAt(c.day, 0) + SHIFTS.weekdayEnd * T;
+    if (isSick(state, s)) return;
+    const startOfDay = minuteOf(c) === SHIFTS.weekdayStart && state.tick > s.hiredTick;
+    if (startOfDay && !onSite(s) && sickFor(state, s, end, "today")) return;
+    if (s.duty !== "on" || s.onCall || s.shiftEnd === null) comeIn(state, s, end);
     return;
   }
   s.shiftEnd = null;
@@ -402,7 +435,9 @@ export function rotaSummary(state: SimState): RotaGroupSummary[] {
         cover,
         filled,
         gaps,
-        onNow: people.filter((p) => onSite(p) && p.duty === "on").length,
+        onNow: Object.values(state.staff).filter(
+          (p) => groupOf(p) === key && onSite(p) && p.duty === "on",
+        ).length,
       };
     })
     .sort((a, b) => a.key.localeCompare(b.key));
@@ -411,6 +446,9 @@ export function rotaSummary(state: SimState): RotaGroupSummary[] {
 /** Someone's working pattern, for the inspector: "Mon day, Wed night, Sat night". */
 export function describeRota(state: SimState, s: Staff): string {
   if (s.contract === "on_call") return "On call from home whenever they're needed";
+  if (s.contract === "bank" || s.contract === "agency") {
+    return `One ${s.contract} shift, filling a rota gap`;
+  }
   if (!state.settings.rotas) return "Works around the clock (rotas are off)";
   if (worksWeekdays(s)) {
     const oncall = s.role === "consultant" ? "; takes turns on call from home out of hours" : "";
@@ -423,7 +461,7 @@ export function describeRota(state: SimState, s: Staff): string {
 
 /** When someone off duty is next at work: "Tue night (19:30)", or null if never. */
 export function nextShift(state: SimState, s: Staff): string | null {
-  if (!state.settings.rotas || s.contract === "on_call") return null;
+  if (!state.settings.rotas || s.contract !== "resident") return null;
   const step = 30 * T;
   for (let t = state.tick + step; t < state.tick + 8 * MINUTES_PER_DAY * T; t += step) {
     const c = clockFromTick(t);
@@ -441,21 +479,4 @@ export function nextShift(state: SimState, s: Staff): string | null {
     }
   }
   return null;
-}
-
-/** Alerts a shift that starts short of its cover. */
-export function shortShifts(state: SimState): void {
-  if (!state.settings.rotas || state.tick % T !== 0) return;
-  const starting = shiftsAt(state.tick).find((t) => t.start === state.tick);
-  if (!starting) return;
-  const short: string[] = [];
-  for (const g of rotaSummary(state)) {
-    if (!g.cover) continue;
-    const want = isNight(starting.slot) ? g.cover.night : g.cover.day;
-    const have = g.filled[starting.slot]!;
-    if (have < want) short.push(`${g.name} ${have} of ${want}`);
-  }
-  if (short.length > 0) {
-    emit(state, `${slotName(starting.slot)} shift starts short: ${short.join(", ")}`, "warn");
-  }
 }

@@ -17,7 +17,7 @@
  * happen in a side room. Unexpected deaths follow a failed resuscitation.
  * Staff involved lose morale; resuscitation teams have a short hot debrief.
  */
-import { conditionById, roleNames, roomById, staffRoleById } from "@data/catalogue";
+import { conditionById, roleNames, roomById } from "@data/catalogue";
 import {
   BODIES_PER_FRIDGE,
   BREAK_NEWS_MINS,
@@ -32,8 +32,6 @@ import {
   MORALE_HIT_EXPECTED,
   MORALE_HIT_TEAM,
   MORALE_HIT_UNEXPECTED,
-  MORALE_RECOVERY_PER_HOUR,
-  MORALE_START,
   RELEASE_HOURS,
   VERIFY_MINS,
 } from "@data/deaths";
@@ -63,6 +61,8 @@ import { earn } from "./finance";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo, stop } from "./movement";
 import { recordDeparture, releaseSeat } from "./patients";
+import { workRate } from "./workforce";
+import { roleTitle } from "./staffing";
 
 const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
 /** Rooms where the public wait: a covered trolley shouldn't pass through them. */
@@ -394,7 +394,8 @@ export function runDeathJob(state: SimState, job: Job, staff: Staff, p: Patient 
       reserve(state, place.id, "staff", staff.id);
     }
   }
-  if (++job.progress < job.durationTicks) return;
+  job.progress += workRate(state, staff);
+  if (job.progress < job.durationTicks) return;
   if (place) release(state, place.id, "staff", staff.id);
   removeJob(state, job);
   if (!p?.death) return;
@@ -554,12 +555,6 @@ export function updateDeaths(state: SimState): void {
       }
     }
   }
-  if (state.tick % TICKS_PER_HOUR === 0) {
-    for (const s of Object.values(state.staff)) {
-      if (s.morale < MORALE_START)
-        s.morale = Math.min(MORALE_START, s.morale + MORALE_RECOVERY_PER_HOUR);
-    }
-  }
 }
 
 /** No mortuary space: the deceased stays in the bay, which stays closed. Recorded once. */
@@ -680,7 +675,7 @@ export function deathStepStatus(state: SimState, p: Patient, step: DeathStep): D
     const job = jobs.find((j) => j.kind === kind && j.state !== "open");
     const s = job?.staffId == null ? undefined : state.staff[job.staffId];
     if (!job || !s) return null;
-    const who = `${staffRoleById.get(s.role)!.name} ${s.name}`;
+    const who = `${roleTitle(s)} ${s.name}`;
     return status("underway", job.state === "working" ? doing(who) : `${who} is on the way`);
   };
   /** Nobody has it yet: is there anyone who could? */

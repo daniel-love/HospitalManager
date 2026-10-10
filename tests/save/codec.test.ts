@@ -178,7 +178,7 @@ describe("M3 state in saves", () => {
     const state = staffedMajorsAE(4);
     state.settings.patientVolume = 2;
     let collapsed = false;
-    for (let i = 0; i < TICKS_PER_DAY && !collapsed; i++) {
+    for (let i = 0; i < 3 * TICKS_PER_DAY && !collapsed; i++) {
       tick(state);
       collapsed = Object.values(state.patients).some((p) => p.stage === "collapsed");
     }

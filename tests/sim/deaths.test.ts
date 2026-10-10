@@ -2,7 +2,7 @@
  * The process after a death (ROADMAP M3 step 4, GAME_DESIGN §5.6).
  */
 import { describe, expect, it } from "vitest";
-import { MORALE_START } from "@data/deaths";
+import { MORALE } from "@data/staff";
 import type { Patient } from "@sim/agents";
 import { holder, reserve, restPoint, siteEntrance } from "@sim/places";
 import { tick } from "@sim/sim";
@@ -144,7 +144,7 @@ describe("an unexpected death", () => {
     const team = Object.values(state.staff).filter((s) => s.role === "nurse");
     debrief(state, team, true);
     for (const s of team) {
-      expect(s.morale).toBeLessThan(MORALE_START);
+      expect(s.morale).toBeLessThan(MORALE.start);
       expect(state.jobs[s.jobId!]?.kind).toBe("debrief");
     }
     runUntil(

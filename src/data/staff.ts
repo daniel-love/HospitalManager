@@ -64,6 +64,113 @@ export const UNSOCIAL = {
   hoursPerYear: 37.5 * 52.14,
 };
 
+/**
+ * Nurse bands (Agenda for Change, GAME_DESIGN §6.1). Band 5 staff nurses do
+ * most of the nursing; Band 6 senior staff nurses are more experienced; a
+ * Band 7 sister or charge nurse on a shift is its nurse in charge, who
+ * keeps the department moving (NURSE_IN_CHARGE). Pay with on-costs, like
+ * the roles' (2025/26 points: £31.0k, £38.7k, £47.8k).
+ */
+export const NURSE_BANDS = [
+  { band: 5, title: "Staff Nurse", annualCost: 40_500, skill: [35, 65] },
+  { band: 6, title: "Senior Staff Nurse", annualCost: 49_500, skill: [55, 80] },
+  { band: 7, title: "Charge Nurse", annualCost: 61_000, skill: [70, 90] },
+] as const;
+export type NurseBand = (typeof NURSE_BANDS)[number]["band"];
+
+/**
+ * While a Band 7 nurse is on duty, the nursing team works this much faster:
+ * they allocate patients, chase delays and keep the board moving. One is
+ * enough; a second doesn't add more.
+ */
+export const NURSE_IN_CHARGE = { speedUp: 0.1 };
+
+/**
+ * Skill (0–100) sets how quickly someone works: from SKILL.slowest at 0 to
+ * SKILL.fastest at 100. New starters get a random skill in their range, and
+ * it grows with hours worked, up to SKILL.max.
+ */
+export const SKILL = {
+  range: [40, 80] as const,
+  slowest: 0.85,
+  fastest: 1.15,
+  growthPerHour: 0.02,
+  max: 95,
+};
+
+/**
+ * Fatigue (0–100) builds on shift, faster while busy, and falls while off
+ * duty. Above `slowFrom` people work more slowly (down to `slowest` at
+ * 100) and their morale suffers.
+ */
+export const FATIGUE = {
+  perHourOnShift: 3,
+  perHourBusy: 2,
+  recoveryPerHour: 6,
+  slowFrom: 50,
+  slowest: 0.8,
+  /** Morale lost per hour while fatigue is above this. */
+  moraleFrom: 75,
+  moralePerHour: 0.5,
+};
+
+/**
+ * Morale (0–100). It drifts back towards a baseline, and each shift's
+ * workload moves it: a shift where someone was busy most of the time, or
+ * their group was short, wears it down. Low morale brings sickness and
+ * resignations.
+ */
+export const MORALE = {
+  start: 75,
+  recoveryPerHour: 0.5,
+  /** At the end of a shift busy for more than this share of it… */
+  busyShare: 0.8,
+  busyHit: 3,
+  /** …or one where their group started short of its cover. */
+  shortHit: 2,
+  /** A shift busy less than this share of it lifts morale a little. */
+  quietShare: 0.4,
+  quietLift: 1,
+  /** Below this, people work a little more slowly. */
+  lowFrom: 40,
+  lowSlowest: 0.95,
+};
+
+/**
+ * Sickness absence: the chance someone rostered calls in sick for a shift
+ * (the NHS rate is about 5%), rising as morale falls below `fromMorale`
+ * and when they're tired.
+ */
+export const SICKNESS = {
+  base: 0.045,
+  fromMorale: 50,
+  /** Multiplies the chance at morale 0 (scaled linearly from fromMorale). */
+  lowMoraleFactor: 3,
+  tiredFrom: 60,
+  tiredFactor: 1.5,
+};
+
+/**
+ * Resignations: checked once a day. Below `fromMorale` someone may hand in
+ * their notice (`dailyChance` at 0 morale, scaled linearly), then works it
+ * out before leaving.
+ */
+export const RESIGNATION = {
+  fromMorale: 30,
+  dailyChance: 0.12,
+  noticeDays: 28,
+};
+
+/**
+ * Filling rota gaps (GAME_DESIGN §6.2): at the start of each shift, a gap
+ * against the cover can go to the staff bank (the hospital's own pool,
+ * paid by the hour at the normal rate; not always filled) and then to an
+ * agency (always found, at about twice the cost, and less familiar with
+ * the hospital, so a little slower).
+ */
+export const BANK = { fillChance: 0.65, payFactor: 1 };
+export const AGENCY = { payFactor: 2, skill: [30, 60] as const, unfamiliar: 0.9 };
+
 export const staffRoles: StaffRoleInput[] = [
   {
     id: "consultant",
@@ -96,12 +203,12 @@ export const staffRoles: StaffRoleInput[] = [
   },
   {
     id: "nurse",
-    name: "Staff Nurse",
+    name: "Nurse",
     short: "Nurses",
     group: "nursing",
     annualCost: 40_500,
     description:
-      "Band 5. Triages every patient (Manchester Triage), does nursing steps such as wound closure and ECGs, and takes observations. Between jobs, waits at a nurse station and watches the beds in sight.",
+      "Triages every patient (Manchester Triage), does nursing steps such as wound closure and ECGs, and takes observations. Between jobs, waits at a nurse station and watches the beds in sight. Hired at Band 5 (staff nurse), 6 (senior staff nurse) or 7 (charge nurse, the nurse in charge of a shift).",
   },
   {
     id: "nurse_practitioner",

@@ -20,7 +20,7 @@ import { applyCommand, type Command, type CommandResult } from "@sim/commands";
 import { addToPlan, buildPreview, commitPlan, planDiff, type PlanPreview } from "@sim/plan";
 import { roomsPatientsCantReach } from "@sim/places";
 import { tick } from "@sim/sim";
-import { createSimState, type SimState } from "@sim/state";
+import { createSimState, type GapFill, type SimState } from "@sim/state";
 import { siteView } from "@sim/world/site";
 import { coverageView, stationsSeeing, bedCover } from "@sim/systems/monitoring";
 import { setCover } from "@sim/systems/rota";
@@ -239,6 +239,12 @@ export class Game {
   /** Sets a rota group's cover levels; the rota changes from the next shift. */
   setCover(group: string, day: number, night: number): void {
     setCover(this.state, group, { day, night });
+    this.refreshPanels();
+  }
+
+  /** Sets how rota gaps are filled at the start of each shift (a hospital policy). */
+  setGapFill(fill: GapFill): void {
+    this.state.policies.gapFill = fill;
     this.refreshPanels();
   }
 

@@ -843,6 +843,23 @@ body.planning #game::after {
   min-width: 16px;
   text-align: center;
 }
+.meter-note {
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
+.gap-fill {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--panel-border);
+}
+.gap-fill .setting-choice {
+  padding: 1px 0;
+  font-size: 13px;
+}
 .rota-gaps {
   font-size: 12px;
 }

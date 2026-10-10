@@ -7,11 +7,10 @@
  * consultants stay at home until they're needed (see updateOnCall).
  */
 import { specialtyById, staffRoleById } from "@data/catalogue";
-import { MORALE_START } from "@data/deaths";
 import { MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS, MAX_THEATRE_SESSIONS } from "@data/outpatients";
 import { FIRST_NAMES, SURNAMES } from "@data/names";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
-import { ON_CALL } from "@data/staff";
+import { MORALE, NURSE_BANDS, ON_CALL, type NurseBand } from "@data/staff";
 import { onDuty, onSite, type Job, type Staff } from "../agents";
 import { emit } from "../events";
 import {
@@ -34,6 +33,7 @@ import { removeJob, ticksFor, unassignJob } from "./jobBoard";
 import { nurseStations, stationSpot } from "./monitoring";
 import { headTo } from "./movement";
 import { nextShift, startOnRota, updateShifts } from "./rota";
+import { leave, startingSkill } from "./workforce";
 
 export type StaffCommand =
   | {
@@ -43,6 +43,8 @@ export type StaffCommand =
       specialty?: SpecialtyId;
       /** Consultants: on call from home rather than resident. */
       onCall?: boolean;
+      /** Nurses: their band (5 if not given). */
+      band?: NurseBand;
     }
   | { type: "dismiss_staff"; id: number }
   /** Gives a resident consultant the Medical Examiner duty, or takes it away. */
@@ -71,33 +73,16 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
     if (cmd.onCall && cmd.role !== "consultant") {
       return { ok: false, error: "Only consultants can be on call" };
     }
-    const at = siteEntrance(state) ?? fallbackEntrance(state);
-    const staff: Staff = {
-      id: state.nextAgentId++,
-      name: `${pick(state.rng, FIRST_NAMES)} ${pick(state.rng, SURNAMES)}`,
+    if (cmd.band !== undefined && cmd.role !== "nurse") {
+      return { ok: false, error: "Only nurses have a band" };
+    }
+    const staff = createStaff(state, {
       role: cmd.role,
       specialty: role.specialist ? cmd.specialty! : null,
+      band: cmd.role === "nurse" ? (cmd.band ?? 5) : null,
       contract: cmd.onCall ? "on_call" : "resident",
-      onCall: cmd.onCall ? { state: "home", at: state.tick } : null,
-      duty: "on",
-      shiftEnd: null,
-      meDuty: false,
-      clinicSessions: 0,
-      theatreSessions: 0,
-      x: at.x,
-      y: at.y,
-      prevX: at.x,
-      prevY: at.y,
-      path: [],
-      dest: null,
-      pathVersion: state.layoutVersion,
-      jobId: null,
-      desk: null,
-      hiredTick: state.tick,
-      lastActiveTick: state.tick,
-      morale: MORALE_START,
-    };
-    state.staff[staff.id] = staff;
+    });
+    const at = { x: staff.x, y: staff.y };
     startOnRota(state, staff);
     const first = onSite(staff) || staff.onCall ? null : nextShift(state, staff);
     emit(
@@ -140,6 +125,61 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
     staff.theatreSessions = clamp(cmd.sessions, Math.min(MAX_THEATRE_SESSIONS, room));
     return { ok: true, staff };
   }
+  removeStaff(state, staff);
+  return { ok: true, staff };
+}
+
+/**
+ * A new member of staff, at the site entrance (on the map only once they're
+ * on duty). Hiring, and bank and agency workers filling a rota gap.
+ */
+export function createStaff(
+  state: SimState,
+  opts: {
+    role: StaffRoleId;
+    specialty: SpecialtyId | null;
+    band: NurseBand | null;
+    contract: Staff["contract"];
+  },
+): Staff {
+  const at = siteEntrance(state) ?? fallbackEntrance(state);
+  const staff: Staff = {
+    id: state.nextAgentId++,
+    name: `${pick(state.rng, FIRST_NAMES)} ${pick(state.rng, SURNAMES)}`,
+    role: opts.role,
+    specialty: opts.specialty,
+    contract: opts.contract,
+    band: opts.band,
+    skill: startingSkill(state, opts.role, opts.band, opts.contract),
+    fatigue: 0,
+    sickUntil: null,
+    leavesAt: null,
+    shiftLoad: null,
+    onCall: opts.contract === "on_call" ? { state: "home", at: state.tick } : null,
+    duty: "on",
+    shiftEnd: null,
+    meDuty: false,
+    clinicSessions: 0,
+    theatreSessions: 0,
+    x: at.x,
+    y: at.y,
+    prevX: at.x,
+    prevY: at.y,
+    path: [],
+    dest: null,
+    pathVersion: state.layoutVersion,
+    jobId: null,
+    desk: null,
+    hiredTick: state.tick,
+    lastActiveTick: state.tick,
+    morale: MORALE.start,
+  };
+  state.staff[staff.id] = staff;
+  return staff;
+}
+
+/** Someone leaves at once: any job they were doing goes back on the board. */
+export function removeStaff(state: SimState, staff: Staff): void {
   const job = staff.jobId === null ? undefined : state.jobs[staff.jobId];
   if (job) {
     // Back on the board for someone else, keeping its place and patient.
@@ -148,7 +188,6 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
   }
   if (staff.desk !== null) release(state, staff.desk, "staff", staff.id);
   delete state.staff[staff.id];
-  return { ok: true, staff };
 }
 
 const clamp = (n: number, max: number) => Math.max(0, Math.min(max, Math.round(n)));
@@ -158,7 +197,8 @@ const clamp = (n: number, max: number) => Math.max(0, Math.min(max, Math.round(n
  * of a surgical specialty, or of Anaesthetics.
  */
 export function operates(s: Staff): boolean {
-  if ((s.role !== "consultant" && s.role !== "registrar") || s.contract === "on_call") return false;
+  if ((s.role !== "consultant" && s.role !== "registrar") || s.contract !== "resident")
+    return false;
   if (!s.specialty) return false;
   return s.specialty === "anaesthetics" || !!specialtyById.get(s.specialty)?.surgery;
 }
@@ -173,12 +213,26 @@ export function runsClinics(s: Staff): boolean {
   );
 }
 
-/** "Cardiology Consultant (on call)", "Staff Nurse". */
+/** Their job title: a nurse's band title ("Senior Staff Nurse"), otherwise their role's. */
+export function roleTitle(s: Staff): string {
+  const band = s.band === null ? undefined : NURSE_BANDS.find((b) => b.band === s.band);
+  return band ? band.title : staffRoleById.get(s.role)!.name;
+}
+
+/** "Cardiology Consultant (on call)", "Senior Staff Nurse (Band 6)", "Porter (agency)". */
 export function staffTitle(s: Staff): string {
-  const role = staffRoleById.get(s.role)!.name;
+  const band = s.band === null ? undefined : NURSE_BANDS.find((b) => b.band === s.band);
+  const role = band ? `${band.title} (Band ${band.band})` : staffRoleById.get(s.role)!.name;
   const specialty = s.specialty ? `${specialtyById.get(s.specialty)!.name} ` : "";
-  const onCall = s.contract === "on_call" ? " (on call)" : "";
-  return `${specialty}${role}${onCall}${s.meDuty ? ", Medical Examiner" : ""}`;
+  const contract =
+    s.contract === "on_call"
+      ? " (on call)"
+      : s.contract === "bank"
+        ? " (bank)"
+        : s.contract === "agency"
+          ? " (agency)"
+          : "";
+  return `${specialty}${role}${contract}${s.meDuty ? ", Medical Examiner" : ""}`;
 }
 
 export function updateStaff(state: SimState): void {
@@ -288,6 +342,9 @@ function goHome(state: SimState, s: Staff): void {
     s.duty = "off";
     s.path = [];
     s.dest = null;
+    // A bank or agency shift is over, or their notice is up.
+    if (s.contract === "bank" || s.contract === "agency") removeStaff(state, s);
+    else if (s.leavesAt !== null && state.tick >= s.leavesAt) leave(state, s);
   }
 }
 

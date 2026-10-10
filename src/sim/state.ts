@@ -30,7 +30,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 27;
+export const SIM_STATE_VERSION = 28;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -142,6 +142,8 @@ export interface SimState {
    * "registrar:cardiology"). Groups with none set share shifts out evenly.
    */
   cover: Record<string, Cover>;
+  /** Hospital policies (GAME_DESIGN §8.4). */
+  policies: Policies;
 
   /** Money and patient flow so far today, and reports for past days (newest last). */
   today: { ledger: Ledger; stats: FlowStats };
@@ -172,6 +174,16 @@ export interface SimSettings {
    * around the clock: saves from before rotas, and test fixtures.
    */
   rotas: boolean;
+}
+
+/**
+ * How rota gaps are filled at the start of a shift: not at all, from the
+ * staff bank, or from the bank and then an agency (systems/workforce.ts).
+ */
+export type GapFill = "none" | "bank" | "bank_agency";
+
+export interface Policies {
+  gapFill: GapFill;
 }
 
 /** People wanted on each day shift and each night shift. */
@@ -228,6 +240,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     roomSpecialties: {},
     emergencyTheatres: {},
     cover: {},
+    policies: { gapFill: "bank" },
     today: { ledger: emptyLedger(), stats: emptyStats() },
     history: [],
     settings: { catchment: DEFAULT_CATCHMENT, patientVolume: 1, rotas: opts.rotas ?? false },

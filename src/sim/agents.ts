@@ -7,6 +7,7 @@
  * (3, 4) stands in the middle of tile (3, 4). Agents never block each other.
  */
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
+import type { NurseBand } from "@data/staff";
 
 export interface Point {
   x: number;
@@ -260,9 +261,22 @@ export interface Staff extends AgentBase {
   specialty: SpecialtyId | null;
   /**
    * Resident staff work in the hospital (on shifts, once rotas are on);
-   * on-call consultants are only ever on call from home.
+   * on-call consultants are only ever on call from home. Bank and agency
+   * staff come for one shift to fill a rota gap, and are gone after it.
    */
-  contract: "resident" | "on_call";
+  contract: "resident" | "on_call" | "bank" | "agency";
+  /** Nurses: their Agenda for Change band (5, 6 or 7). Null for everyone else. */
+  band: NurseBand | null;
+  /** 0–100: how quickly they work (data/staff.ts SKILL). Grows with hours worked. */
+  skill: number;
+  /** 0–100: builds on shift, falls off duty. High fatigue slows them and lowers morale. */
+  fatigue: number;
+  /** Off sick until this tick, or null. */
+  sickUntil: number | null;
+  /** Has handed in their notice: leaves at this tick. Null if not. */
+  leavesAt: number | null;
+  /** The shift under way: minutes worked and busy, and whether their group started it short. */
+  shiftLoad: { mins: number; busy: number; short: boolean } | null;
   /**
    * While someone is on call from home: on-call consultants always, and
    * resident consultants out of hours on their turn (systems/rota.ts).
@@ -294,7 +308,11 @@ export interface Staff extends AgentBase {
   hiredTick: number;
   /** The last tick they had a job (or when hired): how long a free member of staff has been idle. */
   lastActiveTick: number;
-  /** 0–100. Falls after deaths they're involved in; recovers slowly. (Effects from M5.) */
+  /**
+   * 0–100. Falls after deaths they're involved in and after hard shifts,
+   * and drifts back towards a baseline. Low morale slows people a little and
+   * brings sickness and resignations (systems/workforce.ts).
+   */
   morale: number;
 }
 
@@ -463,6 +481,10 @@ export interface Ledger {
   /** NHS tariff for outpatient appointments. */
   outpatients: number;
   salaries: number;
+  /** Bank staff filling rota gaps, by the hour. */
+  bank: number;
+  /** Agency staff filling rota gaps, by the hour. */
+  agency: number;
   upkeep: number;
   /** Ambulances taking patients to other hospitals. */
   transfers: number;
@@ -651,7 +673,7 @@ export interface DayReport {
 }
 
 export function emptyLedger(): Ledger {
-  return { tariff: 0, outpatients: 0, salaries: 0, upkeep: 0, transfers: 0 };
+  return { tariff: 0, outpatients: 0, salaries: 0, bank: 0, agency: 0, upkeep: 0, transfers: 0 };
 }
 
 export function emptyStats(): FlowStats {
@@ -709,7 +731,7 @@ export function emptyStats(): FlowStats {
 }
 
 export function net(l: Ledger): number {
-  return l.tariff + l.outpatients - l.salaries - l.upkeep - l.transfers;
+  return l.tariff + l.outpatients - l.salaries - l.bank - l.agency - l.upkeep - l.transfers;
 }
 
 /**

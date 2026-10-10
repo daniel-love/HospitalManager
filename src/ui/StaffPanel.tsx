@@ -6,18 +6,12 @@
  */
 import { useState } from "preact/hooks";
 import type { SpecialtyId } from "@data/schema";
-import { ON_CALL } from "@data/staff";
+import { ON_CALL, type NurseBand } from "@data/staff";
+import type { GapFill } from "@sim/state";
 import type { Game } from "@game/game";
 import { formatMoney } from "@game/tools";
 import { ListSection } from "./ListSection";
-import {
-  peopleDialog,
-  roster,
-  sidePanel,
-  type RosterData,
-  type RosterRole,
-  type RotaRow,
-} from "./store";
+import { peopleDialog, roster, sidePanel, type RosterData, type RosterRole } from "./store";
 
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
@@ -38,12 +32,14 @@ export function StaffPanel({ game }: { game: Game }) {
             ? ", plus unsocial hours pay for nights and weekends. Each person works three 12½-hour shifts a week, so a post filled around the clock takes about five people."
             : ". Rotas are off for this hospital (Settings), so everyone works around the clock."}
         </p>
-        {data.rotas && <RotaSection game={game} rows={data.rota} />}
+        {data.rotas && <RotaSection game={game} data={data} />}
         {data.groups.map((g) => (
           <ListSection key={g.name} title={g.name}>
             {g.roles.map((r) =>
               r.specialist ? (
                 <SpecialistRow key={r.id} game={game} role={r} specialties={data.specialties} />
+              ) : r.bands ? (
+                <NurseRow key={r.id} game={game} role={r} rotas={data.rotas} />
               ) : (
                 <div key={r.id} class="hire-row">
                   <div class="hire-info">
@@ -87,7 +83,8 @@ export function StaffPanel({ game }: { game: Game }) {
  * Cover levels: how many of each group the rota should put on every day
  * and night shift, and how well the people hired meet it.
  */
-function RotaSection({ game, rows }: { game: Game; rows: RotaRow[] }) {
+function RotaSection({ game, data }: { game: Game; data: RosterData }) {
+  const rows = data.rota;
   return (
     <ListSection title="Rota">
       <p class="hire-desc">
@@ -98,6 +95,28 @@ function RotaSection({ game, rows }: { game: Game; rows: RotaRow[] }) {
         (without the on call).
       </p>
       {rows.length === 0 && <p class="dim">Hire staff to see their rota here.</p>}
+      <div class="gap-fill">
+        <strong>Filling gaps</strong>
+        <span class="hire-desc">
+          At the start of each shift, places short of the cover (not rostered, or off sick) can be
+          offered to the staff bank, your own pool paid by the hour, who fill about two in three;
+          then to an agency, who always find someone, at about twice the cost and a little slower as
+          they don't know the hospital.
+          {data.temps.bank + data.temps.agency > 0 &&
+            ` At work now: ${data.temps.bank} bank, ${data.temps.agency} agency.`}
+        </span>
+        {GAP_FILLS.map((o) => (
+          <label key={o.id} class="setting-choice">
+            <input
+              type="radio"
+              name="gap-fill"
+              checked={data.gapFill === o.id}
+              onChange={() => game.setGapFill(o.id)}
+            />
+            <span>{o.label}</span>
+          </label>
+        ))}
+      </div>
       {rows.map((r) => (
         <div key={r.key} class="rota-row">
           <div class="hire-info">
@@ -135,6 +154,61 @@ function RotaSection({ game, rows }: { game: Game; rows: RotaRow[] }) {
     </ListSection>
   );
 }
+
+const GAP_FILLS: { id: GapFill; label: string }[] = [
+  { id: "none", label: "Leave them unfilled" },
+  { id: "bank", label: "Bank staff only" },
+  { id: "bank_agency", label: "Bank, then agency" },
+];
+
+/** Nurses: hired at a band, each with its own pay. */
+function NurseRow({ game, role, rotas }: { game: Game; role: RosterRole; rotas: boolean }) {
+  const [band, setBand] = useState<NurseBand>(5);
+  const chosen = role.bands!.find((b) => b.band === band)!;
+  const counts = role.bands!.filter((b) => b.count > 0).map((b) => `Band ${b.band} ${b.count}`);
+  return (
+    <div class="hire-row specialist">
+      <div class="hire-info">
+        <strong>Nurse</strong>
+        <span class="dim">
+          {formatMoney(chosen.annualCost)}/yr · {role.count} on staff
+          {counts.length > 0 && ` (${counts.join(", ")})`}
+          {rotas && role.count > 0 && `, ${role.atWork} at work now`}
+        </span>
+        <span class="hire-desc">{role.description}</span>
+        <label class="hire-specialty">
+          Band{" "}
+          <select
+            value={band}
+            onChange={(e) =>
+              setBand(Number((e.currentTarget as HTMLSelectElement).value) as NurseBand)
+            }
+          >
+            {role.bands!.map((b) => (
+              <option key={b.band} value={b.band}>
+                Band {b.band}: {b.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span class="hire-desc">{BAND_NOTES[band]}</span>
+      </div>
+      <button
+        class="small-button"
+        onMouseDown={noFocus}
+        onClick={() => game.applyStaff({ type: "hire_staff", role: "nurse", band })}
+      >
+        Hire
+      </button>
+    </div>
+  );
+}
+
+const BAND_NOTES: Record<NurseBand, string> = {
+  5: "A registered nurse: most of the nursing. New starters vary in experience.",
+  6: "More experienced, so quicker at everything; often leads a team.",
+  7: "Sister or charge nurse. With a Band 7 on duty, the shift has a nurse in charge and the whole nursing team works about 10% faster.",
+};
 
 /** "2", or "1–2" when shifts differ. */
 function describeSpread(min: number, avg: number): string {

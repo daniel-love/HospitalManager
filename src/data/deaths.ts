@@ -59,10 +59,8 @@ export const RELEASE_HOURS: [number, number] = [12, 36];
 export const CORONER_REFERRAL_CHANCE = 0.6;
 export const CORONER_DAYS: [number, number] = [2, 5];
 
-/** Morale lost by each member of staff involved (0–100 scale), and the baseline it recovers to. */
-export const MORALE_START = 75;
+/** Morale lost by each member of staff involved (0–100 scale; see data/staff.ts MORALE). */
 export const MORALE_HIT_UNEXPECTED = 12;
 export const MORALE_HIT_EXPECTED = 4;
 /** Every staff nurse feels an unexpected death in the department a little. */
 export const MORALE_HIT_TEAM = 2;
-export const MORALE_RECOVERY_PER_HOUR = 0.5;

@@ -10,7 +10,8 @@ import type { Speed } from "@game/loop";
 import type { Tool } from "@game/tools";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import type { DayReport, FlowStats, Ledger } from "@sim/agents";
-import type { Rotation, RoomCheck } from "@sim/state";
+import type { GapFill, Rotation, RoomCheck } from "@sim/state";
+import type { NurseBand } from "@data/staff";
 import type { HelpContent } from "./help";
 
 export interface HudState {
@@ -112,6 +113,11 @@ export type AgentInfo =
       rota: string;
       /** 0–100. */
       morale: number;
+      skill: number;
+      /** 0–100; null when rotas are off (nobody tires). */
+      fatigue: number | null;
+      /** Off sick, or working their notice: a line to show, if so. */
+      notice: string | null;
       /** Resident consultants: whether they have the Medical Examiner duty. */
       meDuty?: boolean;
       /** Resident consultants and registrars of a specialty with clinics: their clinics. */
@@ -216,6 +222,10 @@ export interface RosterData {
   payroll: number;
   /** Whether staff work shifts (a setting; off in saves from before rotas). */
   rotas: boolean;
+  /** How rota gaps are filled (a hospital policy). */
+  gapFill: GapFill;
+  /** Bank and agency staff at work now. */
+  temps: { bank: number; agency: number };
   /** Each rota group's cover and how the rota meets it. */
   rota: RotaRow[];
 }
@@ -251,6 +261,8 @@ export interface RosterRole {
   specialist: boolean;
   /** For specialists: how many of each specialty are on staff. */
   bySpecialty: Record<string, number> | null;
+  /** Nurses: each band's title, pay and how many are on staff. */
+  bands: { band: NurseBand; title: string; annualCost: number; count: number }[] | null;
 }
 
 export const roster = signal<RosterData | null>(null);

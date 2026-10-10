@@ -9,7 +9,6 @@ import {
   roleNames,
   roomById,
   specialtyById,
-  staffRoleById,
   staffRoleSections,
 } from "@data/catalogue";
 import { specialtyIds } from "@data/schema";
@@ -46,12 +45,12 @@ import { inCare } from "@sim/systems/curtains";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { annualCost } from "@sim/systems/finance";
 import { formatWait, inAE } from "@sim/systems/patients";
-import { canDo, operates, runsClinics, staffTitle } from "@sim/systems/staffing";
+import { canDo, operates, roleTitle, runsClinics, staffTitle } from "@sim/systems/staffing";
 import { describeJobPlan, jobPlan } from "@sim/systems/clinics";
 import { MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS, MAX_THEATRE_SESSIONS } from "@data/outpatients";
 import { analysers, pendingResults } from "@sim/systems/diagnostics";
 import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
-import { SHIFTS } from "@data/staff";
+import { NURSE_BANDS, SHIFTS } from "@data/staff";
 import { inClinic, liveSessions } from "@sim/systems/outpatients";
 import { describeRota, nextShift, rotaSummary } from "@sim/systems/rota";
 import { emergencyOpOf, inTheatre } from "@sim/systems/theatres";
@@ -155,7 +154,7 @@ export function waitReason(state: SimState, p: Patient): string | null {
   if (!job || job.state === "working") return null;
   if (job.state === "assigned") {
     const s = job.staffId === null ? undefined : state.staff[job.staffId];
-    return s ? `${staffRoleById.get(s.role)!.name} ${s.name} is on the way` : null;
+    return s ? `${roleTitle(s)} ${s.name} is on the way` : null;
   }
   if (p.toilet) return "At the toilet, so the next patient is called instead";
   const results = resultsReason(state, p, job);
@@ -631,6 +630,9 @@ export function staffState(state: SimState, s: Staff): StaffState {
   if (s.onCall?.state === "leaving" && s.jobId === null) {
     return { status: "on_the_way", activity: "Going home: nothing more for them", ...none };
   }
+  if (s.duty === "off" && !s.onCall && s.sickUntil !== null && state.tick < s.sickUntil) {
+    return { status: "off_site", activity: "Off sick", ...none };
+  }
   if (s.duty === "off" && !s.onCall) {
     const next = nextShift(state, s);
     return {
@@ -873,6 +875,16 @@ export function whereIs(state: SimState, a: Point): string {
   }
 }
 
+/** Off sick or working their notice, for the inspector. */
+function staffNotice(state: SimState, s: Staff): string | null {
+  if (s.leavesAt !== null) {
+    const days = Math.max(1, Math.ceil((s.leavesAt - state.tick) / TICKS_PER_DAY));
+    return `Has handed in their notice: leaves in ${days} ${days === 1 ? "day" : "days"}`;
+  }
+  if (s.sickUntil !== null && state.tick < s.sickUntil) return "Off sick";
+  return null;
+}
+
 export function describeStaff(state: SimState, s: Staff): AgentInfo {
   return {
     kind: "staff",
@@ -883,6 +895,9 @@ export function describeStaff(state: SimState, s: Staff): AgentInfo {
     annualCost: annualCost(s),
     rota: describeRota(state, s),
     morale: Math.round(s.morale),
+    skill: Math.round(s.skill),
+    fatigue: state.settings.rotas ? Math.round(s.fatigue) : null,
+    notice: staffNotice(state, s),
     ...(s.role === "consultant" && s.contract === "resident" ? { meDuty: s.meDuty } : {}),
     ...(runsClinics(s) ? { clinics: clinicPlan(state, s) } : {}),
     ...(operates(s) ? { theatre: theatrePlan(state, s) } : {}),
@@ -933,6 +948,15 @@ export function describeRoster(state: SimState): RosterData {
         annualCost: r.annualCost,
         count: staff.filter((s) => s.role === r.id).length,
         atWork: staff.filter((s) => s.role === r.id && onSite(s)).length,
+        bands:
+          r.id === "nurse"
+            ? NURSE_BANDS.map((b) => ({
+                band: b.band,
+                title: b.title,
+                annualCost: b.annualCost,
+                count: staff.filter((s) => s.role === "nurse" && s.band === b.band).length,
+              }))
+            : null,
         specialist: r.specialist,
         bySpecialty: r.specialist
           ? Object.fromEntries(
@@ -956,6 +980,11 @@ export function describeRoster(state: SimState): RosterData {
     })),
     payroll: staff.reduce((sum, s) => sum + annualCost(s), 0),
     rotas: state.settings.rotas,
+    gapFill: state.policies.gapFill,
+    temps: {
+      bank: staff.filter((s) => s.contract === "bank").length,
+      agency: staff.filter((s) => s.contract === "agency").length,
+    },
     rota: rotaSummary(state).map((g) => {
       const days = g.filled.filter((_, i) => i % 2 === 0);
       const nights = g.filled.filter((_, i) => i % 2 === 1);

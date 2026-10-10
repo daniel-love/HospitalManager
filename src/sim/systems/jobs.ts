@@ -55,6 +55,7 @@ import {
 } from "./diagnostics";
 import { chance } from "../rng";
 import { roomOfObject } from "../world/rooms";
+import { workRate } from "./workforce";
 
 /**
  * Jobs done wherever the patient is, rather than at a particular couch:
@@ -343,7 +344,8 @@ export function runJobs(state: SimState): void {
         patient.consultants.push(staff.id);
       }
     }
-    if (++job.progress >= job.durationTicks) complete(state, job, obj);
+    job.progress += workRate(state, staff);
+    if (job.progress >= job.durationTicks) complete(state, job, obj);
   }
 }
 
@@ -374,7 +376,8 @@ function runAtPatient(state: SimState, job: Job, staff: Staff, p: Patient): void
     if (arrival !== "arrived" || p.path.length > 0 || p.toilet) return;
     job.state = "working";
   }
-  if (++job.progress < job.durationTicks) return;
+  job.progress += workRate(state, staff);
+  if (job.progress < job.durationTicks) return;
   removeJob(state, job);
   if (job.kind === "obs") {
     p.obs = { tick: state.tick, news: newsScore(state, p) };

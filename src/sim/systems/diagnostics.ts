@@ -24,6 +24,7 @@ import { roomOfObject } from "../world/rooms";
 import { postJob, removeJob, ticksFor } from "./jobBoard";
 import { sendBack, unwellToTravel } from "./escorts";
 import { headTo } from "./movement";
+import { workRate } from "./workforce";
 
 /** Jobs this module runs: carrying samples to the lab, and processing them there. */
 export const DIAGNOSTIC_JOBS = new Set<Job["kind"]>(["carry_sample", "lab_test"]);
@@ -127,7 +128,8 @@ export function runDiagnosticJob(state: SimState, job: Job, staff: Staff, p: Pat
     if (headTo(state, staff, frontOf(analyser)) !== "arrived") return;
     job.state = "working";
   }
-  if (++job.progress < job.durationTicks) return;
+  job.progress += workRate(state, staff);
+  if (job.progress < job.durationTicks) return;
   removeJob(state, job);
   const tested = p.investigations.find(
     (i) => i.test === "bloods" && i.done !== null && i.ready === null,

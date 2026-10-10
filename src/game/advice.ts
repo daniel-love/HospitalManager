@@ -120,6 +120,12 @@ export function describeAdvice(state: SimState): AdviceData {
       ),
       item(has("nurse"), "Staff nurses", "They triage, do nursing steps and take observations."),
       item(
+        Object.values(state.staff).some((s) => s.role === "nurse" && s.band === 7),
+        "A Band 7 charge nurse",
+        "With one on duty the shift has a nurse in charge, and the nursing team works about 10% faster. Set Band 7 cover of 1 on days and nights for one every shift.",
+        true,
+      ),
+      item(
         hasRoom("minors_cubicle"),
         "Minors Cubicles",
         "Where minor injuries and illnesses are treated.",

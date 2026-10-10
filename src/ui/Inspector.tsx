@@ -222,6 +222,7 @@ function AgentSection({
           {agent.role} · {formatMoney(agent.annualCost)}/yr
         </p>
         <p>{agent.activity}</p>
+        {agent.notice && <p class="warn-text">{agent.notice}</p>}
         <p class="dim">Works: {agent.rota}</p>
         {agent.meDuty !== undefined && (
           <label class="duty-toggle">
@@ -260,6 +261,29 @@ function AgentSection({
             style={{ width: `${agent.morale}%` }}
           />
         </div>
+        <span class="dim meter-note">
+          Hard or short-staffed shifts wear it down. Low morale means more sickness, and below 30
+          they may resign.
+        </span>
+        <h4>Skill</h4>
+        <div class="meter" title={`${agent.skill} / 100`}>
+          <div class="meter-fill" style={{ width: `${agent.skill}%` }} />
+        </div>
+        <span class="dim meter-note">How quickly they work. It grows with experience.</span>
+        {agent.fatigue !== null && (
+          <>
+            <h4>Fatigue</h4>
+            <div class="meter" title={`${agent.fatigue} / 100`}>
+              <div
+                class={`meter-fill${agent.fatigue > 75 ? " bad" : agent.fatigue > 50 ? " warn" : ""}`}
+                style={{ width: `${agent.fatigue}%` }}
+              />
+            </div>
+            <span class="dim meter-note">
+              Builds through a shift, faster when busy; above half way they slow down.
+            </span>
+          </>
+        )}
       </section>
     );
   }
