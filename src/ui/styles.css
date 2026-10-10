@@ -795,14 +795,31 @@ body.planning #game::after {
   flex-basis: 100%;
   font-size: 12px;
 }
-.ward-specialty {
+.job-plan {
+  font-size: 13px;
+  margin: 6px 0;
+}
+.job-plan .dim {
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stepper button {
+  min-width: 28px;
+}
+.room-specialty {
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 13px;
   margin: 6px 0;
 }
-.ward-specialty select {
+.room-specialty select {
   align-self: flex-start;
 }
 .hire-buttons {

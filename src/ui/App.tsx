@@ -26,8 +26,11 @@ export function App({ game }: { game: Game }) {
       <Inspector
         onClose={() => game.select(null)}
         onMove={(id) => game.startMove(id)}
-        onWardSpecialty={(sp) => game.setWardSpecialty(sp)}
+        onRoomSpecialty={(sp) => game.setRoomSpecialty(sp)}
         onMeDuty={(id, on) => game.applyStaff({ type: "set_me_duty", id, on })}
+        onClinicSessions={(id, sessions) =>
+          game.applyStaff({ type: "set_clinic_sessions", id, sessions })
+        }
       />
       {/* Strips under the top bar stack rather than overlap. */}
       <div class="under-topbar">

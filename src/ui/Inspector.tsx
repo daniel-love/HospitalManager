@@ -5,13 +5,15 @@ import { inspector, type AgentInfo } from "./store";
 export function Inspector({
   onClose,
   onMove,
-  onWardSpecialty,
+  onRoomSpecialty,
   onMeDuty,
+  onClinicSessions,
 }: {
   onClose: () => void;
   onMove: (objectId: number) => void;
-  onWardSpecialty: (specialty: SpecialtyId | null) => void;
+  onRoomSpecialty: (specialty: SpecialtyId | null) => void;
   onMeDuty: (staffId: number, on: boolean) => void;
+  onClinicSessions: (staffId: number, sessions: number) => void;
 }) {
   const data = inspector.value;
   if (!data) return null;
@@ -21,7 +23,9 @@ export function Inspector({
       <button class="close" title="Close (Esc)" onClick={onClose}>
         ×
       </button>
-      {agent && <AgentSection agent={agent} onMeDuty={onMeDuty} />}
+      {agent && (
+        <AgentSection agent={agent} onMeDuty={onMeDuty} onClinicSessions={onClinicSessions} />
+      )}
       {object && (
         <section>
           <h2>{object.name}</h2>
@@ -59,13 +63,13 @@ export function Inspector({
           </p>
           <p class="dim">{room.description}</p>
           {room.specialty && (
-            <label class="ward-specialty">
+            <label class="room-specialty">
               Specialty{" "}
               <select
                 value={room.specialty.value ?? ""}
                 onChange={(e) => {
                   const v = (e.currentTarget as HTMLSelectElement).value;
-                  onWardSpecialty(v === "" ? null : (v as SpecialtyId));
+                  onRoomSpecialty(v === "" ? null : (v as SpecialtyId));
                 }}
               >
                 <option value="">Any specialty</option>
@@ -147,9 +151,11 @@ function moodWord(mood: number): string {
 function AgentSection({
   agent,
   onMeDuty,
+  onClinicSessions,
 }: {
   agent: AgentInfo;
   onMeDuty: (staffId: number, on: boolean) => void;
+  onClinicSessions: (staffId: number, sessions: number) => void;
 }) {
   if (agent.kind === "staff") {
     return (
@@ -172,6 +178,35 @@ function AgentSection({
               patient they treated. Clinical work the rest of the time.
             </span>
           </label>
+        )}
+        {agent.clinics && (
+          <div class="job-plan">
+            <h4>Outpatient clinics</h4>
+            <div class="stepper">
+              <button
+                disabled={agent.clinics.sessions <= 0}
+                onClick={() => onClinicSessions(agent.id, agent.clinics!.sessions - 1)}
+                aria-label="Fewer clinic sessions"
+              >
+                −
+              </button>
+              <span>
+                {agent.clinics.sessions} a week (of {agent.clinics.max})
+              </span>
+              <button
+                disabled={agent.clinics.sessions >= agent.clinics.max}
+                onClick={() => onClinicSessions(agent.id, agent.clinics!.sessions + 1)}
+                aria-label="More clinic sessions"
+              >
+                +
+              </button>
+            </div>
+            <span class="dim">
+              {agent.clinics.sessions > 0
+                ? `${agent.clinics.when}. In clinic they see booked outpatients and aren't free for other work.`
+                : "Each session is a morning (09:00 to 13:00) or afternoon (13:30 to 17:30) seeing booked outpatients, in a clinic room for their specialty."}
+            </span>
+          </div>
         )}
         <h4>Morale</h4>
         <div class="meter" title={`${agent.morale} / 100`}>

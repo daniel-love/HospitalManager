@@ -44,7 +44,9 @@ import { inCare } from "@sim/systems/curtains";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { annualCost } from "@sim/systems/finance";
 import { formatWait, inAE } from "@sim/systems/patients";
-import { canDo, staffTitle } from "@sim/systems/staffing";
+import { canDo, runsClinics, staffTitle } from "@sim/systems/staffing";
+import { describeJobPlan, jobPlan } from "@sim/systems/clinics";
+import { MAX_CLINIC_SESSIONS } from "@data/outpatients";
 import { analysers, pendingResults } from "@sim/systems/diagnostics";
 import { clockFromTick, TICKS_PER_MINUTE } from "@sim/time";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
@@ -744,6 +746,15 @@ export function describeStaff(state: SimState, s: Staff): AgentInfo {
     annualCost: annualCost(s),
     morale: Math.round(s.morale),
     ...(s.role === "consultant" && !s.onCall ? { meDuty: s.meDuty } : {}),
+    ...(runsClinics(s)
+      ? {
+          clinics: {
+            sessions: s.clinicSessions,
+            max: MAX_CLINIC_SESSIONS,
+            when: describeJobPlan(jobPlan(state, s)),
+          },
+        }
+      : {}),
   };
 }
 

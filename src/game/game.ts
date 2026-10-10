@@ -32,7 +32,7 @@ import {
   TICKS_PER_SECOND_1X,
 } from "@sim/time";
 import { itemsAt } from "@sim/world/objects";
-import { roomAt, setWardSpecialty } from "@sim/world/rooms";
+import { roomAt, setRoomSpecialty } from "@sim/world/rooms";
 import { CameraControls, isPanModifier } from "@render/cameraControls";
 import { TILE_SIZE } from "@render/constants";
 import { tagSpot } from "@render/deathMarks";
@@ -222,18 +222,18 @@ export class Game {
     this.drainEvents();
     this.refreshPanels();
     this.publishHud();
-    if (cmd.type === "set_me_duty") this.publishInspector();
+    if (cmd.type === "set_me_duty" || cmd.type === "set_clinic_sessions") this.publishInspector();
   }
 
   /**
-   * Gives the selected ward to a specialty (null: any). Like staffing, a
-   * setting for the real hospital, even in plan mode.
+   * Gives the selected ward or clinic room to a specialty (null: any). Like
+   * staffing, a setting for the real hospital, even in plan mode.
    */
-  setWardSpecialty(specialty: SpecialtyId | null): void {
+  setRoomSpecialty(specialty: SpecialtyId | null): void {
     const tile = this.selectedTile;
     const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
-    if (!room || room.typeId !== "ward") return;
-    setWardSpecialty(this.state, room, specialty);
+    if (!room || !roomById.get(room.typeId)?.specialty) return;
+    setRoomSpecialty(this.state, room, specialty);
     if (this.preview) this.rebuildPreview();
     this.publishInspector();
   }
@@ -706,11 +706,14 @@ export class Game {
         patientsCantReach: roomsPatientsCantReach(this.viewState).includes(room),
         capabilities: room.capabilities,
         items: [...counts].map(([name, count]) => ({ name, count })),
-        ...(room.typeId === "ward"
+        ...(roomDef.specialty
           ? {
               specialty: {
                 value: room.specialty,
-                options: content.specialties.map((sp) => ({ id: sp.id, name: sp.name })),
+                // Clinic rooms: only specialties that run outpatient clinics.
+                options: content.specialties
+                  .filter((sp) => room.typeId !== "outpatient_clinic" || sp.outpatients)
+                  .map((sp) => ({ id: sp.id, name: sp.name })),
               },
             }
           : {}),

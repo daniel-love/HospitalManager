@@ -27,7 +27,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 21;
+export const SIM_STATE_VERSION = 22;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -64,7 +64,7 @@ export interface Room {
   capabilities: string[];
   checks: RoomCheck[];
   valid: boolean;
-  /** Wards: the specialty it's for (see SimState.wardSpecialties), or null for any. */
+  /** Wards and clinic rooms: the specialty it's for (see SimState.roomSpecialties), or null for any. */
   specialty: SpecialtyId | null;
   /**
    * Advisory: equipment some conditions need here, beyond being valid
@@ -113,11 +113,11 @@ export interface SimState {
   /** Uses since last cleaned, by object id (couches and toilets). */
   dirt: Record<number, number>;
   /**
-   * Wards given to a specialty, keyed "floor:tile" by one of the ward's
+   * Wards and clinic rooms given to a specialty, keyed "floor:tile" by one of their
    * tiles. Room ids change whenever rooms are re-detected, so the setting
    * is pinned to a tile and found again from it (detectRooms).
    */
-  wardSpecialties: Record<string, SpecialtyId>;
+  roomSpecialties: Record<string, SpecialtyId>;
 
   /** Money and patient flow so far today, and reports for past days (newest last). */
   today: { ledger: Ledger; stats: FlowStats };
@@ -183,7 +183,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     nextCollectionId: 1,
     reserved: {},
     dirt: {},
-    wardSpecialties: {},
+    roomSpecialties: {},
     today: { ledger: emptyLedger(), stats: emptyStats() },
     history: [],
     settings: { catchment: DEFAULT_CATCHMENT, patientVolume: 1 },

@@ -8,6 +8,7 @@
  */
 import { specialtyById, staffRoleById } from "@data/catalogue";
 import { MORALE_START } from "@data/deaths";
+import { MAX_CLINIC_SESSIONS } from "@data/outpatients";
 import { FIRST_NAMES, SURNAMES } from "@data/names";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import { ON_CALL } from "@data/staff";
@@ -42,7 +43,9 @@ export type StaffCommand =
     }
   | { type: "dismiss_staff"; id: number }
   /** Gives a resident consultant the Medical Examiner duty, or takes it away. */
-  | { type: "set_me_duty"; id: number; on: boolean };
+  | { type: "set_me_duty"; id: number; on: boolean }
+  /** Sets how many outpatient clinic sessions a week are in a doctor's job plan. */
+  | { type: "set_clinic_sessions"; id: number; sessions: number };
 
 export type StaffResult = { ok: true; staff: Staff } | { ok: false; error: string };
 
@@ -70,6 +73,7 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
       specialty: role.specialist ? cmd.specialty! : null,
       onCall: cmd.onCall ? { state: "home", at: state.tick } : null,
       meDuty: false,
+      clinicSessions: 0,
       x: at.x,
       y: at.y,
       prevX: at.x,
@@ -101,6 +105,16 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
     staff.meDuty = cmd.on;
     return { ok: true, staff };
   }
+  if (cmd.type === "set_clinic_sessions") {
+    if (!runsClinics(staff)) {
+      return {
+        ok: false,
+        error: "Only resident consultants and registrars of a specialty with clinics run them",
+      };
+    }
+    staff.clinicSessions = Math.max(0, Math.min(MAX_CLINIC_SESSIONS, Math.round(cmd.sessions)));
+    return { ok: true, staff };
+  }
   const job = staff.jobId === null ? undefined : state.jobs[staff.jobId];
   if (job) {
     // Back on the board for someone else, keeping its place and patient.
@@ -110,6 +124,14 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
   if (staff.desk !== null) release(state, staff.desk, "staff", staff.id);
   delete state.staff[staff.id];
   return { ok: true, staff };
+}
+
+/** Whether someone can have clinic sessions in their job plan. */
+export function runsClinics(s: Staff): boolean {
+  const specialty = s.specialty && specialtyById.get(s.specialty);
+  return (
+    (s.role === "consultant" || s.role === "registrar") && !s.onCall && !!specialty?.outpatients
+  );
 }
 
 /** "Cardiology Consultant (on call)", "Staff Nurse". */

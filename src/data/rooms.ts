@@ -170,6 +170,7 @@ export const rooms: RoomInput[] = [
     colour: 0x7fa6d9,
     minSize: [4, 4],
     enclosed: true,
+    specialty: true,
     required: [
       { label: "Hospital bed", anyOf: ["hospital_bed", "profiling_bed"] },
       { label: "Hand-wash sink", anyOf: ["sink"] },
@@ -290,12 +291,45 @@ export const rooms: RoomInput[] = [
     description:
       "The cleaners' base, where their trolleys and supplies are kept. Cleaners wait here between jobs.",
   },
+  {
+    id: "outpatients_reception",
+    code: 21,
+    name: "Outpatients Reception",
+    department: "Outpatients",
+    colour: 0x5bb0c9,
+    minSize: [3, 3],
+    enclosed: false,
+    publicRoute: true,
+    required: [{ label: "Reception desk", anyOf: ["reception_desk"] }],
+    connectedTo: [{ roomType: "waiting_area", label: "Opens onto a Waiting Area" }],
+    description:
+      "Outpatients book in here for their appointment, then wait in the Waiting Area it opens onto. Needs its own receptionist: one at A&E Reception stays there.",
+  },
+  {
+    id: "outpatient_clinic",
+    code: 22,
+    name: "Outpatient Clinic Room",
+    department: "Outpatients",
+    colour: 0x8fcfb8,
+    // A consulting and examination room is about 16 m² (NHS HBN 00-03).
+    minSize: [3, 4],
+    enclosed: true,
+    specialty: true,
+    required: [
+      { label: "Desk", anyOf: ["desk"] },
+      { label: "Examination couch", anyOf: ["exam_couch"] },
+      { label: "Hand-wash sink", anyOf: ["sink"] },
+    ],
+    description:
+      "A consultant or registrar sees booked outpatients here in clinic sessions (mornings 09:00 to 13:00, afternoons 13:30 to 17:30, Monday to Friday). Give it a specialty in the inspector, or leave it open to any.",
+  },
 ];
 
 /** Build palette sections for rooms, in display order. */
 export const roomGroups = [
   "ae",
   "wards",
+  "outpatients",
   "diagnostics",
   "shared",
   "facilities",
@@ -307,6 +341,7 @@ export type RoomGroup = (typeof roomGroups)[number];
 export const ROOM_GROUP_NAMES: Record<RoomGroup, string> = {
   ae: "A&E",
   wards: "Wards",
+  outpatients: "Outpatients",
   diagnostics: "Diagnostics",
   shared: "Shared spaces",
   facilities: "Facilities",
@@ -324,4 +359,5 @@ export const ROOM_GROUP_OF: Record<RoomDepartment, RoomGroup> = {
   Facilities: "facilities",
   Support: "support",
   Staff: "staff",
+  Outpatients: "outpatients",
 };

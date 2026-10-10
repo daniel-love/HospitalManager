@@ -100,6 +100,8 @@ export type AgentInfo =
       morale: number;
       /** Resident consultants: whether they have the Medical Examiner duty. */
       meDuty?: boolean;
+      /** Resident consultants and registrars of a specialty with clinics: their job plan. */
+      clinics?: { sessions: number; max: number; when: string };
     };
 
 export interface InspectorData {

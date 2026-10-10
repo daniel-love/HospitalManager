@@ -229,6 +229,11 @@ export interface Staff extends AgentBase {
   onCall: OnCall | null;
   /** Resident consultants: does Medical Examiner reviews in office-hours sessions. */
   meDuty: boolean;
+  /**
+   * Resident consultants and registrars of a specialty with clinics: weekly
+   * outpatient clinic sessions in their job plan (systems/clinics.ts).
+   */
+  clinicSessions: number;
   jobId: number | null;
   /** Receptionists: the desk they staff. Nurses: the nurse station they wait at. */
   desk: number | null;

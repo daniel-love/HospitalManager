@@ -131,6 +131,7 @@ export const roomDepartments = [
   "Facilities",
   "Support",
   "Staff",
+  "Outpatients",
 ] as const;
 export type RoomDepartment = (typeof roomDepartments)[number];
 
@@ -173,6 +174,8 @@ export const roomDefSchema = z.object({
    * joined by a door. E.g. reception must lead straight into a waiting area.
    */
   connectedTo: z.array(z.object({ roomType: id, label: z.string().min(1) })).default([]),
+  /** Can be given to a specialty in the inspector (wards, clinic rooms). */
+  specialty: z.boolean().default(false),
   description: z.string(),
 });
 export type RoomDef = z.infer<typeof roomDefSchema>;
@@ -207,14 +210,51 @@ export const specialtyIds = [
   "general_surgery",
   "trauma_orthopaedics",
   "anaesthetics",
+  "dermatology",
+  "ent",
+  "ophthalmology",
 ] as const;
 export type SpecialtyId = (typeof specialtyIds)[number];
+
+const mins = z.number().int().positive();
+
+/**
+ * A specialty's outpatient service (GAME_DESIGN §5.1): GP referrals to its
+ * clinics, how long appointments are booked for, what happens after them,
+ * and what each pays. Missing for specialties without clinics.
+ */
+export const outpatientServiceSchema = z.object({
+  /**
+   * GP referrals a day per 100,000 people in the catchment, from England's
+   * first outpatient attendances by specialty.
+   */
+  referralsPer100k: z.number().positive(),
+  /** Share referred urgently (suspected cancer): to be seen within 2 weeks. */
+  urgentShare: z.number().min(0).max(1),
+  /** Booked slot lengths in minutes: first appointment, follow-up. */
+  firstSlotMins: mins,
+  followUpSlotMins: mins,
+  /**
+   * Chance of another follow-up after each appointment. The expected number
+   * of follow-ups per first appointment is p / (1 - p).
+   */
+  followUpChance: z.number().min(0).max(0.95),
+  /** Weeks until a follow-up is due. */
+  followUpWeeks: z.tuple([mins, mins]),
+  /** Chance a first appointment ends in a decision to operate (the admitted waiting list). */
+  surgeryChance: z.number().min(0).max(1),
+  /** NHS tariff, £: first attendance, follow-up. */
+  firstTariff: z.number().int().positive(),
+  followUpTariff: z.number().int().positive(),
+});
+export type OutpatientService = z.infer<typeof outpatientServiceSchema>;
 
 export const specialtySchema = z.object({
   id: z.enum(specialtyIds),
   name: z.string().min(1),
   /** As a team, e.g. "the cardiology team". */
   team: z.string().min(1),
+  outpatients: outpatientServiceSchema.optional(),
   description: z.string(),
 });
 export type SpecialtyDef = z.infer<typeof specialtySchema>;

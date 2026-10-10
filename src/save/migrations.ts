@@ -408,6 +408,23 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
     const state = save.state as { jobs: object[] };
     return { ...save, state: { ...state, jobs: state.jobs.map((j) => ({ ...j, kit: null })) } };
   },
+  // v22: outpatient clinics. Clinic rooms take a specialty like wards, so the
+  // setting is renamed; nobody has clinic sessions in their job plan yet.
+  21: (save) => {
+    const { wardSpecialties, ...state } = save.state as {
+      wardSpecialties?: object;
+      roomSpecialties?: object;
+      staff: object[];
+    };
+    return {
+      ...save,
+      state: {
+        ...state,
+        roomSpecialties: wardSpecialties ?? state.roomSpecialties ?? {},
+        staff: state.staff.map((s) => ({ ...s, clinicSessions: 0 })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

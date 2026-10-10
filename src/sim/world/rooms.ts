@@ -82,27 +82,28 @@ export function detectRooms(state: SimState): void {
     }));
   }
   // Ward specialties, found again from the tile each is pinned to.
-  for (const [key, specialty] of Object.entries(state.wardSpecialties)) {
+  for (const [key, specialty] of Object.entries(state.roomSpecialties)) {
     const [floor, tile] = key.split(":").map(Number);
     const id = state.floors[floor!]?.roomId[tile!] ?? 0;
     const room = id === 0 ? undefined : rooms[id - 1];
-    if (room?.typeId === "ward" && room.specialty === null) room.specialty = specialty;
+    const def = room && roomById.get(room.typeId);
+    if (room && def?.specialty && room.specialty === null) room.specialty = specialty;
   }
   state.rooms = rooms;
   state.objectRoom = objectRoom;
 }
 
 /**
- * Gives a ward to a specialty (null: any). Pinned to one of its tiles; any
+ * Gives a ward or clinic room to a specialty (null: any). Pinned to one of its tiles; any
  * older setting for the same room is dropped.
  */
-export function setWardSpecialty(state: SimState, room: Room, specialty: SpecialtyId | null): void {
+export function setRoomSpecialty(state: SimState, room: Room, specialty: SpecialtyId | null): void {
   const grid = state.floors[room.floor]!;
-  for (const key of Object.keys(state.wardSpecialties)) {
+  for (const key of Object.keys(state.roomSpecialties)) {
     const [floor, tile] = key.split(":").map(Number);
-    if (floor === room.floor && grid.roomId[tile!] === room.id) delete state.wardSpecialties[key];
+    if (floor === room.floor && grid.roomId[tile!] === room.id) delete state.roomSpecialties[key];
   }
-  if (specialty !== null) state.wardSpecialties[`${room.floor}:${room.tiles[0]!}`] = specialty;
+  if (specialty !== null) state.roomSpecialties[`${room.floor}:${room.tiles[0]!}`] = specialty;
   room.specialty = specialty;
 }
 

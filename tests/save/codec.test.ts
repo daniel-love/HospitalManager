@@ -5,7 +5,7 @@ import { nextU32 } from "@sim/rng";
 import { createSimState, SIM_STATE_VERSION, type SimState } from "@sim/state";
 import { TICKS_PER_DAY } from "@sim/time";
 import { applyStaffCommand } from "@sim/systems/staffing";
-import { setWardSpecialty } from "@sim/world/rooms";
+import { setRoomSpecialty } from "@sim/world/rooms";
 import { buildMajorsAE, MAJORS_TEAM, staffedMajorsAE } from "../fixtures/majorsAE";
 import { buildSmallAE, staffedSmallAE } from "../fixtures/smallAE";
 
@@ -450,7 +450,7 @@ describe("specialties in saves", () => {
       specialty: "general_medicine",
       onCall: true,
     });
-    setWardSpecialty(
+    setRoomSpecialty(
       state,
       state.rooms.find((r) => r.typeId === "ward")!,
       "cardiology",
@@ -464,7 +464,7 @@ describe("specialties in saves", () => {
     const state = busyDayBeforeTransfers();
     const save = JSON.parse(JSON.stringify(encodeSave(state, "v12")));
     save.version = 12;
-    delete save.state.wardSpecialties;
+    delete save.state.wardSpecialties; // Its name before v22.
     for (const p of save.state.patients) {
       delete p.specialty;
       delete p.times.referred;

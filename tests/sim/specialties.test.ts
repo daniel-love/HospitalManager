@@ -17,7 +17,7 @@ import { removeJob } from "@sim/systems/jobBoard";
 import { postTreatment } from "@sim/systems/patients";
 import { applyStaffCommand } from "@sim/systems/staffing";
 import { TICKS_PER_MINUTE } from "@sim/time";
-import { detectRooms, setWardSpecialty } from "@sim/world/rooms";
+import { detectRooms, setRoomSpecialty } from "@sim/world/rooms";
 import { waitReason } from "@game/describe";
 import { MAJORS_TEAM, staffedMajorsAE } from "../fixtures/majorsAE";
 
@@ -193,7 +193,7 @@ describe("ward specialties", () => {
     const state = quiet();
     hire(state, "registrar", "cardiology");
     const ward = state.rooms.find((r) => r.typeId === "ward")!;
-    setWardSpecialty(state, ward, "general_surgery");
+    setRoomSpecialty(state, ward, "general_surgery");
     // Every layout change re-detects rooms (new ids); the setting is found again.
     detectRooms(state);
     const again = state.rooms.find((r) => r.typeId === "ward")!;
@@ -208,7 +208,7 @@ describe("ward specialties", () => {
     for (const sp of ["cardiology", null] as const) {
       const state = quiet();
       hire(state, "registrar", "cardiology");
-      setWardSpecialty(
+      setRoomSpecialty(
         state,
         state.rooms.find((r) => r.typeId === "ward")!,
         sp,
