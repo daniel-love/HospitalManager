@@ -14,6 +14,7 @@ import { bookAppointments, refer } from "@sim/systems/referrals";
 import { inTheatre } from "@sim/systems/theatres";
 import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 import { invariantProblems } from "./simHelpers";
+import { describeAdvice } from "@game/advice";
 import { decodeSave, encodeSave } from "@save/codec";
 import { applyStaffCommand } from "@sim/systems/staffing";
 import { jobPlan } from "@sim/systems/clinics";
@@ -281,5 +282,28 @@ describe("emergency surgery", () => {
     } finally {
       op.chance = chanceWas;
     }
+  });
+});
+
+describe("advice and alerts for theatres", () => {
+  it("the Help panel checks the theatre setup and sizes lists to demand", () => {
+    const state = quiet();
+    const group = describeAdvice(state).groups.find((g) => g.heading === "Theatres")!;
+    const todo = group.items.filter((i) => i.status === "todo").map((i) => i.text);
+    expect(todo).toEqual([]);
+    const rows = describeAdvice(state).capacity.map((r) => r.label);
+    expect(rows).toContain("Anaesthetist lists a week");
+  });
+
+  it("warns when emergency surgery is overdue", () => {
+    const state = quiet();
+    // No theatre practitioners: nothing can start.
+    for (const s of Object.values(state.staff)) {
+      if (s.role === "theatre_practitioner")
+        applyStaffCommand(state, { type: "dismiss_staff", id: s.id });
+    }
+    needsOperation(state, 0.5);
+    for (let i = 0; i < 2 * 60 * TICKS_PER_MINUTE; i++) tick(state);
+    expect(state.events.map((e) => e.text).join("\n")).toMatch(/overdue for emergency surgery/);
   });
 });

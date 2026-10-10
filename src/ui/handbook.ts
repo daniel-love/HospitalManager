@@ -59,6 +59,10 @@ const ROLE_NEEDS: Partial<Record<StaffRoleId, string[]>> = {
     "An X-ray Room or CT Room, enclosed by lead-lined walls; they wait there between patients",
   ],
   biomedical_scientist: ["A Pathology Lab with a blood analyser"],
+  theatre_practitioner: [
+    "An Operating Theatre and Recovery; they wait in Recovery between operations",
+    "Two of them free for every operation",
+  ],
   cleaner: [
     "A Domestic Services Room to wait in between jobs; they find dirty beds, trolleys and toilets themselves",
   ],
@@ -70,6 +74,7 @@ const ROLE_NEEDS: Partial<Record<StaffRoleId, string[]>> = {
     "As for a registrar",
     "For the Medical Examiner duty: a desk, and to be resident rather than on call",
     "For clinics: an Outpatient Clinic Room for their specialty (or open to any), and Outpatients Reception",
+    "For theatre lists: an Operating Theatre, Recovery, a Day Surgery Unit, an anaesthetist and two theatre practitioners",
   ],
 };
 
@@ -84,6 +89,8 @@ const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
     "Verifies expected deaths and does last offices",
     "Fetches the shared 12-lead ECG to the bedside and wheels it back",
     "Goes with monitored trolley patients to X-ray and CT, and stays for the scan",
+    "Admits planned surgery patients in the Day Surgery Unit",
+    "Looks after patients coming round in Recovery",
   ],
   junior_doctor: [
     "Leads resuscitation at a cardiac arrest",
@@ -105,11 +112,13 @@ const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
   registrar: [
     "Reviews referred patients in A&E and decides to admit",
     "Outpatient clinics (sessions set in their inspector)",
+    "Theatre lists and emergency operations (surgical specialties); anaesthetics for them (Anaesthetics)",
   ],
   consultant: [
     "Reviews referred patients in A&E and decides to admit",
     "Medical Examiner reviews (with the duty)",
     "Outpatient clinics (sessions set in their inspector): GPs only refer to a specialty while a consultant runs its clinics",
+    "Theatre lists and emergency operations (surgical specialties); anaesthetics for them (Anaesthetics)",
   ],
 };
 

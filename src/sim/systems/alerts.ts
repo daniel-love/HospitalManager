@@ -27,6 +27,7 @@ import { clockFromTick, TICKS_PER_MINUTE } from "../time";
 import { sessionsOn } from "./clinics";
 import { outpatientDesks } from "./outpatients";
 import { offersClinic } from "./referrals";
+import { listsOn } from "./theatres";
 import { roomOfObject } from "../world/rooms";
 import { ambulancesWaiting, needsTrolley } from "./ambulances";
 import { hasCleaningJob, postJob, ticksFor } from "./jobBoard";
@@ -240,6 +241,62 @@ export function updateAlerts(state: SimState): void {
         "warn",
       );
     }
+  }
+
+  // Theatres.
+  const overdue = patients.filter(
+    (p) => p.emergencyOp && !p.emergencyOp.done && !p.death && state.tick > p.emergencyOp.due,
+  ).length;
+  if (overdue > 0) {
+    warn(
+      state,
+      "emergency_overdue",
+      COOLDOWN,
+      `${plural(overdue, "patient is", "patients are")} overdue for emergency surgery. A theatre kept for emergencies, more theatre practitioners or an on-call surgeon and anaesthetist would help.`,
+      "bad",
+    );
+  }
+  if (c.weekday <= 4 && c.hour === 8 && c.minute < CHECK_EVERY / TICKS_PER_MINUTE) {
+    const today = (["am", "pm"] as const).flatMap((h) => listsOn(state, c.day, h));
+    const noAnaesthetist = today.filter((l) => l.anaesthetist === null).length;
+    const noTheatre = today.filter((l) => l.anaesthetist !== null && l.roomId === null).length;
+    if (noAnaesthetist > 0) {
+      warn(
+        state,
+        "no_anaesthetist",
+        COOLDOWN,
+        `${plural(noAnaesthetist, "theatre list", "theatre lists")} today ${noAnaesthetist === 1 ? "has" : "have"} no anaesthetist, so ${noAnaesthetist === 1 ? "it" : "they"} can't run. Give Anaesthetics consultants or registrars more theatre lists.`,
+        "warn",
+      );
+    }
+    if (noTheatre > 0) {
+      warn(
+        state,
+        "no_theatre",
+        COOLDOWN,
+        `${plural(noTheatre, "theatre list", "theatre lists")} today ${noTheatre === 1 ? "has" : "have"} no theatre free. Build another Operating Theatre, or give one to the specialty.`,
+        "warn",
+      );
+    }
+  }
+  const unlisted = new Map<string, number>();
+  for (const r of Object.values(state.referrals)) {
+    if (r.kind !== "surgery") continue;
+    const lists = Object.values(state.staff).some(
+      (s) => s.specialty === r.specialty && s.theatreSessions > 0,
+    );
+    if (lists) continue;
+    const name = specialtyById.get(r.specialty)?.name ?? r.specialty;
+    unlisted.set(name, (unlisted.get(name) ?? 0) + 1);
+  }
+  for (const [name, n] of unlisted) {
+    warn(
+      state,
+      `no_lists_${name}`,
+      COOLDOWN * 4,
+      `${plural(n, "patient is", "patients are")} waiting for ${name} surgery, but no ${name} surgeon has theatre lists. Their 18-week clocks keep running.`,
+      "warn",
+    );
   }
 
   // Trolley patients waiting to be wheeled to a scan.

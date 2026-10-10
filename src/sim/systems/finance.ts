@@ -76,7 +76,10 @@ function closeDay(state: SimState): void {
   });
   const s = report.stats;
   const seen = s.firstAppointments + s.followUps;
-  const clinics = seen > 0 ? ` · ${seen} seen in clinic` : "";
+  const ops = s.electiveOps + s.emergencyOps;
+  const clinics =
+    (seen > 0 ? ` · ${seen} seen in clinic` : "") +
+    (ops > 0 ? ` · ${ops} ${ops === 1 ? "operation" : "operations"}` : "");
   const fourHour =
     s.departures > 0 ? ` · 4-hour ${Math.round((100 * s.within4h) / s.departures)}%` : "";
   emit(

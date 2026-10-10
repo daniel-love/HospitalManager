@@ -20,7 +20,8 @@ import { dailyDemand } from "@sim/systems/arrivals";
 import { monitorsCovering, observedBeds, stationsSeeing } from "@sim/systems/monitoring";
 import { outpatientDesks } from "@sim/systems/outpatients";
 import { offersClinic, referralsPerDay } from "@sim/systems/referrals";
-import { runsClinics } from "@sim/systems/staffing";
+import { operates, runsClinics } from "@sim/systems/staffing";
+import { PRACTITIONERS, TURNAROUND_MINS } from "@sim/systems/theatres";
 import { CLINIC_SESSIONS } from "@data/outpatients";
 
 export type AdviceStatus = "ok" | "todo" | "optional";
@@ -366,7 +367,75 @@ export function describeAdvice(state: SimState): AdviceData {
     ],
   };
 
-  const groups = [essentials, diagnostics, majors, admissions, outpatients, afterDeath, staffAreas];
+  // Theatres: optional until there's a theatre, a list, or patients waiting for surgery.
+  const surgeons = Object.values(state.staff).filter((s) => operates(s));
+  const lists = (anaesthetic: boolean) =>
+    surgeons
+      .filter((s) => (s.specialty === "anaesthetics") === anaesthetic)
+      .reduce((n, s) => n + s.theatreSessions, 0);
+  const waitingForSurgery = Object.values(state.referrals).some((r) => r.kind === "surgery");
+  const theatreStarted =
+    hasRoom("theatre") || hasRoom("recovery") || lists(false) > 0 || waitingForSurgery;
+  const theatres: AdviceGroup = {
+    heading: "Theatres",
+    intro:
+      "Planned operations for patients your clinics list for surgery, and emergency operations for patients admitted through A&E. Day cases go home the same day; the rest need a ward bed.",
+    items: [
+      item(
+        hasRoom("theatre"),
+        "An Operating Theatre (table, anaesthetic machine, light, scrub sink)",
+        "On a bed-width route to Recovery, the wards and A&E. One per list running at once.",
+        !theatreStarted,
+      ),
+      item(
+        hasRoom("recovery"),
+        "Recovery, next to the theatres",
+        "A trolley, bedside monitor and oxygen for each patient coming round. Without a free one, the theatre can't take its next case.",
+        !theatreStarted,
+      ),
+      item(
+        hasRoom("day_surgery_unit"),
+        "A Day Surgery Unit (a nurses' desk and seats)",
+        "Planned patients are admitted here by a nurse on the day, and day cases rest here before going home.",
+        !theatreStarted,
+      ),
+      item(
+        lists(false) > 0,
+        "Surgeons with theatre lists",
+        "Set their weekly lists in their inspector. Only planned lists bring patients off the surgical waiting list.",
+        !theatreStarted,
+      ),
+      item(
+        lists(true) >= lists(false) && lists(true) > 0,
+        "Anaesthetists covering every list",
+        `Every list needs an anaesthetist: Anaesthetics consultants or registrars with theatre lists in their inspector (${lists(true)} of ${lists(false)} covered).`,
+        !theatreStarted,
+      ),
+      item(
+        staffCount("theatre_practitioner") >= PRACTITIONERS,
+        "Two theatre practitioners per theatre in use",
+        "Scrub nurses or ODPs. Without two free, an operation can't start.",
+        !theatreStarted,
+      ),
+      item(
+        state.rooms.some((r) => r.valid && r.typeId === "theatre" && r.emergency),
+        "A theatre kept for emergencies",
+        "Emergencies otherwise take the next slot on a planned list, cancelling someone's operation.",
+        true,
+      ),
+    ],
+  };
+
+  const groups = [
+    essentials,
+    diagnostics,
+    majors,
+    admissions,
+    outpatients,
+    theatres,
+    afterDeath,
+    staffAreas,
+  ];
   const next = groups.flatMap((g) => g.items).find((i) => i.status === "todo") ?? null;
   const demand = dailyDemand(state);
   return {
@@ -497,6 +566,7 @@ export function capacityGuide(
       note: "Minor injuries. Without them, the doctors see these too.",
     },
     ...clinicCapacity(state),
+    ...theatreCapacity(state),
     {
       label: "Cleaners",
       have: count("cleaner"),
@@ -533,6 +603,59 @@ function clinicCapacity(state: SimState): CapacityRow[] {
       note: `About ${Math.round(firsts)} GP referrals a week, and ${followUps.toFixed(1)} follow-ups each. Fewer sessions and the waiting list grows.`,
     });
   }
+  return rows;
+}
+
+/**
+ * Theatre lists a week each specialty's clinics will fill: first
+ * appointments × the share listed for surgery, at the average operation
+ * plus turnaround, over a 4-hour list. Then anaesthetists to cover the
+ * lists, and practitioners for the most lists at once.
+ */
+function theatreCapacity(state: SimState): CapacityRow[] {
+  const listMins = CLINIC_SESSIONS.am.end - CLINIC_SESSIONS.am.start;
+  const rows: CapacityRow[] = [];
+  const staff = Object.values(state.staff).filter((s) => operates(s));
+  let surgeonLists = 0;
+  for (const sp of content.specialties) {
+    const op = sp.surgery;
+    const clinic = sp.outpatients;
+    if (!op || !clinic) continue;
+    const have = staff
+      .filter((s) => s.specialty === sp.id)
+      .reduce((n, s) => n + s.theatreSessions, 0);
+    surgeonLists += have;
+    const listed = Object.values(state.referrals).some(
+      (r) => r.kind === "surgery" && r.specialty === sp.id,
+    );
+    if (!offersClinic(state, sp.id) && have === 0 && !listed) continue;
+    const ops = referralsPerDay(state, sp.id) * 7 * clinic.surgeryChance;
+    const mins = ops * ((op.opMins[0] + op.opMins[1]) / 2 + TURNAROUND_MINS);
+    rows.push({
+      label: `${sp.name} theatre lists a week`,
+      have,
+      recommended: Math.ceil(mins / listMins),
+      note: `About ${Math.round(ops)} operations a week from its clinics, ${Math.round(op.dayCaseShare * 100)}% day cases. Fewer lists and the surgical waiting list grows.`,
+    });
+  }
+  if (surgeonLists === 0) return rows;
+  const anaesthetic = staff
+    .filter((s) => s.specialty === "anaesthetics")
+    .reduce((n, s) => n + s.theatreSessions, 0);
+  rows.push({
+    label: "Anaesthetist lists a week",
+    have: anaesthetic,
+    recommended: surgeonLists,
+    note: "One for every surgeon's list. A list without an anaesthetist doesn't run.",
+  });
+  rows.push({
+    label: "Theatre practitioners",
+    have: Object.values(state.staff).filter((s) => s.role === "theatre_practitioner").length,
+    recommended:
+      PRACTITIONERS *
+      Math.max(1, state.rooms.filter((r) => r.valid && r.typeId === "theatre").length),
+    note: `${PRACTITIONERS} for each theatre that may be in use at once.`,
+  });
   return rows;
 }
 

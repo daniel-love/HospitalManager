@@ -78,7 +78,7 @@ export function ReportsPanel({ onShow }: { onShow: (at: { x: number; y: number }
 
         {data.waitingLists.length > 0 && (
           <>
-            <h3>Outpatient waiting lists</h3>
+            <h3>Waiting lists</h3>
             <WaitingLists lists={data.waitingLists} />
           </>
         )}
@@ -532,6 +532,43 @@ function FlowSections({ stats: s }: { stats: FlowStats }) {
                 title="A decision to operate in clinic: they wait for theatre on the 18-week clock"
                 value={s.listedForSurgery}
               />
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {s.electiveOps + s.emergencyOps + s.cancelledOnDay > 0 && (
+        <div class="report-group">
+          <h4>Theatres</h4>
+          <table class="report-table">
+            <tbody>
+              <Row
+                label="Planned operations"
+                value={s.electiveOps}
+                extra={plural(s.dayCases, "day case")}
+              />
+              {s.cancelledOnDay > 0 && (
+                <Row
+                  label="Cancelled on the day"
+                  title="Planned operations the hospital cancelled on the day (no ward bed, the list ran out of time, or an emergency took the slot). Each must be rebooked within 28 days."
+                  value={s.cancelledOnDay}
+                  extra={s.bumped > 0 ? `${s.bumped} for emergencies` : undefined}
+                  bad
+                />
+              )}
+              <Row
+                label="Emergency operations"
+                title="Operations on patients admitted through A&E"
+                value={s.emergencyOps}
+              />
+              {s.emergencyOps > 0 && (
+                <Row
+                  label="Emergencies on time"
+                  title="Started within their target: 24 hours for appendicitis, 36 for a broken hip (NICE), 48 for an ankle fracture"
+                  value={pct(s.emergencyOnTime, s.emergencyOps)}
+                  bad={s.emergencyOnTime < s.emergencyOps}
+                />
+              )}
             </tbody>
           </table>
         </div>
