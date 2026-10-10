@@ -32,7 +32,7 @@ import {
   TICKS_PER_SECOND_1X,
 } from "@sim/time";
 import { itemsAt } from "@sim/world/objects";
-import { roomAt, setRoomSpecialty } from "@sim/world/rooms";
+import { roomAt, setEmergencyTheatre, setRoomSpecialty } from "@sim/world/rooms";
 import { CameraControls, isPanModifier } from "@render/cameraControls";
 import { TILE_SIZE } from "@render/constants";
 import { tagSpot } from "@render/deathMarks";
@@ -106,6 +106,15 @@ const SPEED_KEYS: Record<string, Speed> = {
   Digit3: 4,
   Digit4: 8,
   Digit5: 16,
+};
+
+/** What giving a room a specialty means, by room type. */
+const SPECIALTY_NOTES: Record<string, string> = {
+  ward: "Patients go to their own specialty's ward first, then one for any specialty, and only then to another specialty's ward (an outlier).",
+  outpatient_clinic:
+    "Clinic sessions use a room of their own specialty first, then one open to any specialty.",
+  theatre:
+    "Theatre lists use a theatre of their own specialty first, then one open to any specialty.",
 };
 
 export class Game {
@@ -223,7 +232,7 @@ export class Game {
     this.drainEvents();
     this.refreshPanels();
     this.publishHud();
-    if (cmd.type === "set_me_duty" || cmd.type === "set_clinic_sessions") this.publishInspector();
+    if (cmd.type !== "hire_staff" && cmd.type !== "dismiss_staff") this.publishInspector();
   }
 
   /**
@@ -235,6 +244,16 @@ export class Game {
     const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
     if (!room || !roomById.get(room.typeId)?.specialty) return;
     setRoomSpecialty(this.state, room, specialty);
+    if (this.preview) this.rebuildPreview();
+    this.publishInspector();
+  }
+
+  /** Keeps the selected theatre for emergencies, or opens it to planned lists. */
+  setEmergencyTheatre(on: boolean): void {
+    const tile = this.selectedTile;
+    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    if (!room || room.typeId !== "theatre") return;
+    setEmergencyTheatre(this.state, room, on);
     if (this.preview) this.rebuildPreview();
     this.publishInspector();
   }
@@ -722,13 +741,16 @@ export class Game {
           ? {
               specialty: {
                 value: room.specialty,
-                // Clinic rooms: only specialties that run outpatient clinics.
+                // Clinic rooms and theatres: only specialties that use them.
                 options: content.specialties
                   .filter((sp) => room.typeId !== "outpatient_clinic" || sp.outpatients)
+                  .filter((sp) => room.typeId !== "theatre" || sp.surgery)
                   .map((sp) => ({ id: sp.id, name: sp.name })),
+                note: SPECIALTY_NOTES[room.typeId] ?? "",
               },
             }
           : {}),
+        ...(room.typeId === "theatre" ? { emergency: room.emergency } : {}),
       };
       this.renderer.setSelection(
         room.tiles.map((i) => ({ x: i % grid.width, y: Math.floor(i / grid.width) })),

@@ -456,6 +456,18 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v24: theatres. Nobody does theatre lists yet, and no theatre is kept for emergencies.
+  23: (save) => {
+    const state = save.state as { staff: object[] };
+    return {
+      ...save,
+      state: {
+        ...state,
+        emergencyTheatres: {},
+        staff: state.staff.map((s) => ({ ...s, theatreSessions: 0 })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

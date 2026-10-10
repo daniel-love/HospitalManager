@@ -31,6 +31,10 @@ export function App({ game }: { game: Game }) {
         onClinicSessions={(id, sessions) =>
           game.applyStaff({ type: "set_clinic_sessions", id, sessions })
         }
+        onTheatreSessions={(id, sessions) =>
+          game.applyStaff({ type: "set_theatre_sessions", id, sessions })
+        }
+        onEmergencyTheatre={(on) => game.setEmergencyTheatre(on)}
       />
       {/* Strips under the top bar stack rather than overlap. */}
       <div class="under-topbar">

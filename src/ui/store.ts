@@ -112,8 +112,10 @@ export type AgentInfo =
       morale: number;
       /** Resident consultants: whether they have the Medical Examiner duty. */
       meDuty?: boolean;
-      /** Resident consultants and registrars of a specialty with clinics: their job plan. */
-      clinics?: { sessions: number; max: number; when: string };
+      /** Resident consultants and registrars of a specialty with clinics: their clinics. */
+      clinics?: { sessions: number; max: number; note: string };
+      /** Resident surgeons and anaesthetists: their theatre lists. */
+      theatre?: { sessions: number; max: number; note: string };
     };
 
 export interface InspectorData {
@@ -136,7 +138,11 @@ export interface InspectorData {
     specialty?: {
       value: SpecialtyId | null;
       options: { id: SpecialtyId; name: string }[];
+      /** How the setting is used, for this kind of room. */
+      note: string;
     };
+    /** Operating theatres: kept for emergencies. */
+    emergency?: boolean;
   };
   object?: {
     id: number;

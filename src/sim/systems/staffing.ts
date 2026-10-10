@@ -8,7 +8,7 @@
  */
 import { specialtyById, staffRoleById } from "@data/catalogue";
 import { MORALE_START } from "@data/deaths";
-import { MAX_CLINIC_SESSIONS } from "@data/outpatients";
+import { MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS, MAX_THEATRE_SESSIONS } from "@data/outpatients";
 import { FIRST_NAMES, SURNAMES } from "@data/names";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import { ON_CALL } from "@data/staff";
@@ -46,7 +46,9 @@ export type StaffCommand =
   /** Gives a resident consultant the Medical Examiner duty, or takes it away. */
   | { type: "set_me_duty"; id: number; on: boolean }
   /** Sets how many outpatient clinic sessions a week are in a doctor's job plan. */
-  | { type: "set_clinic_sessions"; id: number; sessions: number };
+  | { type: "set_clinic_sessions"; id: number; sessions: number }
+  /** Sets how many theatre lists a week a surgeon or anaesthetist does. */
+  | { type: "set_theatre_sessions"; id: number; sessions: number };
 
 export type StaffResult = { ok: true; staff: Staff } | { ok: false; error: string };
 
@@ -75,6 +77,7 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
       onCall: cmd.onCall ? { state: "home", at: state.tick } : null,
       meDuty: false,
       clinicSessions: 0,
+      theatreSessions: 0,
       x: at.x,
       y: at.y,
       prevX: at.x,
@@ -113,7 +116,20 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
         error: "Only resident consultants and registrars of a specialty with clinics run them",
       };
     }
-    staff.clinicSessions = Math.max(0, Math.min(MAX_CLINIC_SESSIONS, Math.round(cmd.sessions)));
+    const room = MAX_FIXED_SESSIONS - (operates(staff) ? staff.theatreSessions : 0);
+    staff.clinicSessions = clamp(cmd.sessions, Math.min(MAX_CLINIC_SESSIONS, room));
+    return { ok: true, staff };
+  }
+  if (cmd.type === "set_theatre_sessions") {
+    if (!operates(staff)) {
+      return {
+        ok: false,
+        error:
+          "Only resident surgeons and anaesthetists (consultants and registrars) do theatre lists",
+      };
+    }
+    const room = MAX_FIXED_SESSIONS - (runsClinics(staff) ? staff.clinicSessions : 0);
+    staff.theatreSessions = clamp(cmd.sessions, Math.min(MAX_THEATRE_SESSIONS, room));
     return { ok: true, staff };
   }
   const job = staff.jobId === null ? undefined : state.jobs[staff.jobId];
@@ -125,6 +141,17 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
   if (staff.desk !== null) release(state, staff.desk, "staff", staff.id);
   delete state.staff[staff.id];
   return { ok: true, staff };
+}
+
+const clamp = (n: number, max: number) => Math.max(0, Math.min(max, Math.round(n)));
+
+/**
+ * Whether someone can do theatre lists: a resident consultant or registrar
+ * of a surgical specialty, or of Anaesthetics.
+ */
+export function operates(s: Staff): boolean {
+  if ((s.role !== "consultant" && s.role !== "registrar") || s.onCall || !s.specialty) return false;
+  return s.specialty === "anaesthetics" || !!specialtyById.get(s.specialty)?.surgery;
 }
 
 /** Whether someone can have clinic sessions in their job plan. */

@@ -45,6 +45,7 @@ export function detectRooms(state: SimState): void {
         checks: [],
         valid: false,
         specialty: null,
+        emergency: false,
         forConditions: [],
       });
     }
@@ -89,8 +90,25 @@ export function detectRooms(state: SimState): void {
     const def = room && roomById.get(room.typeId);
     if (room && def?.specialty && room.specialty === null) room.specialty = specialty;
   }
+  for (const key of Object.keys(state.emergencyTheatres)) {
+    const [floor, tile] = key.split(":").map(Number);
+    const id = state.floors[floor!]?.roomId[tile!] ?? 0;
+    const room = id === 0 ? undefined : rooms[id - 1];
+    if (room?.typeId === "theatre") room.emergency = true;
+  }
   state.rooms = rooms;
   state.objectRoom = objectRoom;
+}
+
+/** Keeps a theatre for emergencies, or opens it to planned lists again. */
+export function setEmergencyTheatre(state: SimState, room: Room, on: boolean): void {
+  const grid = state.floors[room.floor]!;
+  for (const key of Object.keys(state.emergencyTheatres)) {
+    const [floor, tile] = key.split(":").map(Number);
+    if (floor === room.floor && grid.roomId[tile!] === room.id) delete state.emergencyTheatres[key];
+  }
+  if (on) state.emergencyTheatres[`${room.floor}:${room.tiles[0]!}`] = true;
+  room.emergency = on;
 }
 
 /**

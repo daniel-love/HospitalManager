@@ -45,9 +45,9 @@ import { inCare } from "@sim/systems/curtains";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { annualCost } from "@sim/systems/finance";
 import { formatWait, inAE } from "@sim/systems/patients";
-import { canDo, runsClinics, staffTitle } from "@sim/systems/staffing";
+import { canDo, operates, runsClinics, staffTitle } from "@sim/systems/staffing";
 import { describeJobPlan, jobPlan } from "@sim/systems/clinics";
-import { MAX_CLINIC_SESSIONS } from "@data/outpatients";
+import { MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS, MAX_THEATRE_SESSIONS } from "@data/outpatients";
 import { analysers, pendingResults } from "@sim/systems/diagnostics";
 import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 import { liveSessions } from "@sim/systems/outpatients";
@@ -811,15 +811,40 @@ export function describeStaff(state: SimState, s: Staff): AgentInfo {
     annualCost: annualCost(s),
     morale: Math.round(s.morale),
     ...(s.role === "consultant" && !s.onCall ? { meDuty: s.meDuty } : {}),
-    ...(runsClinics(s)
-      ? {
-          clinics: {
-            sessions: s.clinicSessions,
-            max: MAX_CLINIC_SESSIONS,
-            when: describeJobPlan(jobPlan(state, s)),
-          },
-        }
-      : {}),
+    ...(runsClinics(s) ? { clinics: clinicPlan(state, s) } : {}),
+    ...(operates(s) ? { theatre: theatrePlan(state, s) } : {}),
+  };
+}
+
+/** Their clinic sessions, for the inspector. */
+function clinicPlan(state: SimState, s: Staff) {
+  const when = jobPlan(state, s).filter((p) => p.kind === "clinic");
+  return {
+    sessions: s.clinicSessions,
+    max: Math.min(MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS - (operates(s) ? s.theatreSessions : 0)),
+    note:
+      when.length > 0
+        ? `${describeJobPlan(when)}. In clinic they see booked outpatients and aren't free for other work.`
+        : "Each session is a morning (09:00 to 13:00) or afternoon (13:30 to 17:30) seeing booked outpatients, in a clinic room for their specialty.",
+  };
+}
+
+/** Their theatre lists, for the inspector. */
+function theatrePlan(state: SimState, s: Staff) {
+  const when = jobPlan(state, s).filter((p) => p.kind === "theatre");
+  const anaesthetist = s.specialty === "anaesthetics";
+  const note = anaesthetist
+    ? "Each list needs an anaesthetist: they're paired with surgeons' lists each week, on the half-days they're needed."
+    : when.length > 0
+      ? `${describeJobPlan(when)}. On a list they operate on booked patients, with an anaesthetist and two theatre practitioners.`
+      : "Each list is a morning (09:00 to 13:00) or afternoon (13:30 to 17:30) in theatre, operating on patients from their waiting list.";
+  return {
+    sessions: s.theatreSessions,
+    max: Math.min(
+      MAX_THEATRE_SESSIONS,
+      MAX_FIXED_SESSIONS - (runsClinics(s) ? s.clinicSessions : 0),
+    ),
+    note,
   };
 }
 

@@ -16,6 +16,10 @@ export type SessionHalf = keyof typeof CLINIC_SESSIONS;
  * and admin, so six clinics is a heavy outpatient week.
  */
 export const MAX_CLINIC_SESSIONS = 6;
+/** Most theatre lists a week in a job plan. */
+export const MAX_THEATRE_SESSIONS = 4;
+/** Most clinics and lists together: a ten-session job plan keeps some for other work. */
+export const MAX_FIXED_SESSIONS = 8;
 
 /**
  * The half-days a job plan's clinics fall on, in the order they're added,

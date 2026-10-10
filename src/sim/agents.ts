@@ -234,6 +234,11 @@ export interface Staff extends AgentBase {
    * outpatient clinic sessions in their job plan (systems/clinics.ts).
    */
   clinicSessions: number;
+  /**
+   * Weekly theatre lists: surgeons operate on fixed half-days; anaesthetists
+   * are paired with surgeons' lists (systems/theatres.ts).
+   */
+  theatreSessions: number;
   jobId: number | null;
   /** Receptionists: the desk they staff. Nurses: the nurse station they wait at. */
   desk: number | null;

@@ -488,6 +488,57 @@ export const equipment: EquipmentInput[] = [
     description: "Mechanical ventilation for critically ill patients.",
   },
 
+  // Theatres
+  {
+    id: "operating_table",
+    name: "Operating table",
+    category: "surgical",
+    tier: 3,
+    cost: 45000,
+    upkeep: 300,
+    footprint: [1, 2],
+    reliability: 0.998,
+    power: true,
+    capabilities: ["operating_table"],
+    glyph: "OT",
+    // The team works from both sides.
+    access: [{ side: "sides", who: "staff", need: "all" }],
+    description:
+      "A powered, adjustable operating table. The surgeon and scrub practitioner stand either side; it needs clear space all round.",
+  },
+  {
+    id: "anaesthetic_machine",
+    name: "Anaesthetic machine",
+    category: "surgical",
+    tier: 3,
+    cost: 40000,
+    upkeep: 450,
+    footprint: [1, 1],
+    reliability: 0.997,
+    power: true,
+    capabilities: ["anaesthesia"],
+    glyph: "AM",
+    access: [{ side: "front", who: "staff" }],
+    description:
+      "Delivers anaesthetic gases and ventilates the patient, with its own monitoring. The anaesthetist stands at it, at the head of the table.",
+  },
+  {
+    id: "operating_light",
+    name: "Operating light",
+    category: "surgical",
+    tier: 2,
+    cost: 22000,
+    upkeep: 150,
+    footprint: [1, 1],
+    reliability: 0.999,
+    power: true,
+    capabilities: ["theatre_lighting"],
+    glyph: "OL",
+    mount: "ceiling",
+    access: [],
+    description: "Shadow-free LED surgical lights on a ceiling arm, over the operating table.",
+  },
+
   // Facilities
   {
     id: "sink",
@@ -599,6 +650,7 @@ export const equipment: EquipmentInput[] = [
 /** Rooms gain these capabilities when they hold all the listed ones. */
 export const capabilityCombos = [
   { capability: "resuscitation", requires: ["defibrillation", "resus_kit"] },
+  { capability: "surgery", requires: ["operating_table", "anaesthesia", "theatre_lighting"] },
 ];
 
 /** Build palette sections for equipment, one per category. */
@@ -611,4 +663,5 @@ export const EQUIPMENT_CATEGORY_NAMES: Record<EquipmentCategory, string> = {
   life_support: "Life support",
   facilities: "Facilities",
   decor: "Décor",
+  surgical: "Theatres",
 };

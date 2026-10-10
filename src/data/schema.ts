@@ -17,6 +17,7 @@ export const equipmentCategories = [
   "life_support",
   "facilities",
   "decor",
+  "surgical",
 ] as const;
 export type EquipmentCategory = (typeof equipmentCategories)[number];
 
@@ -132,6 +133,7 @@ export const roomDepartments = [
   "Support",
   "Staff",
   "Outpatients",
+  "Theatres",
 ] as const;
 export type RoomDepartment = (typeof roomDepartments)[number];
 
@@ -200,6 +202,7 @@ export const staffRoleIds = [
   "registrar",
   "radiographer",
   "biomedical_scientist",
+  "theatre_practitioner",
 ] as const;
 export type StaffRoleId = (typeof staffRoleIds)[number];
 
@@ -249,12 +252,32 @@ export const outpatientServiceSchema = z.object({
 });
 export type OutpatientService = z.infer<typeof outpatientServiceSchema>;
 
+/**
+ * A specialty's operations (GAME_DESIGN §5.1, M4 step 7): the planned
+ * operations its clinics list patients for, done on its theatre lists.
+ */
+export const surgicalServiceSchema = z.object({
+  /** Share done as day cases: home from the Day Surgery Unit the same day. */
+  dayCaseShare: z.number().min(0).max(1),
+  /** Time in theatre, minutes, anaesthetic to leaving for Recovery. */
+  opMins: z.tuple([mins, mins]),
+  /** Inpatients: days on the ward afterwards. */
+  stayDays: z.tuple([z.number().positive(), z.number().positive()]),
+  /** NHS tariff, £, for the whole spell: day case, inpatient. */
+  dayCaseTariff: z.number().int().positive(),
+  inpatientTariff: z.number().int().positive(),
+  /** What's typically done, e.g. "hip and knee replacements". */
+  examples: z.string(),
+});
+export type SurgicalService = z.infer<typeof surgicalServiceSchema>;
+
 export const specialtySchema = z.object({
   id: z.enum(specialtyIds),
   name: z.string().min(1),
   /** As a team, e.g. "the cardiology team". */
   team: z.string().min(1),
   outpatients: outpatientServiceSchema.optional(),
+  surgery: surgicalServiceSchema.optional(),
   description: z.string(),
 });
 export type SpecialtyDef = z.infer<typeof specialtySchema>;

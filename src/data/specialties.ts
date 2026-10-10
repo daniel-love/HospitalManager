@@ -8,6 +8,11 @@
  * of them from GPs), follow-up chances from the national follow-up ratios
  * (ophthalmology about 3 per first appointment, ENT about 1), and tariffs are
  * rough 2025/26 NHS prices for consultant-led attendances.
+ *
+ * `surgery` is what its clinics list patients for (M4 step 7): day-case
+ * shares from NHS day surgery rates (the British Association of Day
+ * Surgery's targets), lengths of stay with enhanced recovery, and tariffs for
+ * the whole spell (a hip replacement about £6,000, a cataract under £1,000).
  */
 import type { SpecialtyInput } from "./schema";
 
@@ -45,6 +50,14 @@ export const specialties: SpecialtyInput[] = [
       firstTariff: 210,
       followUpTariff: 110,
     },
+    surgery: {
+      dayCaseShare: 0.6,
+      opMins: [45, 90],
+      stayDays: [1, 2],
+      dayCaseTariff: 1600,
+      inpatientTariff: 3200,
+      examples: "pacemaker implants (angioplasty needs a cath lab, which comes later)",
+    },
     description: "Heart conditions, including chest pain that may be a heart attack.",
   },
   {
@@ -62,6 +75,15 @@ export const specialties: SpecialtyInput[] = [
       firstTariff: 165,
       followUpTariff: 100,
     },
+    surgery: {
+      dayCaseShare: 0.65,
+      opMins: [45, 120],
+      stayDays: [1, 4],
+      dayCaseTariff: 1300,
+      inpatientTariff: 3500,
+      examples:
+        "hernia repairs and gallbladder removals, most as day cases; bowel surgery as inpatients",
+    },
     description: "Abdominal pain, and head injuries that need observing overnight.",
   },
   {
@@ -78,6 +100,15 @@ export const specialties: SpecialtyInput[] = [
       surgeryChance: 0.15,
       firstTariff: 170,
       followUpTariff: 95,
+    },
+    surgery: {
+      dayCaseShare: 0.45,
+      opMins: [60, 150],
+      stayDays: [2, 4],
+      dayCaseTariff: 1500,
+      inpatientTariff: 6200,
+      examples:
+        "hip and knee replacements (a few days on a ward), and knee arthroscopies and hand surgery as day cases",
     },
     description:
       "Broken bones from A&E, and in clinic, joint and back problems referred by GPs: hips and knees that may need replacing.",
@@ -104,6 +135,14 @@ export const specialties: SpecialtyInput[] = [
       firstTariff: 140,
       followUpTariff: 90,
     },
+    surgery: {
+      dayCaseShare: 1,
+      opMins: [20, 45],
+      stayDays: [1, 1],
+      dayCaseTariff: 600,
+      inpatientTariff: 1200,
+      examples: "skin cancer excisions, all day cases",
+    },
     description:
       "Skin conditions, almost all seen in clinic: eczema, psoriasis, and moles or lesions that might be skin cancer, which are referred urgently.",
   },
@@ -122,6 +161,14 @@ export const specialties: SpecialtyInput[] = [
       firstTariff: 145,
       followUpTariff: 95,
     },
+    surgery: {
+      dayCaseShare: 0.7,
+      opMins: [30, 90],
+      stayDays: [1, 2],
+      dayCaseTariff: 1100,
+      inpatientTariff: 2400,
+      examples: "tonsillectomies, sinus and ear operations",
+    },
     description:
       "Ear, nose and throat: hearing loss, sinus problems, tonsils, and lumps in the neck. Mostly clinic work, with some day surgery.",
   },
@@ -139,6 +186,14 @@ export const specialties: SpecialtyInput[] = [
       surgeryChance: 0.15,
       firstTariff: 155,
       followUpTariff: 80,
+    },
+    surgery: {
+      dayCaseShare: 0.98,
+      opMins: [20, 40],
+      stayDays: [1, 1],
+      dayCaseTariff: 950,
+      inpatientTariff: 2000,
+      examples: "cataract operations, almost all day cases",
     },
     description:
       "Eyes: cataracts (the commonest operation in the NHS), glaucoma and macular degeneration, which need many follow-up visits.",

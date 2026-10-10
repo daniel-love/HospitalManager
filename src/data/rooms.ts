@@ -323,6 +323,54 @@ export const rooms: RoomInput[] = [
     description:
       "A consultant or registrar sees booked outpatients here in clinic sessions (mornings 09:00 to 13:00, afternoons 13:30 to 17:30, Monday to Friday). Give it a specialty in the inspector, or leave it open to any.",
   },
+  {
+    id: "theatre",
+    code: 23,
+    name: "Operating Theatre",
+    department: "Theatres",
+    colour: 0x7cc3d6,
+    // An NHS operating theatre is about 55 m² (HBN 26).
+    minSize: [6, 6],
+    enclosed: true,
+    specialty: true,
+    required: [
+      { label: "Operating table", anyOf: ["operating_table"] },
+      { label: "Anaesthetic machine", anyOf: ["anaesthetic_machine"] },
+      { label: "Operating light", anyOf: ["operating_light"] },
+      { label: "Scrub sink", anyOf: ["sink"] },
+    ],
+    description:
+      "Where operations happen: planned theatre lists in the week, and emergencies at any time. Give it a specialty, leave it open to any, or keep it for emergencies so they don't cancel planned operations. Needs a bed-width route to Recovery, the wards and A&E.",
+  },
+  {
+    id: "recovery",
+    code: 24,
+    name: "Recovery",
+    department: "Theatres",
+    colour: 0xa6d8e4,
+    minSize: [3, 3],
+    enclosed: false,
+    required: [
+      { label: "Trolley or bed", anyOf: patientBed },
+      { label: "Bedside monitor", anyOf: ["bedside_monitor"] },
+      { label: "Piped oxygen point", anyOf: ["oxygen_point"] },
+    ],
+    description:
+      "Patients come round from the anaesthetic here, on a trolley with a nurse beside them, before going home or to a ward. Without a free Recovery trolley, the next operation can't finish. Put it next to the theatres.",
+  },
+  {
+    id: "day_surgery_unit",
+    code: 25,
+    name: "Day Surgery Unit",
+    department: "Theatres",
+    colour: 0xc2e3c8,
+    minSize: [4, 4],
+    enclosed: true,
+    minSeats: 4,
+    required: [{ label: "Nurses' desk", anyOf: ["desk"] }],
+    description:
+      "Patients coming in for a planned operation are admitted here on the day by a nurse, and wait for theatre. Day cases come back here from Recovery to get ready to go home.",
+  },
 ];
 
 /** Build palette sections for rooms, in display order. */
@@ -330,6 +378,7 @@ export const roomGroups = [
   "ae",
   "wards",
   "outpatients",
+  "theatres",
   "diagnostics",
   "shared",
   "facilities",
@@ -342,6 +391,7 @@ export const ROOM_GROUP_NAMES: Record<RoomGroup, string> = {
   ae: "A&E",
   wards: "Wards",
   outpatients: "Outpatients",
+  theatres: "Theatres",
   diagnostics: "Diagnostics",
   shared: "Shared spaces",
   facilities: "Facilities",
@@ -360,4 +410,5 @@ export const ROOM_GROUP_OF: Record<RoomDepartment, RoomGroup> = {
   Support: "support",
   Staff: "staff",
   Outpatients: "outpatients",
+  Theatres: "theatres",
 };

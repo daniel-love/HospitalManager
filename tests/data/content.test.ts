@@ -103,7 +103,7 @@ describe("list sections (Hire panel and build palettes)", () => {
     expectComplete(staffRoleSections(), content.staffRoles);
     expect(staffRoleSections().map((s) => s.name)).toEqual([
       "Medical",
-      "Nursing",
+      "Nursing & theatres",
       "Diagnostics",
       "Support services",
       "Administrative",

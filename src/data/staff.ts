@@ -95,6 +95,15 @@ export const staffRoles: StaffRoleInput[] = [
       "Band 5, HCPC registered. Processes blood samples in the Pathology Lab once a porter brings them; results follow when the analyser has run. Without one, no blood results.",
   },
   {
+    id: "theatre_practitioner",
+    name: "Theatre Practitioner",
+    short: "Theatre practitioners",
+    group: "nursing",
+    annualCost: 45_000,
+    description:
+      "Band 5/6 scrub nurse or operating department practitioner (ODP). Every operation needs two: one scrubbed to pass instruments to the surgeon, one assisting the anaesthetist. They also wheel patients from theatre to Recovery. Without two free, a theatre list can't start.",
+  },
+  {
     id: "porter",
     name: "Porter",
     short: "Porters",
@@ -126,7 +135,7 @@ export const staffRoles: StaffRoleInput[] = [
 /** Headings for each staff group, as the Hire panel shows them. */
 export const STAFF_GROUP_NAMES: Record<StaffGroup, string> = {
   medical: "Medical",
-  nursing: "Nursing",
+  nursing: "Nursing & theatres",
   diagnostics: "Diagnostics",
   support: "Support services",
   admin: "Administrative",

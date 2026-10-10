@@ -46,6 +46,7 @@ const BASES: Record<StaffRoleId, BaseKind[]> = {
   biomedical_scientist: [{ type: "lab" }, STAFF_ROOM],
   porter: [{ type: "porters_lodge" }, STAFF_ROOM],
   cleaner: [{ type: "domestic_services_room" }, STAFF_ROOM],
+  theatre_practitioner: [{ type: "recovery" }, { type: "theatre" }, STAFF_ROOM],
   receptionist: [],
 };
 

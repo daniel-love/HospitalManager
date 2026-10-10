@@ -33,6 +33,7 @@ export const CATEGORY_COLOURS: Record<EquipmentDef["category"], number> = {
   life_support: 0xe05a5a,
   facilities: 0xc9d6df,
   decor: 0x6abf5a,
+  surgical: 0x3a9bb8,
 };
 
 /** Marks the side of an item that staff work from (NHS-ish blue). */
@@ -61,6 +62,8 @@ export const ROLE_COLOURS: Record<StaffRoleId, number> = {
   radiographer: 0x2a8a9c,
   biomedical_scientist: 0x7a5cb0,
   cleaner: 0x3f9a6a,
+  // Theatre scrubs: green-teal.
+  theatre_practitioner: 0x2e8b7a,
 };
 
 /** Patients wear white until triaged, then show their triage colour as a ring. */

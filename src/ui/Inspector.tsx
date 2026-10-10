@@ -8,12 +8,16 @@ export function Inspector({
   onRoomSpecialty,
   onMeDuty,
   onClinicSessions,
+  onTheatreSessions,
+  onEmergencyTheatre,
 }: {
   onClose: () => void;
   onMove: (objectId: number) => void;
   onRoomSpecialty: (specialty: SpecialtyId | null) => void;
   onMeDuty: (staffId: number, on: boolean) => void;
   onClinicSessions: (staffId: number, sessions: number) => void;
+  onTheatreSessions: (staffId: number, sessions: number) => void;
+  onEmergencyTheatre: (on: boolean) => void;
 }) {
   const data = inspector.value;
   if (!data) return null;
@@ -24,7 +28,12 @@ export function Inspector({
         ×
       </button>
       {agent && (
-        <AgentSection agent={agent} onMeDuty={onMeDuty} onClinicSessions={onClinicSessions} />
+        <AgentSection
+          agent={agent}
+          onMeDuty={onMeDuty}
+          onClinicSessions={onClinicSessions}
+          onTheatreSessions={onTheatreSessions}
+        />
       )}
       {object && (
         <section>
@@ -79,9 +88,20 @@ export function Inspector({
                   </option>
                 ))}
               </select>
+              <span class="dim">{room.specialty.note}</span>
+            </label>
+          )}
+          {room.emergency !== undefined && (
+            <label class="duty-toggle">
+              <input
+                type="checkbox"
+                checked={room.emergency}
+                onChange={(e) => onEmergencyTheatre((e.currentTarget as HTMLInputElement).checked)}
+              />{" "}
+              Keep for emergencies
               <span class="dim">
-                Patients go to their own specialty's ward first, then one for any specialty, and
-                only then to another specialty's ward (an outlier).
+                A CEPOD theatre: no planned lists, so emergencies never cancel anyone's operation.
+                Without one, emergencies take the next free slot on a list.
               </span>
             </label>
           )}
@@ -148,14 +168,51 @@ function moodWord(mood: number): string {
   return "Angry: may leave";
 }
 
+/** Sessions a week in a job plan, with − and + buttons. */
+function SessionStepper(props: {
+  title: string;
+  what: string;
+  plan: { sessions: number; max: number; note: string };
+  onChange: (sessions: number) => void;
+}) {
+  const { sessions, max, note } = props.plan;
+  return (
+    <div class="job-plan">
+      <h4>{props.title}</h4>
+      <div class="stepper">
+        <button
+          disabled={sessions <= 0}
+          onClick={() => props.onChange(sessions - 1)}
+          aria-label={`Fewer ${props.what}`}
+        >
+          −
+        </button>
+        <span>
+          {sessions} a week (of {max})
+        </span>
+        <button
+          disabled={sessions >= max}
+          onClick={() => props.onChange(sessions + 1)}
+          aria-label={`More ${props.what}`}
+        >
+          +
+        </button>
+      </div>
+      <span class="dim">{note}</span>
+    </div>
+  );
+}
+
 function AgentSection({
   agent,
   onMeDuty,
   onClinicSessions,
+  onTheatreSessions,
 }: {
   agent: AgentInfo;
   onMeDuty: (staffId: number, on: boolean) => void;
   onClinicSessions: (staffId: number, sessions: number) => void;
+  onTheatreSessions: (staffId: number, sessions: number) => void;
 }) {
   if (agent.kind === "staff") {
     return (
@@ -180,33 +237,20 @@ function AgentSection({
           </label>
         )}
         {agent.clinics && (
-          <div class="job-plan">
-            <h4>Outpatient clinics</h4>
-            <div class="stepper">
-              <button
-                disabled={agent.clinics.sessions <= 0}
-                onClick={() => onClinicSessions(agent.id, agent.clinics!.sessions - 1)}
-                aria-label="Fewer clinic sessions"
-              >
-                −
-              </button>
-              <span>
-                {agent.clinics.sessions} a week (of {agent.clinics.max})
-              </span>
-              <button
-                disabled={agent.clinics.sessions >= agent.clinics.max}
-                onClick={() => onClinicSessions(agent.id, agent.clinics!.sessions + 1)}
-                aria-label="More clinic sessions"
-              >
-                +
-              </button>
-            </div>
-            <span class="dim">
-              {agent.clinics.sessions > 0
-                ? `${agent.clinics.when}. In clinic they see booked outpatients and aren't free for other work.`
-                : "Each session is a morning (09:00 to 13:00) or afternoon (13:30 to 17:30) seeing booked outpatients, in a clinic room for their specialty."}
-            </span>
-          </div>
+          <SessionStepper
+            title="Outpatient clinics"
+            what="clinic sessions"
+            plan={agent.clinics}
+            onChange={(n) => onClinicSessions(agent.id, n)}
+          />
+        )}
+        {agent.theatre && (
+          <SessionStepper
+            title="Theatre lists"
+            what="theatre lists"
+            plan={agent.theatre}
+            onChange={(n) => onTheatreSessions(agent.id, n)}
+          />
         )}
         <h4>Morale</h4>
         <div class="meter" title={`${agent.morale} / 100`}>

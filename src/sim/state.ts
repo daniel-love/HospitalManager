@@ -29,7 +29,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 23;
+export const SIM_STATE_VERSION = 24;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -68,6 +68,8 @@ export interface Room {
   valid: boolean;
   /** Wards and clinic rooms: the specialty it's for (see SimState.roomSpecialties), or null for any. */
   specialty: SpecialtyId | null;
+  /** Operating theatres: kept for emergencies (see SimState.emergencyTheatres). */
+  emergency: boolean;
   /**
    * Advisory: equipment some conditions need here, beyond being valid
    * (e.g. an ECG for chest pain). Doesn't affect `valid`.
@@ -128,6 +130,8 @@ export interface SimState {
    * is pinned to a tile and found again from it (detectRooms).
    */
   roomSpecialties: Record<string, SpecialtyId>;
+  /** Operating theatres kept for emergencies, pinned to a tile like roomSpecialties. */
+  emergencyTheatres: Record<string, true>;
 
   /** Money and patient flow so far today, and reports for past days (newest last). */
   today: { ledger: Ledger; stats: FlowStats };
@@ -197,6 +201,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     reserved: {},
     dirt: {},
     roomSpecialties: {},
+    emergencyTheatres: {},
     today: { ledger: emptyLedger(), stats: emptyStats() },
     history: [],
     settings: { catchment: DEFAULT_CATCHMENT, patientVolume: 1 },

@@ -1,42 +1,54 @@
 /**
- * Outpatient clinics (GAME_DESIGN §5.1). Each resident consultant or
- * registrar of a specialty with clinics has a number of weekly clinic
- * sessions in their job plan; this works out which half-days they fall on,
- * and which clinic room each session gets.
+ * Job plans (GAME_DESIGN §5.1): each resident consultant or registrar of a
+ * specialty with clinics has a number of weekly outpatient clinic sessions,
+ * and surgeons a number of theatre lists. This works out which half-days
+ * they fall on, and which clinic room each clinic gets. (Theatre lists get
+ * their theatre and anaesthetist in systems/theatres.ts.)
  */
 import { SESSION_ORDER, type SessionHalf } from "@data/outpatients";
 import type { Staff } from "../agents";
 import type { SimState } from "../state";
 import { WEEKDAY_NAMES } from "../time";
-import { runsClinics } from "./staffing";
+import { operates, runsClinics } from "./staffing";
 
 export interface SessionSlot {
   /** 0 Monday … 4 Friday. */
   weekday: number;
   half: SessionHalf;
+  kind: "clinic" | "theatre";
+}
+
+/** Weekly sessions in someone's job plan that fall on fixed half-days. */
+function fixedSessions(s: Staff): number {
+  const lists = operates(s) && s.specialty !== "anaesthetics" ? s.theatreSessions : 0;
+  return (runsClinics(s) ? s.clinicSessions : 0) + lists;
 }
 
 /**
- * The half-days a clinician's clinics fall on each week. Their colleagues of
- * the same specialty hired before them fill the earlier half-days, so a
- * team's clinics spread across the week rather than all wanting the same
- * rooms at once.
+ * The half-days a clinician's clinics and theatre lists fall on each week:
+ * clinics first, then lists. Their colleagues of the same specialty hired
+ * before them fill the earlier half-days, so a team's sessions spread across
+ * the week rather than all wanting the same rooms at once. Anaesthetists
+ * have no fixed half-days: they're paired with surgeons' lists.
  */
 export function jobPlan(state: SimState, s: Staff): SessionSlot[] {
-  if (!runsClinics(s) || s.clinicSessions === 0) return [];
+  const total = fixedSessions(s);
+  if (total === 0) return [];
   let before = 0;
   for (const o of Object.values(state.staff)) {
-    if (o.id < s.id && o.specialty === s.specialty && runsClinics(o)) before += o.clinicSessions;
+    if (o.id < s.id && o.specialty === s.specialty) before += fixedSessions(o);
   }
+  const clinics = runsClinics(s) ? s.clinicSessions : 0;
   const out: SessionSlot[] = [];
-  for (let i = 0; i < s.clinicSessions; i++) {
-    out.push(SESSION_ORDER[(before + i) % SESSION_ORDER.length]!);
+  for (let i = 0; i < total; i++) {
+    const slot = SESSION_ORDER[(before + i) % SESSION_ORDER.length]!;
+    out.push({ ...slot, kind: i < clinics ? "clinic" : "theatre" });
   }
   return out.sort((a, b) => a.weekday - b.weekday || (a.half === "am" ? -1 : 1));
 }
 
 /** "Mon morning, Wed afternoon". */
-export function describeJobPlan(slots: readonly SessionSlot[]): string {
+export function describeJobPlan(slots: readonly { weekday: number; half: SessionHalf }[]): string {
   return slots
     .map((s) => `${WEEKDAY_NAMES[s.weekday]} ${s.half === "am" ? "morning" : "afternoon"}`)
     .join(", ");
@@ -63,7 +75,9 @@ export function sessionsOn(state: SimState, day: number, half: SessionHalf): Ses
   // Cached until the layout or anyone's job plan changes.
   let plans = "";
   for (const s of Object.values(state.staff)) {
-    if (s.clinicSessions > 0) plans += `${s.id}:${s.clinicSessions},`;
+    if (s.clinicSessions + s.theatreSessions > 0) {
+      plans += `${s.id}:${s.clinicSessions}:${s.theatreSessions},`;
+    }
   }
   const key = `${day}:${half}:${state.layoutVersion}:${plans}`;
   let cache = sessionCache.get(state);
@@ -86,7 +100,8 @@ const sessionCache = new WeakMap<
 function findSessions(state: SimState, day: number, weekday: number, half: SessionHalf): Session[] {
   const sessions: Session[] = [];
   for (const s of Object.values(state.staff).sort((a, b) => a.id - b.id)) {
-    if (jobPlan(state, s).some((p) => p.weekday === weekday && p.half === half)) {
+    const plan = jobPlan(state, s);
+    if (plan.some((p) => p.kind === "clinic" && p.weekday === weekday && p.half === half)) {
       sessions.push({ day, half, staff: s, roomId: null });
     }
   }
