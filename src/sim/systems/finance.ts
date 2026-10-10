@@ -75,12 +75,14 @@ function closeDay(state: SimState): void {
     maximumFractionDigits: 0,
   });
   const s = report.stats;
+  const seen = s.firstAppointments + s.followUps;
+  const clinics = seen > 0 ? ` · ${seen} seen in clinic` : "";
   const fourHour =
     s.departures > 0 ? ` · 4-hour ${Math.round((100 * s.within4h) / s.departures)}%` : "";
   emit(
     state,
     `Day ${report.day} closed: ${n >= 0 ? "surplus" : "deficit"} ${money.format(Math.abs(n))} · ` +
-      `${s.discharged} treated, ${s.lwbs} left unseen${fourHour}`,
+      `${s.discharged} treated, ${s.lwbs} left unseen${fourHour}${clinics}`,
     n >= 0 ? "info" : "warn",
   );
 }

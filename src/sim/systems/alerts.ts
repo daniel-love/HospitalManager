@@ -10,11 +10,12 @@ import {
   TOILET_CLEAN_MINS,
   TOILET_USES_BEFORE_CLEAN,
 } from "@data/patients";
-import { conditionById, roleNames, roomById } from "@data/catalogue";
+import { conditionById, roleNames, roomById, specialtyById } from "@data/catalogue";
 import type { StaffRoleId } from "@data/schema";
 import { warn } from "../events";
 import {
   freeToilet,
+  holder,
   isCouch,
   missingRoom,
   receptionDesks,
@@ -22,7 +23,10 @@ import {
   seatCount,
 } from "../places";
 import type { SimState } from "../state";
-import { TICKS_PER_MINUTE } from "../time";
+import { clockFromTick, TICKS_PER_MINUTE } from "../time";
+import { sessionsOn } from "./clinics";
+import { outpatientDesks } from "./outpatients";
+import { offersClinic } from "./referrals";
 import { roomOfObject } from "../world/rooms";
 import { ambulancesWaiting, needsTrolley } from "./ambulances";
 import { hasCleaningJob, postJob, ticksFor } from "./jobBoard";
@@ -189,6 +193,53 @@ export function updateAlerts(state: SimState): void {
       "A deceased patient is waiting to go to the mortuary, but you have no porters. The bay stays closed.",
       "bad",
     );
+  }
+
+  // Outpatients.
+  const atDesk = Object.values(state.outpatients).filter(
+    (o) => o.stage === "arriving" && o.path.length === 0,
+  );
+  if (
+    atDesk.length > 0 &&
+    !outpatientDesks(state).some((d) => holder(state, d.id, "staff") !== undefined)
+  ) {
+    warn(
+      state,
+      "no_outpatient_receptionist",
+      COOLDOWN,
+      `${plural(atDesk.length, "outpatient is", "outpatients are")} waiting at Outpatients Reception with nobody on the desk. Receptionists fill A&E's desks first: hire another.`,
+      "bad",
+    );
+  }
+  const stranded = new Map<string, number>();
+  for (const r of Object.values(state.referrals)) {
+    if (r.kind === "surgery" || offersClinic(state, r.specialty)) continue;
+    const name = specialtyById.get(r.specialty)?.name ?? r.specialty;
+    stranded.set(name, (stranded.get(name) ?? 0) + 1);
+  }
+  for (const [name, n] of stranded) {
+    warn(
+      state,
+      `clinic_closed_${name}`,
+      COOLDOWN * 4,
+      `${plural(n, "patient is", "patients are")} on the ${name} waiting list, but its clinics aren't running (they need a clinic room, Outpatients Reception, and a consultant with clinic sessions). Their wait goes on.`,
+      "warn",
+    );
+  }
+  const c = clockFromTick(state.tick);
+  if (c.weekday <= 4 && c.hour === 8 && c.minute < CHECK_EVERY / TICKS_PER_MINUTE) {
+    const roomless = (["am", "pm"] as const).flatMap((h) =>
+      sessionsOn(state, c.day, h).filter((s) => s.roomId === null),
+    );
+    if (roomless.length > 0) {
+      warn(
+        state,
+        "no_clinic_room",
+        COOLDOWN,
+        `${plural(roomless.length, "clinic session", "clinic sessions")} today ${roomless.length === 1 ? "has" : "have"} no clinic room free, so ${roomless.length === 1 ? "it" : "they"} can't run. Build more Outpatient Clinic Rooms, or give one to the specialty.`,
+        "warn",
+      );
+    }
   }
 
   // Trolley patients waiting to be wheeled to a scan.

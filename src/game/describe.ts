@@ -51,6 +51,7 @@ import { MAX_CLINIC_SESSIONS } from "@data/outpatients";
 import { analysers, pendingResults } from "@sim/systems/diagnostics";
 import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 import { liveSessions } from "@sim/systems/outpatients";
+import { waitingLists } from "@sim/systems/referrals";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { roomAt, roomOfObject } from "@sim/world/rooms";
 import { porterJob } from "@sim/systems/escorts";
@@ -883,6 +884,7 @@ export function describeReport(state: SimState): ReportData {
         { within4h: 0, departures: 0 },
       ),
     ),
+    waitingLists: waitingLists(state).map(({ specialty: _id, ...rest }) => rest),
     mortuary: {
       ...mortuarySpaces(state),
       awaitingReview: Object.values(state.patients).filter(

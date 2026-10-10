@@ -1,7 +1,7 @@
 /**
- * Daily P&L and A&E performance (GAME_DESIGN §8.1, §8.5): headline figures for
- * today, the department right now, trends over the last fortnight, incidents
- * and the daily reports.
+ * Daily P&L, A&E and outpatient performance (GAME_DESIGN §8.1, §8.5):
+ * headline figures for today, the department right now, trends over the
+ * last fortnight, outpatient waiting lists, incidents and the daily reports.
  */
 import { formatMoney } from "@game/tools";
 import { net, type DayReport, type FlowStats, type Ledger } from "@sim/agents";
@@ -15,6 +15,8 @@ const FOUR_HOUR_INTERIM = 0.78;
 /** Ambulance handover and arrival-to-triage targets, in minutes. */
 const HANDOVER_TARGET = 15;
 const TRIAGE_TARGET = 15;
+/** NHS standard: 92% of patients waiting under 18 weeks from referral. */
+const RTT_TARGET = 0.92;
 const TREND_DAYS = 14;
 const TABLE_DAYS = 14;
 
@@ -73,6 +75,13 @@ export function ReportsPanel({ onShow }: { onShow: (at: { x: number; y: number }
             )}
           </div>
         </div>
+
+        {data.waitingLists.length > 0 && (
+          <>
+            <h3>Outpatient waiting lists</h3>
+            <WaitingLists lists={data.waitingLists} />
+          </>
+        )}
 
         <h3>Patient safety incidents</h3>
         {data.incidents.length === 0 ? (
@@ -144,8 +153,9 @@ function Headlines({ data }: { data: ReportData }) {
         label="Net today"
         value={formatMoney(n)}
         status={n < 0 ? "bad" : n > 0 ? "ok" : "none"}
-        note={`${formatMoney(l.tariff)} in · ${formatMoney(l.salaries + l.upkeep + l.transfers)} out`}
+        note={`${formatMoney(l.tariff + l.outpatients)} in · ${formatMoney(l.salaries + l.upkeep + l.transfers)} out`}
       />
+      <RttTile lists={data.waitingLists} />
       <Tile
         label="Patients"
         value={String(s.arrivals)}
@@ -164,6 +174,79 @@ function Headlines({ data }: { data: ReportData }) {
         }
       />
     </div>
+  );
+}
+
+/** The 18-week referral-to-treatment standard, across every specialty's list. */
+function RttTile({ lists }: { lists: ReportData["waitingLists"] }) {
+  const pathways = lists.reduce((n, l) => n + l.pathways, 0);
+  if (pathways === 0 && lists.length === 0) return null;
+  const within = lists.reduce((n, l) => n + l.within18w, 0);
+  const longest = Math.max(0, ...lists.map((l) => l.longestWeeks));
+  const s = share(within, pathways);
+  const status: Status = s === null ? "none" : s >= RTT_TARGET ? "ok" : s >= 0.75 ? "warn" : "bad";
+  return (
+    <Tile
+      label="18 weeks (RTT)"
+      title="Share of patients on an outpatient or surgical waiting list who have waited under 18 weeks since their GP referred them. NHS standard 92%."
+      value={s === null ? "—" : `${Math.round(s * 100)}%`}
+      status={status}
+      note={
+        pathways === 0
+          ? "Nobody waiting"
+          : `${plural(pathways, "patient")} waiting · longest ${plural(longest, "week")}`
+      }
+    />
+  );
+}
+
+function WaitingLists({ lists }: { lists: ReportData["waitingLists"] }) {
+  return (
+    <table class="report-table waiting-lists">
+      <thead>
+        <tr>
+          <th>Specialty</th>
+          <th class="num" title="Waiting for a first appointment (of them, booked)">
+            First appt
+          </th>
+          <th class="num" title="Due a follow-up appointment">
+            Follow-ups
+          </th>
+          <th class="num" title="Listed for an operation after clinic (theatres come next)">
+            Surgery
+          </th>
+          <th class="num" title="Waiting under 18 weeks since referral (NHS standard 92%)">
+            Under 18 wk
+          </th>
+          <th class="num" title="The longest wait since referral">
+            Longest
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {lists.map((l) => {
+          const s = share(l.within18w, l.pathways);
+          return (
+            <tr key={l.name}>
+              <td title={l.open ? undefined : "GPs can't refer here now: no clinic running"}>
+                {l.name}
+                {!l.open && <span class="dim"> (closed)</span>}
+              </td>
+              <td class="num">
+                {l.firstWaiting}
+                {l.firstWaiting > 0 && <span class="dim"> ({l.booked} booked)</span>}
+              </td>
+              <td class="num">{l.followUps}</td>
+              <td class="num">{l.surgery}</td>
+              <td class={`num${s !== null && s < RTT_TARGET ? " bad" : ""}`}>
+                {pct(l.within18w, l.pathways)}
+              </td>
+              <td class="num">{l.pathways === 0 ? "—" : `${l.longestWeeks} wk`}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
@@ -190,13 +273,18 @@ function Tile(props: {
 function MoneySection({ ledger }: { ledger: Ledger }) {
   const n = net(ledger);
   const costs = ledger.salaries + ledger.upkeep + ledger.transfers;
-  const scale = Math.max(ledger.tariff, costs, 1);
+  const income = ledger.tariff + ledger.outpatients;
+  const scale = Math.max(income, costs, 1);
   return (
     <div class="report-group">
       <h4>Finance</h4>
       <div class="money-bars" aria-hidden="true">
         <div class="money-bar">
           <span class="money-fill income" style={{ width: `${(100 * ledger.tariff) / scale}%` }} />
+          <span
+            class="money-fill outpatients"
+            style={{ width: `${(100 * ledger.outpatients) / scale}%` }}
+          />
         </div>
         <div class="money-bar">
           <span
@@ -213,9 +301,15 @@ function MoneySection({ ledger }: { ledger: Ledger }) {
       <table class="report-table">
         <tbody>
           <Row
-            label={<Swatch kind="income">Tariff income</Swatch>}
+            label={<Swatch kind="income">A&E and inpatient tariff</Swatch>}
             value={formatMoney(ledger.tariff)}
           />
+          {ledger.outpatients > 0 && (
+            <Row
+              label={<Swatch kind="outpatients">Outpatient tariff</Swatch>}
+              value={formatMoney(ledger.outpatients)}
+            />
+          )}
           <Row
             label={<Swatch kind="salaries">Salaries</Swatch>}
             value={`−${formatMoney(ledger.salaries)}`}
@@ -399,6 +493,49 @@ function FlowSections({ stats: s }: { stats: FlowStats }) {
           </tbody>
         </table>
       </div>
+
+      {s.gpReferrals + s.firstAppointments + s.followUps + s.dnas > 0 && (
+        <div class="report-group">
+          <h4>Outpatients</h4>
+          <table class="report-table">
+            <tbody>
+              <Row label="GP referrals" value={s.gpReferrals} />
+              <Row
+                label="Appointments"
+                title="First appointments, and follow-ups"
+                value={s.firstAppointments + s.followUps}
+                extra={`${s.firstAppointments} first`}
+              />
+              <Row
+                label="Did not attend"
+                title="Booked patients who didn't come (NHS about 7%)"
+                value={s.dnas}
+              />
+              {s.clinicCancellations > 0 && (
+                <Row
+                  label="Cancelled by the hospital"
+                  title="Booked appointments whose clinic didn't run: the clinician's job plan changed, they left, or there was no clinic room"
+                  value={s.clinicCancellations}
+                  bad
+                />
+              )}
+              {s.urgentSeen > 0 && (
+                <Row
+                  label="Urgent seen within 2 weeks"
+                  title="Suspected cancer referrals seen at a first appointment within 14 days of referral"
+                  value={pct(s.urgentWithin2w, s.urgentSeen)}
+                  bad={s.urgentWithin2w < s.urgentSeen}
+                />
+              )}
+              <Row
+                label="Listed for surgery"
+                title="A decision to operate in clinic: they wait for theatre on the 18-week clock"
+                value={s.listedForSurgery}
+              />
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div class="report-group">
         <h4>Safety</h4>

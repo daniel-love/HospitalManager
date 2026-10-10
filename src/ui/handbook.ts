@@ -36,7 +36,10 @@ export interface GuideSection {
  * kit they work from. Duties come from the role descriptions and pathways.
  */
 const ROLE_NEEDS: Partial<Record<StaffRoleId, string[]>> = {
-  receptionist: ["A&E Reception with a reception desk (one receptionist per desk)"],
+  receptionist: [
+    "A&E Reception with a reception desk (one receptionist per desk)",
+    "Outpatients Reception, for clinics: A&E's desks are staffed first",
+  ],
   nurse: [
     "A Triage Room to triage walk-ins",
     "A nurse station (or central monitor) to wait at between jobs, in sight of Majors and Resus trolleys; with every station taken, they wait at the A&E Staff Base",
@@ -66,12 +69,13 @@ const ROLE_NEEDS: Partial<Record<StaffRoleId, string[]>> = {
   consultant: [
     "As for a registrar",
     "For the Medical Examiner duty: a desk, and to be resident rather than on call",
+    "For clinics: an Outpatient Clinic Room for their specialty (or open to any), and Outpatients Reception",
   ],
 };
 
 /** Duties that aren't treatment steps in a pathway. */
 const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
-  receptionist: ["Books in every walk-in"],
+  receptionist: ["Books in every walk-in", "Books in outpatients for clinic"],
   nurse: [
     "Triages every patient",
     "Takes over ambulance patients from the crew",
@@ -98,10 +102,14 @@ const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
   ],
   biomedical_scientist: ["Books in and processes blood samples on the analyser"],
   cleaner: ["Cleans cubicles, trolleys and beds between patients", "Keeps toilets usable"],
-  registrar: ["Reviews referred patients in A&E and decides to admit"],
+  registrar: [
+    "Reviews referred patients in A&E and decides to admit",
+    "Outpatient clinics (sessions set in their inspector)",
+  ],
   consultant: [
     "Reviews referred patients in A&E and decides to admit",
     "Medical Examiner reviews (with the duty)",
+    "Outpatient clinics (sessions set in their inspector): GPs only refer to a specialty while a consultant runs its clinics",
   ],
 };
 

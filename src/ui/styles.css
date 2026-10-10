@@ -1469,6 +1469,10 @@ body.planning #game::after {
 .money-swatch.income {
   background: #2a9d8f;
 }
+.money-fill.outpatients,
+.money-swatch.outpatients {
+  background: #6cc4b8;
+}
 .money-fill.salaries,
 .money-swatch.salaries {
   background: #e07040;
@@ -1822,4 +1826,15 @@ body.planning #game::after {
 }
 .guide-entry .help-section li::marker {
   color: var(--text-dim);
+}
+
+/* Outpatient waiting lists. */
+.waiting-lists th {
+  font-weight: 500;
+  font-size: 11px;
+  text-align: left;
+  opacity: 0.7;
+}
+.waiting-lists th.num {
+  text-align: right;
 }

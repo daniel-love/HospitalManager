@@ -5,6 +5,7 @@
  * appointments are rebooked; clinics that can't run are cancelled.
  */
 import { describe, expect, it } from "vitest";
+import { describeAdvice } from "@game/advice";
 import { decodeSave, encodeSave } from "@save/codec";
 import { applyCommand } from "@sim/commands";
 import { tick } from "@sim/sim";
@@ -168,5 +169,32 @@ describe("waiting lists", () => {
     expect(Object.keys(loaded.outpatients).length).toBeGreaterThan(0);
     expect(Object.keys(loaded.referrals)).toEqual(Object.keys(state.referrals));
     runDays(loaded, 1);
+  });
+});
+
+describe("advice and alerts", () => {
+  it("the Help panel checks the outpatients setup and sizes clinics to demand", () => {
+    const state = buildOutpatients(1);
+    runDays(state, 0.01); // The receptionist takes the desk.
+    const advice = describeAdvice(state);
+    const group = advice.groups.find((g) => g.heading === "Outpatients")!;
+    expect(group.items.every((i) => i.status === "ok")).toBe(true);
+    const row = advice.capacity.find((r) => r.label === "Cardiology clinics a week")!;
+    expect(row.have).toBe(4);
+    expect(row.recommended).toBeGreaterThan(0);
+  });
+
+  it("warns when patients are on a list whose clinics have stopped", () => {
+    const state = buildOutpatients(1);
+    refer(state, "cardiology");
+    applyStaffCommand(state, {
+      type: "set_clinic_sessions",
+      id: consultant(state).id,
+      sessions: 0,
+    });
+    runDays(state, 0.1);
+    expect(state.events.map((e) => e.text).join("\n")).toMatch(
+      /on the Cardiology waiting list, but its clinics aren't running/,
+    );
   });
 });

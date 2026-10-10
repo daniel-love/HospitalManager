@@ -13,11 +13,15 @@ import {
   TRIAGE_MINS,
 } from "@data/patients";
 import type { ConditionDef, SpecialtyId, StaffRoleId } from "@data/schema";
-import { missingRoom, roomsPatientsCantReach } from "@sim/places";
+import { holder, missingRoom, roomsPatientsCantReach } from "@sim/places";
 import type { SimState } from "@sim/state";
 import { parkingSpaces } from "@sim/systems/ambulances";
 import { dailyDemand } from "@sim/systems/arrivals";
 import { monitorsCovering, observedBeds, stationsSeeing } from "@sim/systems/monitoring";
+import { outpatientDesks } from "@sim/systems/outpatients";
+import { offersClinic, referralsPerDay } from "@sim/systems/referrals";
+import { runsClinics } from "@sim/systems/staffing";
+import { CLINIC_SESSIONS } from "@data/outpatients";
 
 export type AdviceStatus = "ok" | "todo" | "optional";
 
@@ -322,7 +326,46 @@ export function describeAdvice(state: SimState): AdviceData {
     ],
   };
 
-  const groups = [essentials, diagnostics, majors, admissions, afterDeath, staffAreas];
+  // Outpatients is optional until the player starts on it; then it's a checklist.
+  const clinicians = Object.values(state.staff).filter((s) => runsClinics(s));
+  const sessions = clinicians.reduce((n, s) => n + s.clinicSessions, 0);
+  const started = hasRoom("outpatients_reception") || hasRoom("outpatient_clinic") || sessions > 0;
+  const deskStaffed = outpatientDesks(state).some(
+    (d) => holder(state, d.id, "staff") !== undefined,
+  );
+  const outpatients: AdviceGroup = {
+    heading: "Outpatients",
+    intro:
+      "GP referrals to specialty clinics: a business of its own, with booked appointments, follow-ups and the 18-week referral-to-treatment standard. GPs only refer while a specialty's clinics are running.",
+    items: [
+      item(
+        hasRoom("outpatients_reception"),
+        "Outpatients Reception, opening onto a Waiting Area",
+        "Outpatients book in here, then wait to be called.",
+        !started,
+      ),
+      item(
+        deskStaffed,
+        "A receptionist at its desk",
+        "Receptionists fill A&E's desks first, so hire one more than A&E needs.",
+        !started,
+      ),
+      item(
+        hasRoom("outpatient_clinic"),
+        "Outpatient Clinic Rooms (desk, couch, sink)",
+        "Give each a specialty in its inspector, or leave it open to any. One room per clinic running at the same time.",
+        !started,
+      ),
+      item(
+        clinicians.some((s) => s.role === "consultant" && s.clinicSessions > 0),
+        "A resident consultant with clinic sessions",
+        "Set their weekly clinics in their inspector. Dermatology, ENT and Ophthalmology are mostly clinic work; Cardiology, General Surgery and Trauma & Orthopaedics also take A&E referrals.",
+        !started,
+      ),
+    ],
+  };
+
+  const groups = [essentials, diagnostics, majors, admissions, outpatients, afterDeath, staffAreas];
   const next = groups.flatMap((g) => g.items).find((i) => i.status === "todo") ?? null;
   const demand = dailyDemand(state);
   return {
@@ -452,6 +495,7 @@ export function capacityGuide(
       recommended: people("nurse_practitioner"),
       note: "Minor injuries. Without them, the doctors see these too.",
     },
+    ...clinicCapacity(state),
     {
       label: "Cleaners",
       have: count("cleaner"),
@@ -462,6 +506,33 @@ export function capacityGuide(
       note: `About 1 per ${PLANNING.bedsPerCleaner} cubicles, trolleys and ward beds.`,
     },
   ];
+}
+
+/**
+ * Clinic sessions a week each specialty's GP demand needs: first
+ * appointments plus their follow-ups (p / (1 − p) each), in booked minutes,
+ * over a 4-hour session. Only for specialties with clinics running.
+ */
+function clinicCapacity(state: SimState): CapacityRow[] {
+  const sessionMins = CLINIC_SESSIONS.am.end - CLINIC_SESSIONS.am.start;
+  const rows: CapacityRow[] = [];
+  for (const sp of content.specialties) {
+    const o = sp.outpatients;
+    if (!o || !offersClinic(state, sp.id)) continue;
+    const firsts = referralsPerDay(state, sp.id) * 7;
+    const followUps = o.followUpChance / (1 - o.followUpChance);
+    const mins = firsts * (o.firstSlotMins + followUps * o.followUpSlotMins);
+    const have = Object.values(state.staff)
+      .filter((s) => s.specialty === sp.id && runsClinics(s))
+      .reduce((n, s) => n + s.clinicSessions, 0);
+    rows.push({
+      label: `${sp.name} clinics a week`,
+      have,
+      recommended: Math.ceil(mins / sessionMins),
+      note: `About ${Math.round(firsts)} GP referrals a week, and ${followUps.toFixed(1)} follow-ups each. Fewer sessions and the waiting list grows.`,
+    });
+  }
+  return rows;
 }
 
 function isBed(state: SimState, id: number): boolean {

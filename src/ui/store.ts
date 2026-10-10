@@ -236,6 +236,18 @@ export interface ReportData {
   mortuary: { total: number; taken: number; awaitingReview: number };
   /** Ward beds in use, of the total, and admitted patients waiting in A&E for one. */
   wardBeds: { total: number; inUse: number; waiting: number };
+  /** Outpatient waiting lists by specialty (only those with a list or a clinic running). */
+  waitingLists: {
+    name: string;
+    open: boolean;
+    firstWaiting: number;
+    booked: number;
+    followUps: number;
+    surgery: number;
+    pathways: number;
+    within18w: number;
+    longestWeeks: number;
+  }[];
   /** Most recent patient safety incidents, newest first. */
   incidents: {
     id: number;
