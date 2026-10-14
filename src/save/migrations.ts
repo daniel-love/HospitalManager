@@ -832,6 +832,21 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v36: major incidents; an ambulance can bring a given casualty.
+  35: (save) => {
+    const state = save.state as {
+      pressure: object;
+      ambulances?: object[];
+    };
+    return {
+      ...save,
+      state: {
+        ...state,
+        pressure: { majorIncident: null, ...state.pressure },
+        ambulances: state.ambulances?.map((a) => ({ conditionId: null, ...a })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

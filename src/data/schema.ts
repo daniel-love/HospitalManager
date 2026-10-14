@@ -373,9 +373,10 @@ export const conditionDefSchema = z.object({
   pathway: z.array(pathwayStepSchema).min(1),
   /**
    * After the last step: home, or (for the sickest) a transfer to intensive
-   * care. Ward admissions come later in M3.
+   * care, or to a major trauma centre (by transfer ambulance: a district
+   * hospital is a trauma unit, which stabilises and sends on).
    */
-  outcome: z.enum(["discharge", "icu"]).default("discharge"),
+  outcome: z.enum(["discharge", "icu", "trauma_centre"]).default("discharge"),
   /**
    * Chance the doctor decides to admit them to a ward after the last step
    * (instead of the outcome above), how long they stay, and the NHS tariff

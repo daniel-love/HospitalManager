@@ -51,8 +51,8 @@ describe("room connections", () => {
 
 describe("conditions", () => {
   it("every pathway step happens in a known room with a role that exists", () => {
-    // Twelve that come to A&E, and six planned operations.
-    expect(content.conditions.filter((c) => !c.planned)).toHaveLength(12);
+    // Twelve that come to A&E, two only a major incident brings, and six planned operations.
+    expect(content.conditions.filter((c) => !c.planned)).toHaveLength(14);
     expect(content.conditions.filter((c) => c.planned)).toHaveLength(6);
     for (const c of content.conditions) expect(c.pathway.length).toBeGreaterThan(0);
   });

@@ -17,6 +17,7 @@
  * ward first, then one open to any specialty, and only then to another
  * specialty's ward (an "outlier").
  */
+import { MAJOR_INCIDENT } from "@data/pressure";
 import { conditionById, equipmentById } from "@data/catalogue";
 import { MOOD_LIFT_DECISION, REFERRAL_MINS, WARD_DISCHARGE_MINS } from "@data/patients";
 import { onDuty, type Job, type Patient, type Point, type Staff } from "../agents";
@@ -37,6 +38,7 @@ import { leave, lift, recordDeparture } from "./patients";
 import { cantOperate } from "./theatres";
 import { cantAdmit, decideToTransfer } from "./transfers";
 import { freeEscalationBeds } from "./escalation";
+import { majorIncidentDeclared } from "./majorIncident";
 
 const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
 
@@ -46,6 +48,11 @@ export function finishPathway(state: SimState, p: Patient, trolley: PlacedObject
   if (condition.outcome === "icu") {
     leave(state, p, "transferred");
     dirtyCouch(state, trolley.id);
+    return;
+  }
+  if (condition.outcome === "trauma_centre") {
+    // Stabilised and scanned: on to the major trauma centre by transfer ambulance.
+    decideToTransfer(state, p, "Needs the major trauma centre");
     return;
   }
   const admission = condition.admission;
@@ -406,9 +413,13 @@ export function updateWards(state: SimState): void {
     minute < DISCHARGE_ROUND.to;
   const endOfDay = tickAt(c.day, 0) + DISCHARGE_ROUND.lastDischarge * TICKS_PER_MINUTE;
   if (state.policies.dischargeBeforeNoon && minute === DISCHARGE_ROUND.to) rushedRound(state);
+  const incident = majorIncidentDeclared(state);
   for (const p of Object.values(state.patients)) {
     if (p.stage !== "on_ward" || p.stayUntil === null) continue;
-    const early = morning && p.stayUntil <= endOfDay;
+    // A declared major incident: everyone due home within a day is reviewed now.
+    const early =
+      (morning && p.stayUntil <= endOfDay) ||
+      (incident && p.stayUntil <= state.tick + MAJOR_INCIDENT.rapidDischargeHours * TICKS_PER_HOUR);
     if (state.tick < p.stayUntil && !early) continue;
     if (p.emergencyOp && !p.emergencyOp.done) continue; // Not before their operation.
     if (p.endOfLife) {

@@ -54,7 +54,7 @@ export function HospitalDialog({ game }: { game: Game }) {
         {tab === "departments" && <Departments game={game} data={data} />}
         {tab === "escalation" && <Escalation game={game} data={data} />}
         {tab === "policies" && <Policies game={game} data={data} />}
-        {tab === "events" && <Events data={data.events} />}
+        {tab === "events" && <Events game={game} data={data.events} />}
         {tab === "performance" && <Performance data={data.performance} />}
       </div>
     </section>
@@ -375,11 +375,44 @@ const FREQUENCY_WORDS = {
 };
 
 /** Pressure events forecast or under way, what they do and the levers; and past ones. */
-function Events({ data }: { data: HospitalData["events"] }) {
+function Events({ game, data }: { game: Game; data: HospitalData["events"] }) {
+  const mi = data.majorIncident;
   return (
     <>
       <p class="dim small-note">{FREQUENCY_WORDS[data.frequency]}</p>
-      {data.active.length === 0 && <p class="dim">Nothing forecast. All quiet, for now.</p>}
+      {mi && (
+        <div class={`dept-card major-incident${mi.declared ? " declared" : ""}`}>
+          <div class="dept-head">
+            <strong>
+              {mi.declared
+                ? "Major incident declared"
+                : mi.underWay
+                  ? "Major incident: casualties arriving"
+                  : "Major incident: standby"}
+            </strong>
+            {mi.declared ? (
+              <button class="small-button" onClick={() => game.standDownMajorIncident()}>
+                Stand down
+              </button>
+            ) : (
+              <button class="small-button danger" onClick={() => game.declareMajorIncident()}>
+                Declare a major incident
+              </button>
+            )}
+          </div>
+          <span class="hire-desc">
+            {mi.cause.replace(/^./, (c) => c.toUpperCase())}. {mi.arrived} of about {mi.expected}{" "}
+            casualties here so far
+            {mi.critical > 0 ? `, ${mi.critical} critically injured still to come` : ""}.
+          </span>
+          <span class="dim small-note">
+            {mi.declared
+              ? `${mi.asked === 0 ? "Nobody was off duty to call in." : `${mi.calledIn} of ${mi.asked} off-duty staff have come in${mi.coming > 0 ? `, ${mi.coming} more on their way` : ""}, on overtime.`} Clinics and planned operations are stood down and escalation beds are open. Stand down once A&E has recovered.`
+              : "Declaring calls in off-duty staff (about 60% answer, within an hour or so, at time and a half), stands down clinics and planned operations, opens escalation beds, and reviews every ward patient due home within a day. Without it, you face the wave with the staff on shift."}
+          </span>
+        </div>
+      )}
+      {data.active.length === 0 && !mi && <p class="dim">Nothing forecast. All quiet, for now.</p>}
       {data.active.map((e) => (
         <div key={e.id} class={`dept-card event-card${e.coming ? " coming" : " restricted"}`}>
           <div class="dept-head">

@@ -231,8 +231,10 @@ export function conditionGuide(): GuideSection[] {
         c.channels.walk_in > 0 ? "walks in" : null,
         c.channels.ambulance > 0 ? "comes by ambulance" : null,
       ].filter(Boolean);
+      if (arrives.length === 0) arrives.push("only in a major incident");
       const outcome: string[] = [];
       if (c.outcome === "icu") outcome.push("Transferred to intensive care");
+      if (c.outcome === "trauma_centre") outcome.push("Transferred to the major trauma centre");
       if (c.admission) {
         const sp = specialtyById.get(c.specialty!)!.name;
         outcome.push(`${Math.round(c.admission.chance * 100)}% admitted under ${sp}`);

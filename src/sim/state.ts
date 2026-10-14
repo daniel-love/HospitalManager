@@ -40,7 +40,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 35;
+export const SIM_STATE_VERSION = 36;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -197,6 +197,8 @@ export interface SimState {
     nextId: number;
     /** The financial year (0 = Year 1) staff were last vaccinated against flu, or null. */
     vaccinated: number | null;
+    /** A major incident on standby or under way, or null. */
+    majorIncident: MajorIncident | null;
   };
   settings: SimSettings;
   /** Tick each kind of warning was last raised, so they aren't repeated constantly. */
@@ -226,6 +228,32 @@ export interface SimSettings {
   rotas: boolean;
   /** How often pressure events come (data/pressure.ts EVENT_FREQUENCY). Off for test fixtures. */
   eventFrequency: EventFrequency;
+}
+
+/** A major incident under way (systems/majorIncident.ts). */
+export interface MajorIncident {
+  /** The pressure event it belongs to. */
+  eventId: number;
+  /** What happened, e.g. "a train derailment". */
+  cause: string;
+  expected: number;
+  arrived: number;
+  /** Casualties still to come, soonest first. */
+  casualties: { at: number; conditionId: string; channel: "walk_in" | "ambulance" }[];
+  /** When the hospital declared its own major incident, or null. */
+  declared: number | null;
+  /** What declaring changed, to put back on standing down. */
+  previous: {
+    outpatients: Departments["outpatients"];
+    theatres: Departments["theatres"];
+    escalation: boolean;
+  } | null;
+  /** Off-duty staff asked to come in; those on their way, and those who've arrived. */
+  asked: number;
+  coming: { staffId: number; at: number }[];
+  calledIn: number[];
+  /** When the last casualty came, or null. */
+  last: number | null;
 }
 
 /** A pressure event forecast or under way (systems/pressure.ts). */
@@ -404,7 +432,7 @@ export function createSimState(opts: NewGameOptions): SimState {
       nextOffer: GRANT_OFFERS.everyDays[0] * TICKS_PER_DAY,
       done: [],
     },
-    pressure: { active: [], past: [], nextId: 1, vaccinated: null },
+    pressure: { active: [], past: [], nextId: 1, vaccinated: null, majorIncident: null },
     settings: {
       catchment: DEFAULT_CATCHMENT,
       patientVolume: 1,

@@ -39,6 +39,7 @@ import {
 } from "../time";
 import { roomAt } from "../world/rooms";
 import { book } from "./serviceLines";
+import { majorIncidentDeclared, planIncident, standbyText } from "./majorIncident";
 
 /** Events start at 08:00 on their first day. */
 const START_HOUR = 8;
@@ -157,7 +158,10 @@ export function heatFatigue(state: SimState, s: Staff): number {
 export function updatePressure(state: SimState): void {
   const active = state.pressure.active;
   if (active.length > 0) {
-    for (const e of active) if (state.tick === e.start) started(state, e);
+    for (const e of active) {
+      if (state.tick === e.announced && e.start > e.announced) forecastNotice(state, e);
+      if (state.tick === e.start && e.start > e.announced) started(state, e);
+    }
     if (active.some((e) => state.tick >= e.end)) {
       for (const e of active.filter((a) => state.tick >= a.end)) ended(state, e);
     }
@@ -197,48 +201,71 @@ function canStart(state: SimState, def: PressureEventDef, monthIndex: number): b
   return !last || state.tick - last.end >= def.gapDays * TICKS_PER_DAY;
 }
 
-/** Forecasts an event (or, for tests and scenarios, starts one at once). */
-export function announce(
-  state: SimState,
-  def: PressureEventDef,
-  leadDays = def.leadDays,
-): PressureEvent {
-  const days = nextInt(state.rng, def.days[0], def.days[1]);
-  const today = clockFromTick(state.tick).day;
-  const start = leadDays === 0 ? state.tick : tickAt(today + leadDays, START_HOUR);
+/**
+ * Forecasts an event (or, with no lead time, for tests and scenarios,
+ * starts one at once). Most are forecast days ahead at midnight; one with
+ * `leadMins` (a major incident) happens at a random time in the next day,
+ * with only that much notice.
+ */
+export function announce(state: SimState, def: PressureEventDef, leadDays?: number): PressureEvent {
+  const length = def.hours
+    ? nextInt(state.rng, def.hours[0] * 60, def.hours[1] * 60) * TICKS_PER_MINUTE
+    : nextInt(state.rng, def.days[0], def.days[1]) * TICKS_PER_DAY;
+  let announced = state.tick;
+  let start: number;
+  if (leadDays === undefined && def.leadMins !== undefined) {
+    announced = state.tick + nextInt(state.rng, 0, MINUTES_PER_DAY - 1) * TICKS_PER_MINUTE;
+    start = announced + def.leadMins * TICKS_PER_MINUTE;
+  } else {
+    const lead = leadDays ?? def.leadDays;
+    start = lead === 0 ? state.tick : tickAt(clockFromTick(state.tick).day + lead, START_HOUR);
+  }
   const e: PressureEvent = {
     id: state.pressure.nextId++,
     defId: def.id,
-    announced: state.tick,
+    announced,
     start,
-    end: start + days * TICKS_PER_DAY,
+    end: start + length,
   };
   state.pressure.active.push(e);
-  if (leadDays > 0) {
-    emit(
-      state,
-      `${def.name} from ${formatDate(clockFromTick(start).day)}, for about ${days} days. ${def.levers[0]}.`,
-      "warn",
-      undefined,
-      undefined,
-      undefined,
-      "events",
-    );
-  } else started(state, e);
+  if (def.id === "major_incident") planIncident(state, e);
+  if (announced === state.tick) {
+    if (start > state.tick) forecastNotice(state, e);
+    else started(state, e);
+  }
   return e;
 }
 
-function started(state: SimState, e: PressureEvent): void {
+/** Forecast or under way, as the player knows it: not before it's been announced. */
+export function knownEvents(state: SimState): PressureEvent[] {
+  return state.pressure.active.filter((e) => e.announced <= state.tick);
+}
+
+function forecastNotice(state: SimState, e: PressureEvent): void {
   const def = pressureEventById.get(e.defId)!;
+  const days = Math.round((e.end - e.start) / TICKS_PER_DAY);
+  const text =
+    def.id === "major_incident"
+      ? standbyText(state, e)
+      : `${def.name} from ${formatDate(clockFromTick(e.start).day)}, for about ${days} days. ${def.levers[0]}.`;
   emit(
     state,
-    `${def.name} has begun. ${def.description}`,
-    "warn",
+    text,
+    def.id === "major_incident" ? "bad" : "warn",
     undefined,
     undefined,
     undefined,
     "events",
   );
+}
+
+function started(state: SimState, e: PressureEvent): void {
+  const def = pressureEventById.get(e.defId)!;
+  const text =
+    def.id === "major_incident"
+      ? `Major incident: the first casualties are on their way in.${majorIncidentDeclared(state) ? "" : " You haven't declared a major incident (Hospital → Events)."}`
+      : `${def.name} has begun. ${def.description}`;
+  emit(state, text, "warn", undefined, undefined, undefined, "events");
 }
 
 function ended(state: SimState, e: PressureEvent): void {

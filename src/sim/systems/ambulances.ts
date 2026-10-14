@@ -111,7 +111,7 @@ const sameSpace = (a: ParkingSpace, b: ParkingSpace) => a.x === b.x && a.y === b
  * A 999 call arrives: the ambulance reaches the hospital now. On a map with
  * a road it comes onto the map at either end and drives in.
  */
-export function ambulanceArrives(state: SimState): Ambulance {
+export function ambulanceArrives(state: SimState, conditionId: string | null = null): Ambulance {
   const site = state.site;
   const from: 0 | 1 = site && nextFloat(state.rng) >= 0.5 ? 1 : 0;
   const at = site ? entryPoint(site, state.floors[0]!.width, from) : { x: 0, y: 0 };
@@ -128,6 +128,7 @@ export function ambulanceArrives(state: SimState): Ambulance {
     routeVersion: state.layoutVersion,
     from,
     patientId: null,
+    conditionId,
     handedOver: null,
     leaveAt: null,
   };
@@ -202,7 +203,7 @@ function park(state: SimState, a: Ambulance): void {
   a.x = a.prevX = at.x;
   a.y = a.prevY = at.y;
   a.route = [];
-  const p = spawnPatient(state, at, undefined, "ambulance");
+  const p = spawnPatient(state, at, a.conditionId ?? undefined, "ambulance");
   p.ambulanceId = a.id;
   // The 4-hour and handover clocks start at arrival. (Deterioration is timed
   // from parking: until then the crew is managing them in the ambulance.)

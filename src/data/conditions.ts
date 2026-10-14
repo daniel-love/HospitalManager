@@ -430,6 +430,89 @@ export const conditions: ConditionInput[] = [
     description:
       "Sepsis with dangerously low blood pressure. Stabilised in Resus, then transferred to intensive care.",
   },
+  // Major incident casualties (M6 step 2): only ever brought by a major
+  // incident (systems/majorIncident.ts), never in day-to-day arrivals.
+  {
+    id: "major_trauma",
+    name: "Major trauma",
+    acuity: 1,
+    channels: { walk_in: 0, ambulance: 0 },
+    specialty: "general_surgery",
+    tariff: 900,
+    monitoring: "continuous",
+    deterioration: { chance: 0.5, onsetMins: [10, 40], warningMins: [20, 45] },
+    outcome: "trauma_centre",
+    pathway: [
+      {
+        name: "Trauma team: primary survey, airway, bleeding control",
+        roles: [...DOCTOR],
+        room: RESUS,
+        capabilities: ["resuscitation"],
+        mins: [25, 40],
+        stabilises: true,
+        retriageTo: 2, // Still critically injured, awaiting the trauma centre.
+        sample: true,
+      },
+      scan("ct", "Trauma CT, head to pelvis"),
+      {
+        name: "Secondary survey and packaging for transfer",
+        roles: [...DOCTOR],
+        room: RESUS,
+        mins: [20, 30],
+        needsResults: true,
+      },
+    ],
+    description:
+      "Life-threatening injuries from a major incident: bleeding, head or chest injuries. A trauma unit stabilises them in Resus and scans them, then sends them on to the major trauma centre.",
+  },
+  {
+    id: "serious_injury",
+    name: "Serious injury",
+    acuity: 2,
+    channels: { walk_in: 0, ambulance: 0 },
+    specialty: "trauma_orthopaedics",
+    tariff: 450,
+    monitoring: "periodic",
+    deterioration: { chance: 0.1, onsetMins: [30, 120], warningMins: [40, 90] },
+    admission: {
+      chance: 0.5,
+      stayHours: [48, 144],
+      tariff: 3800,
+      operation: {
+        chance: 0.6,
+        name: "Fracture fixation",
+        mins: [75, 120],
+        withinHours: 24,
+        tariff: 4200,
+      },
+    },
+    pathway: [
+      {
+        name: "Pain relief and observations",
+        roles: [...NURSE],
+        room: MAJORS,
+        mins: [10, 20],
+      },
+      {
+        name: "Doctor assessment",
+        roles: [...DOCTOR],
+        room: MAJORS,
+        mins: [25, 35],
+        stabilises: true,
+        retriageTo: 3,
+      },
+      scan("xray", "X-rays", 0.9),
+      {
+        name: "Doctor review with X-rays",
+        roles: [...DOCTOR],
+        room: MAJORS,
+        mins: [10, 15],
+        needsResults: true,
+      },
+    ],
+    description:
+      "Broken bones, burns or chest injuries from a major incident, serious but not immediately life-threatening. Half are admitted under orthopaedics, most of them for surgery.",
+  },
 ];
 
 /**

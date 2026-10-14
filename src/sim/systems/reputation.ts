@@ -21,6 +21,7 @@ import type { FlowStats } from "../agents";
 import type { SimState } from "../state";
 import { TICKS_PER_DAY } from "../time";
 import { patientsInEscalation } from "./escalation";
+import { majorIncidentDeclared } from "./majorIncident";
 
 /** A day's patient-experience score, 0–100, or null if there was nothing to judge. */
 export function dayScore(state: SimState, s: FlowStats): number | null {
@@ -64,10 +65,12 @@ export function dayScore(state: SimState, s: FlowStats): number | null {
 export function statusPenalty(state: SimState): number {
   const d = state.departments;
   const p = REPUTATION.status;
+  // Planned care stood down for a declared major incident is understood.
+  const incident = majorIncidentDeclared(state);
   return (
     (d.ae === "open" ? 0 : p.ae[d.ae]) +
-    (d.outpatients === "open" ? 0 : p.outpatients[d.outpatients]) +
-    (d.theatres === "open" ? 0 : p.theatres[d.theatres])
+    (d.outpatients === "open" || incident ? 0 : p.outpatients[d.outpatients]) +
+    (d.theatres === "open" || incident ? 0 : p.theatres[d.theatres])
   );
 }
 

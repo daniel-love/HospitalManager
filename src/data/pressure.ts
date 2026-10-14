@@ -5,7 +5,7 @@
  * Effects scale with the event's intensity, 0 to 1: a winter flu wave
  * builds, peaks and fades; a heatwave is at full strength throughout.
  */
-export type PressureEventId = "winter_surge" | "heatwave";
+export type PressureEventId = "winter_surge" | "heatwave" | "major_incident";
 
 export interface PressureEventDef {
   id: PressureEventId;
@@ -26,8 +26,15 @@ export interface PressureEventDef {
   gapDays: number;
   /** Notice before it starts (forecasts, surveillance, alerts), days. */
   leadDays: number;
-  /** How long it lasts, days. */
+  /**
+   * Instead: it happens at a random time of day, with this many minutes'
+   * notice (a major incident's "standby").
+   */
+  leadMins?: number;
+  /** How long it lasts, days… */
   days: [number, number];
+  /** …or hours, for something short. */
+  hours?: [number, number];
   /** Builds to a peak and fades (a wave), or full strength throughout. */
   shape: "wave" | "flat";
   /** Arrival multipliers at full intensity. */
@@ -91,6 +98,31 @@ export const PRESSURE_EVENTS: PressureEventDef[] = [
     sickness: 1,
     heat: true,
   },
+  {
+    id: "major_incident",
+    name: "Major incident",
+    description:
+      "The ambulance service has declared a major incident nearby. A wave of casualties is on its way: a few critically injured (P1) for Resus, more seriously hurt (P2) for Majors, and walking wounded (P3) who'll make their own way in.",
+    levers: [
+      "Declare a major incident: call in off-duty staff, stand down clinics and planned operations, open escalation beds and discharge everyone fit to go",
+      "Clear Resus and Majors for the critically injured",
+      "Stand down once A&E has recovered: called-in staff go home and planned care resumes",
+    ],
+    // Any time of year: a hospital declares one for mass casualties every two or three years.
+    months: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    perSeason: 0.4,
+    maxPerSeason: 1,
+    gapDays: 120,
+    leadDays: 0,
+    leadMins: 45,
+    days: [0, 0],
+    hours: [2, 4],
+    shape: "flat",
+    arrivals: { walk_in: 1, ambulance: 1 },
+    conditions: {},
+    sickness: 1,
+    heat: false,
+  },
 ];
 
 export const pressureEventById = new Map(PRESSURE_EVENTS.map((e) => [e.id, e]));
@@ -130,4 +162,33 @@ export const FLU_VACCINATION = {
   protection: 0.5,
   /** The campaign runs from October (month 6 of the financial year). */
   month: 6,
+};
+
+/** Major incidents (systems/majorIncident.ts). */
+export const MAJOR_INCIDENT = {
+  /** Casualties coming here, and their mix (the rest are walking wounded, P3). */
+  casualties: [10, 30] as [number, number],
+  p1Share: 0.15,
+  p2Share: 0.35,
+  /** Walking wounded: minor injuries who make their own way in. */
+  walkingWounded: ["laceration", "sprained_ankle", "minor_head_injury", "broken_ankle"],
+  /** What happened, for the standby message. */
+  causes: [
+    "a multi-vehicle collision on the motorway",
+    "a fire in a block of flats",
+    "a crowd crush at a concert",
+    "a train derailment",
+    "an explosion at an industrial site",
+    "a coach crash on the bypass",
+  ],
+  /** Declaring: each off-duty member of staff answers the call with this chance… */
+  respondChance: 0.6,
+  /** …and arrives this many minutes later. */
+  arriveMins: [30, 90] as [number, number],
+  /** Called-in staff are paid at time and a half on top of their salary's hours. */
+  overtimeRate: 1.5,
+  /** Planned care stands down; ward patients due home within this many hours are reviewed now. */
+  rapidDischargeHours: 24,
+  /** Stood down automatically this long after the last casualty, if the player hasn't. */
+  autoStandDownHours: 12,
 };

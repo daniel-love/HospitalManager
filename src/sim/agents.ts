@@ -436,6 +436,8 @@ export interface Ambulance {
   /** The end of the road it came in from: 0 west, 1 east. */
   from: 0 | 1;
   patientId: number | null;
+  /** A major incident casualty's condition (systems/majorIncident.ts), or null for any. */
+  conditionId: string | null;
   /** Tick the crew handed over, or null. */
   handedOver: number | null;
   /** Tick it drives off (after handover and turnaround), or null. */

@@ -2517,3 +2517,10 @@ body.planning #game::after {
   padding-left: 18px;
   font-size: 12px;
 }
+.major-incident {
+  border-color: rgba(255, 138, 128, 0.6);
+}
+.major-incident .small-button.danger {
+  border-color: var(--bad);
+  color: var(--bad);
+}

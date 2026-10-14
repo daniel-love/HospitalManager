@@ -6,8 +6,8 @@
 import { roomById } from "@data/catalogue";
 import { pressureEventById, type EventFrequency } from "@data/pressure";
 import type { SimState } from "@sim/state";
-import { intensity, isCooled } from "@sim/systems/pressure";
-import { clockFromTick, formatDate, TICKS_PER_DAY } from "@sim/time";
+import { intensity, isCooled, knownEvents } from "@sim/systems/pressure";
+import { clockFromTick, formatDate, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 
 export interface EventChip {
   id: number;
@@ -31,6 +31,22 @@ export interface EventsData {
     intensity: number;
     shape: "wave" | "flat";
   }[];
+  /** A major incident on standby or under way, for the declare and stand-down buttons. */
+  majorIncident: {
+    eventId: number;
+    cause: string;
+    expected: number;
+    arrived: number;
+    /** P1 casualties still to come. */
+    critical: number;
+    declared: boolean;
+    /** Casualties have started arriving. */
+    underWay: boolean;
+    /** Off-duty staff asked to come in. */
+    asked: number;
+    coming: number;
+    calledIn: number;
+  } | null;
   /** In the heat: patient rooms without enough cooling. */
   uncooled: { name: string; count: number }[] | null;
   past: { name: string; dates: string }[];
@@ -39,25 +55,47 @@ export interface EventsData {
 const SHORT: Record<string, string> = {
   winter_surge: "Flu season",
   heatwave: "Heatwave",
+  major_incident: "Major incident",
 };
+
+function majorIncident(state: SimState): EventsData["majorIncident"] {
+  const mi = state.pressure.majorIncident;
+  const e = mi && state.pressure.active.find((a) => a.id === mi.eventId);
+  if (!mi || (e && e.announced > state.tick)) return null;
+  return {
+    eventId: mi.eventId,
+    cause: mi.cause,
+    expected: mi.expected,
+    arrived: mi.arrived,
+    critical: mi.casualties.filter((c) => c.conditionId === "major_trauma").length,
+    declared: mi.declared !== null,
+    underWay: !e || state.tick >= e.start,
+    asked: mi.asked,
+    coming: mi.coming.length,
+    calledIn: mi.calledIn.length,
+  };
+}
 
 const dayOf = (tick: number) => clockFromTick(tick).day;
 
 function when(state: SimState, start: number, end: number): { coming: boolean; text: string } {
   if (state.tick < start) {
     const days = dayOf(start) - dayOf(state.tick);
+    const mins = Math.max(1, Math.round((start - state.tick) / TICKS_PER_MINUTE));
+    if (mins < 120) return { coming: true, text: `in ${mins} min` };
     return {
       coming: true,
       text: days <= 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`,
     };
   }
+  if (end - start < TICKS_PER_DAY) return { coming: false, text: "under way" };
   const day = Math.floor((state.tick - start) / TICKS_PER_DAY) + 1;
   const of = Math.round((end - start) / TICKS_PER_DAY);
   return { coming: false, text: `day ${day} of ${of}` };
 }
 
 export function eventChips(state: SimState): EventChip[] {
-  return state.pressure.active.map((e) => {
+  return knownEvents(state).map((e) => {
     const w = when(state, e.start, e.end);
     return { id: e.id, label: SHORT[e.defId] ?? e.defId, when: w.text, coming: w.coming };
   });
@@ -78,7 +116,7 @@ const PATIENT_ROOMS = new Set([
 export function describeEvents(state: SimState): EventsData {
   let uncooled: EventsData["uncooled"] = null;
   // Coming or under way: time to get cooling in.
-  if (state.pressure.active.some((e) => pressureEventById.get(e.defId)!.heat)) {
+  if (knownEvents(state).some((e) => pressureEventById.get(e.defId)!.heat)) {
     const counts = new Map<string, number>();
     for (const r of state.rooms) {
       if (!r.valid || !PATIENT_ROOMS.has(r.typeId) || isCooled(state, r)) continue;
@@ -91,7 +129,8 @@ export function describeEvents(state: SimState): EventsData {
   }
   return {
     frequency: state.settings.eventFrequency,
-    active: state.pressure.active.map((e) => {
+    majorIncident: majorIncident(state),
+    active: knownEvents(state).map((e) => {
       const def = pressureEventById.get(e.defId)!;
       const w = when(state, e.start, e.end);
       return {

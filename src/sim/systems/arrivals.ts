@@ -131,7 +131,7 @@ export function updateArrivals(state: SimState): void {
  * a hospital with somewhere they can park, and ambulance control sends them
  * elsewhere when crews are already queueing outside.
  */
-function ambulanceComes(state: SimState): void {
+function ambulanceComes(state: SimState, conditionId: string | null = null): boolean {
   if (parkingSpaces(state).length === 0) {
     if (baySpaces(state).length > 0) {
       warn(
@@ -143,7 +143,7 @@ function ambulanceComes(state: SimState): void {
         stretcherSpot(baySpaces(state)[0]!),
       );
     }
-    return;
+    return false;
   }
   const queueing = ambulancesWaiting(state);
   if (queueing >= DEFLECT_AT_QUEUE) {
@@ -154,13 +154,14 @@ function ambulanceComes(state: SimState): void {
       TICKS_PER_HOUR * 2,
       `Ambulance control is sending ambulances to other hospitals: ${queueing} crews are already queueing outside here. Free up Majors and Resus, or add Ambulance Bay spaces.`,
     );
-    return;
+    return false;
   }
-  ambulanceArrives(state);
+  ambulanceArrives(state, conditionId);
+  return true;
 }
 
-function walkInArrives(state: SimState): void {
-  if (receptionDesks(state).length === 0) return; // No A&E open, so no one comes.
+function walkInArrives(state: SimState, conditionId?: string): boolean {
+  if (receptionDesks(state).length === 0) return false; // No A&E open, so no one comes.
   const entrance = siteEntrance(state);
   if (!entrance) {
     warn(
@@ -170,9 +171,26 @@ function walkInArrives(state: SimState): void {
       "Patients can't reach A&E reception: there's no way in from outside. Add an outside door.",
       "bad",
     );
-    return;
+    return false;
   }
-  spawnPatient(state, walkInPoint(state) ?? entrance);
+  spawnPatient(state, walkInPoint(state) ?? entrance, conditionId);
+  return true;
+}
+
+/**
+ * A major incident casualty by ambulance (systems/majorIncident.ts). With
+ * A&E closed or on divert, or nowhere to park, ambulance control takes them
+ * elsewhere. Returns whether they came here.
+ */
+export function casualtyAmbulance(state: SimState, conditionId: string): boolean {
+  if (state.funding === "private" || state.departments.ae !== "open") return false;
+  return ambulanceComes(state, conditionId);
+}
+
+/** Walking wounded from a major incident, making their own way to A&E. */
+export function casualtyWalksIn(state: SimState, conditionId: string): boolean {
+  if (state.funding === "private" || state.departments.ae === "closed") return false;
+  return walkInArrives(state, conditionId);
 }
 
 /**

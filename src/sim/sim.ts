@@ -23,10 +23,12 @@ import { updateTheatres } from "./systems/theatres";
 import { updateWorkforce } from "./systems/workforce";
 import { updateVisitors } from "./systems/visitors";
 import { updatePressure } from "./systems/pressure";
+import { updateMajorIncident } from "./systems/majorIncident";
 
 export function tick(state: SimState): void {
   state.tick++;
   updatePressure(state);
+  updateMajorIncident(state);
   updateArrivals(state);
   updateReferrals(state);
   updateAmbulances(state);

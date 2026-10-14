@@ -32,6 +32,7 @@ import {
 import { jobPlan } from "./clinics";
 import { operates, runsClinics, staffTitle } from "./staffing";
 import { callsInSick, endOfShift, fillGaps } from "./workforce";
+import { isCalledIn } from "./majorIncident";
 
 /** A week has 14 shifts: slot 2d is weekday d's day shift, 2d + 1 its night. */
 export const SLOTS = 14;
@@ -269,6 +270,11 @@ function comeIn(state: SimState, s: Staff, shiftEnd: number | null): void {
   s.shiftEnd = shiftEnd;
 }
 
+/** Called in from home (a major incident): at work until they're stood down. */
+export function callIn(state: SimState, s: Staff): void {
+  comeIn(state, s, null);
+}
+
 /** Sends someone home at the end of their shift: they finish what they're doing first. */
 function finish(s: Staff): void {
   if (s.duty === "on") {
@@ -311,6 +317,8 @@ export function updateShifts(state: SimState): void {
   const now = shiftsAt(state.tick);
   for (const s of Object.values(state.staff)) {
     if (s.contract === "on_call" || s.contract === "privileges") continue;
+    // Called in for a major incident: they stay until it's stood down.
+    if (isCalledIn(state, s)) continue;
     if (worksWeekdays(s)) weekdayDuty(state, s, c);
     else rosteredDuty(state, s, plan.get(s.id) ?? 0, now);
   }

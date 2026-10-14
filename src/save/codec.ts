@@ -325,6 +325,7 @@ const ambulanceSchema = z.object({
   routeVersion: int.min(0),
   from: z.union([z.literal(0), z.literal(1)]),
   patientId: nullableInt,
+  conditionId: z.string().nullable(),
   handedOver: nullableInt,
   leaveAt: nullableInt,
 });
@@ -636,6 +637,33 @@ const saveSchema = z.object({
       past: z.array(z.object({ defId: pressureEventId, start: int, end: int })),
       nextId: int.positive(),
       vaccinated: nullableInt,
+      majorIncident: z
+        .object({
+          eventId: int.positive(),
+          cause: z.string(),
+          expected: int.min(0),
+          arrived: int.min(0),
+          casualties: z.array(
+            z.object({
+              at: int,
+              conditionId: z.string(),
+              channel: z.enum(["walk_in", "ambulance"]),
+            }),
+          ),
+          declared: nullableInt,
+          previous: z
+            .object({
+              outpatients: z.enum(["open", "urgent", "closed"]),
+              theatres: z.enum(["open", "emergency", "closed"]),
+              escalation: z.boolean(),
+            })
+            .nullable(),
+          asked: int.min(0),
+          coming: z.array(z.object({ staffId: int.positive(), at: int })),
+          calledIn: z.array(int.positive()),
+          last: nullableInt,
+        })
+        .nullable(),
     }),
     settings: z.object({
       catchment: int.min(1_000).max(10_000_000),
@@ -813,6 +841,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
       past: s.pressure.past,
       nextId: s.pressure.nextId,
       vaccinated: s.pressure.vaccinated,
+      majorIncident: s.pressure.majorIncident,
     },
     settings: { ...s.settings },
     alerts: { ...s.alerts },

@@ -6,6 +6,7 @@
  * In plan mode, commands go into the build plan instead (see sim/plan.ts), and
  * the map, tools and inspector all show the plan preview ("viewState").
  */
+import { declare, standDown } from "@sim/systems/majorIncident";
 import type { EventFrequency } from "@data/pressure";
 import { content, equipmentById, objectDef, roomById } from "@data/catalogue";
 import type { SpecialtyId } from "@data/schema";
@@ -698,6 +699,18 @@ export class Game {
   /** Opens or closes escalation beds (Hospital → Escalation). */
   setEscalation(on: boolean): void {
     this.state.policies.escalation = on;
+    this.afterMoney();
+  }
+
+  /** Declares a major incident (Hospital → Events). */
+  declareMajorIncident(): void {
+    declare(this.state);
+    this.afterMoney();
+  }
+
+  /** Stands a declared major incident down (Hospital → Events). */
+  standDownMajorIncident(): void {
+    standDown(this.state);
     this.afterMoney();
   }
 

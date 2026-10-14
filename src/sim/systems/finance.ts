@@ -6,6 +6,7 @@
  */
 import { equipmentById, staffRoleById } from "@data/catalogue";
 import { DAYS_PER_MONTH, NHS_FUNDING, PRIVATE, RUNNING_COSTS } from "@data/economy";
+import { MAJOR_INCIDENT } from "@data/pressure";
 import { AGENCY, BANK, NURSE_BANDS, ON_CALL, UNSOCIAL } from "@data/staff";
 import { RTT_TARGET_DAYS } from "@data/outpatients";
 import {
@@ -32,6 +33,7 @@ import { updateGrants } from "./grants";
 import { checkCash, repayLoans, reviewRating } from "./loans";
 import { overPrivateCap } from "./referrals";
 import { updateReputation } from "./reputation";
+import { isCalledIn } from "./majorIncident";
 import {
   book,
   objectLine,
@@ -185,6 +187,8 @@ function staffHour(state: SimState, s: Staff, rate: number): HourlyPay {
   } else if (s.contract === "agency") {
     if (onSite(s)) pay.agency += (hour + unsocial) * AGENCY.payFactor;
   } else pay.salaries += unsocial;
+  // Called in for a major incident: overtime on top.
+  if (onSite(s) && isCalledIn(state, s)) pay.salaries += hour * MAJOR_INCIDENT.overtimeRate;
   return pay;
 }
 
