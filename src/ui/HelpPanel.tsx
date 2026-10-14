@@ -101,9 +101,20 @@ function Advice({ data }: { data: AdviceData }) {
       <section class="advice-group">
         <h3>Suggested numbers</h3>
         <p class="dim">
-          A catchment of {catchment.toLocaleString("en-GB")} people brings about {walkIns} walk-ins
-          and {ambulances} ambulances a day, busiest from late morning to early evening. A rough
-          guide for that peak. Staff numbers are people to hire, at three shifts a week each.
+          {data.funding === "private" ? (
+            <>
+              Clinic sessions and theatre lists a week for the patients your catchment of{" "}
+              {catchment.toLocaleString("en-GB")} people would bring, at your reputation and prices,
+              for what you offer now.
+            </>
+          ) : (
+            <>
+              A catchment of {catchment.toLocaleString("en-GB")} people brings about {walkIns}{" "}
+              walk-ins and {ambulances} ambulances a day, busiest from late morning to early
+              evening. A rough guide for that peak. Staff numbers are people to hire, at three
+              shifts a week each.
+            </>
+          )}
         </p>
         <table class="capacity-table">
           <thead>

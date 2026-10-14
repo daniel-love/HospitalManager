@@ -73,6 +73,7 @@ src/
       movement.ts         # route following, re-planning after layout changes
       finance.ts          # tariff (emergency at the marginal rate, planned in full), pay, supplies, estates, daily reports, monthly statements
       funding.ts          # the NHS block contract: sized to rooms and beds, capped by delivered activity
+      reputation.ts       # 0–100 reputation: a running average of each day's patient experience
       alerts.ts           # bottleneck warnings; tidies after layout changes
       monitoring.ts       # nurse stations, coverage (cached per layout), obs rounds
       deterioration.ts    # NEWS2, noticing and escalation, cardiac arrest, incidents

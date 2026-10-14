@@ -9,7 +9,9 @@ export function Inspector({
   onMeDuty,
   onClinicSessions,
   onTheatreSessions,
+  onPrivateSessions,
   onEmergencyTheatre,
+  onPrivateRoom,
 }: {
   onClose: () => void;
   onMove: (objectId: number) => void;
@@ -17,7 +19,9 @@ export function Inspector({
   onMeDuty: (staffId: number, on: boolean) => void;
   onClinicSessions: (staffId: number, sessions: number) => void;
   onTheatreSessions: (staffId: number, sessions: number) => void;
+  onPrivateSessions: PrivateSessionsHandler;
   onEmergencyTheatre: (on: boolean) => void;
+  onPrivateRoom: (on: boolean) => void;
 }) {
   const data = inspector.value;
   if (!data) return null;
@@ -33,6 +37,7 @@ export function Inspector({
           onMeDuty={onMeDuty}
           onClinicSessions={onClinicSessions}
           onTheatreSessions={onTheatreSessions}
+          onPrivateSessions={onPrivateSessions}
         />
       )}
       {object && (
@@ -102,6 +107,20 @@ export function Inspector({
               <span class="dim">
                 A CEPOD theatre: no planned lists, so emergencies never cancel anyone's operation.
                 Without one, emergencies take the next free slot on a list.
+              </span>
+            </label>
+          )}
+          {room.private !== undefined && (
+            <label class="duty-toggle">
+              <input
+                type="checkbox"
+                checked={room.private}
+                onChange={(e) => onPrivateRoom((e.currentTarget as HTMLInputElement).checked)}
+              />{" "}
+              Private Patient Unit
+              <span class="dim">
+                For private patients only: private clinics and theatre lists are held in the unit's
+                rooms, and private inpatients stay in its side rooms. NHS work uses the rest.
               </span>
             </label>
           )}
@@ -203,16 +222,24 @@ function SessionStepper(props: {
   );
 }
 
+type PrivateSessionsHandler = (
+  staffId: number,
+  kind: "clinic" | "theatre",
+  sessions: number,
+) => void;
+
 function AgentSection({
   agent,
   onMeDuty,
   onClinicSessions,
   onTheatreSessions,
+  onPrivateSessions,
 }: {
   agent: AgentInfo;
   onMeDuty: (staffId: number, on: boolean) => void;
   onClinicSessions: (staffId: number, sessions: number) => void;
   onTheatreSessions: (staffId: number, sessions: number) => void;
+  onPrivateSessions: PrivateSessionsHandler;
 }) {
   if (agent.kind === "staff") {
     return (
@@ -252,6 +279,22 @@ function AgentSection({
             what="theatre lists"
             plan={agent.theatre}
             onChange={(n) => onTheatreSessions(agent.id, n)}
+          />
+        )}
+        {agent.privateClinics && (
+          <SessionStepper
+            title="Private clinics"
+            what="private clinic sessions"
+            plan={agent.privateClinics}
+            onChange={(n) => onPrivateSessions(agent.id, "clinic", n)}
+          />
+        )}
+        {agent.privateTheatre && (
+          <SessionStepper
+            title="Private theatre lists"
+            what="private theatre lists"
+            plan={agent.privateTheatre}
+            onChange={(n) => onPrivateSessions(agent.id, "theatre", n)}
           />
         )}
         <h4>Morale</h4>

@@ -10,7 +10,7 @@ import type { Speed } from "@game/loop";
 import type { Tool } from "@game/tools";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import type { DayReport, FlowStats, Ledger } from "@sim/agents";
-import type { GapFill, Rotation, RoomCheck } from "@sim/state";
+import type { Funding, GapFill, Rotation, RoomCheck } from "@sim/state";
 import type { NurseBand } from "@data/staff";
 import type { HelpContent } from "./help";
 
@@ -124,6 +124,9 @@ export type AgentInfo =
       clinics?: { sessions: number; max: number; note: string };
       /** Resident surgeons and anaesthetists: their theatre lists. */
       theatre?: { sessions: number; max: number; note: string };
+      /** Hybrid trusts' employed consultants: private clinics and lists on top. */
+      privateClinics?: { sessions: number; max: number; note: string };
+      privateTheatre?: { sessions: number; max: number; note: string };
     };
 
 export interface InspectorData {
@@ -151,6 +154,8 @@ export interface InspectorData {
     };
     /** Operating theatres: kept for emergencies. */
     emergency?: boolean;
+    /** Hybrid trusts: in the Private Patient Unit (rooms that can be). */
+    private?: boolean;
   };
   object?: {
     id: number;
@@ -195,6 +200,8 @@ export const buildTab = signal<BuildTab | null>(null);
 export const cursorInfo = signal<{ x: number; y: number; text: string; ok: boolean } | null>(null);
 export const inspector = signal<InspectorData | null>(null);
 export const saveDialogOpen = signal(false);
+/** The New hospital dialog: choosing a funding model. */
+export const newGameOpen = signal(false);
 
 /** Management panel open on the left (closes the build palette). */
 export type SidePanel = "reports" | "help";
@@ -224,6 +231,7 @@ export interface RosterData {
   payroll: number;
   /** Whether staff work shifts (a setting; off in saves from before rotas). */
   rotas: boolean;
+  funding: Funding;
   /** How rota gaps are filled (a hospital policy). */
   gapFill: GapFill;
   /** Bank and agency staff at work now. */
@@ -288,6 +296,13 @@ export interface ReportData {
   history: DayReport[];
   /** Today's share of the block contract, paid at midnight. */
   blockDue: number;
+  funding: Funding;
+  reputation: number;
+  /** How private demand scales with reputation. */
+  reputationFactor: number;
+  /** Private income's share of all income lately, and the Hybrid cap. */
+  privateShare: number;
+  privateCap: number;
   /** This month so far, and last month's statement (if there is one). */
   month: StatementMonth;
   lastMonth: StatementMonth | null;
@@ -310,6 +325,8 @@ export interface ReportData {
     booked: number;
     followUps: number;
     surgery: number;
+    /** Of everyone on the list, private patients. */
+    private: number;
     pathways: number;
     within18w: number;
     longestWeeks: number;

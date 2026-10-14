@@ -1,11 +1,15 @@
 /**
- * Settings: the hospital's catchment (saved with the game), shifts for
+ * Settings: the hospital's catchment and private-care policies (saved with
+ * the game), shifts for
  * hospitals saved before rotas, and how often to
  * autosave and whether to smooth edges (kept in this browser for every
  * game). A fuller menu comes later.
  */
 import { useEffect, useState } from "preact/hooks";
+import { content } from "@data/catalogue";
+import { PRIVATE } from "@data/economy";
 import { AMBULANCES_PER_100K, CATCHMENTS, WALK_INS_PER_100K } from "@data/patients";
+import type { SpecialtyId } from "@data/schema";
 import type { Game } from "@game/game";
 import { dailyDemand, treatableShare } from "@sim/systems/arrivals";
 import { ANTIALIAS_OPTIONS, AUTOSAVE_OPTIONS, settings, settingsOpen } from "./settings";
@@ -72,10 +76,13 @@ function SettingsBody({ game }: { game: Game }) {
             </label>
           ))}
           <p class="dim">
-            With what you've built, about {walkIns} walk-ins and {ambulances} ambulances a day come
-            here.
+            {game.state.funding === "private"
+              ? "A private hospital has no A&E: the catchment sets how many people might come for private care, and NHS patients who choose you."
+              : `With what you've built, about ${walkIns} walk-ins and ${ambulances} ambulances a day come here.`}
           </p>
         </fieldset>
+
+        {game.state.funding !== "nhs" && <PrivateCareSetting game={game} />}
 
         {!game.state.settings.rotas && <RotasSetting game={game} />}
 
@@ -154,6 +161,75 @@ function RotasSetting({ game }: { game: Game }) {
       >
         Start shifts and rotas
       </button>
+    </fieldset>
+  );
+}
+
+/**
+ * Private care (a Private Hospital or Hybrid trust's policies, saved with
+ * the game): the self-pay price level, and in a Private Hospital which
+ * specialties take NHS referrals.
+ */
+function PrivateCareSetting({ game }: { game: Game }) {
+  const state = game.state;
+  const [price, setPrice] = useState(state.policies.priceLevel);
+  const [nhs, setNhs] = useState({ ...state.policies.nhsReferrals });
+  const [lo, hi] = PRIVATE.priceLevels;
+  const demand = Math.round(100 * price ** -PRIVATE.priceElasticity);
+  const choose = (level: number) => {
+    game.setPriceLevel(level);
+    setPrice(level);
+  };
+  const toggle = (sp: SpecialtyId, on: boolean) => {
+    game.setNhsReferrals(sp, on);
+    setNhs({ ...state.policies.nhsReferrals });
+  };
+  return (
+    <fieldset class="setting">
+      <legend>Private care</legend>
+      <p class="dim">
+        Self-pay patients pay your package prices; insurers pay their own negotiated rates. Higher
+        prices earn more from each self-pay patient but bring fewer of them.
+      </p>
+      <label class="price-level">
+        <span>
+          Self-pay prices:{" "}
+          {price === 1
+            ? "standard"
+            : `${price > 1 ? "+" : "−"}${Math.round(Math.abs(price - 1) * 100)}%`}
+        </span>
+        <input
+          type="range"
+          min={lo}
+          max={hi}
+          step={0.05}
+          value={price}
+          onInput={(e) => choose(Number((e.currentTarget as HTMLInputElement).value))}
+        />
+        <span class="dim">Self-pay demand at {demand}% of standard</span>
+      </label>
+      {state.funding === "private" && (
+        <>
+          <p class="dim">
+            NHS patients can choose an independent hospital for planned care, paid at NHS tariff
+            (lower than private fees) and counted against the 18-week standard. Take them for:
+          </p>
+          <div class="nhs-referrals">
+            {content.specialties
+              .filter((sp) => sp.outpatients)
+              .map((sp) => (
+                <label key={sp.id} class="setting-choice">
+                  <input
+                    type="checkbox"
+                    checked={!!nhs[sp.id]}
+                    onChange={(e) => toggle(sp.id, (e.currentTarget as HTMLInputElement).checked)}
+                  />
+                  <span>{sp.name}</span>
+                </label>
+              ))}
+          </div>
+        </>
+      )}
     </fieldset>
   );
 }

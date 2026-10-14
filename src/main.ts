@@ -6,7 +6,7 @@ import { createSimState } from "@sim/state";
 import { siteView } from "@sim/world/site";
 import { App } from "@ui/App";
 import { wantAntialias } from "@ui/settings";
-import { showToast } from "@ui/store";
+import { newGameOpen, showToast } from "@ui/store";
 import "@ui/styles.css";
 
 /** Seed from `?seed=123` for reproducible runs, otherwise null. */
@@ -36,6 +36,9 @@ async function main(): Promise<void> {
       if (last) {
         game.loadState(last.state, last.name);
         showToast(`Resumed "${last.name}"`);
+      } else {
+        // A first visit: choose how the hospital is funded.
+        newGameOpen.value = true;
       }
     } catch (err) {
       console.error(err);

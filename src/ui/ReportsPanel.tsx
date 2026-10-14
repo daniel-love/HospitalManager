@@ -87,7 +87,7 @@ export function ReportsPanel({ onShow }: { onShow: (at: { x: number; y: number }
         {data.waitingLists.length > 0 && (
           <>
             <h3>Waiting lists</h3>
-            <WaitingLists lists={data.waitingLists} />
+            <WaitingLists lists={data.waitingLists} showPrivate={data.funding !== "nhs"} />
           </>
         )}
 
@@ -166,6 +166,30 @@ function Headlines({ data }: { data: ReportData }) {
       />
       <RttTile lists={data.waitingLists} />
       <Tile
+        label="Reputation"
+        title="What patients and GPs think of the hospital: a running average of each day's patient experience over about a month"
+        value={String(Math.round(data.reputation))}
+        status={data.reputation >= 70 ? "ok" : data.reputation >= 45 ? "warn" : "bad"}
+        note={
+          data.funding === "nhs"
+            ? "of 100"
+            : `of 100 · private demand ×${data.reputationFactor.toFixed(2)}`
+        }
+      />
+      {data.funding !== "nhs" && (
+        <Tile
+          label="Private care"
+          title="Private patients today: referrals, appointments and operations"
+          value={String(s.privateSeen + s.privateOps)}
+          status="none"
+          note={
+            data.funding === "hybrid"
+              ? `seen or operated on · ${Math.round(data.privateShare * 100)}% of income (cap ${Math.round(data.privateCap * 100)}%)`
+              : `seen or operated on · ${s.privateReferrals} referred`
+          }
+        />
+      )}
+      <Tile
         label="Patients"
         value={String(s.arrivals)}
         status="none"
@@ -209,7 +233,13 @@ function RttTile({ lists }: { lists: ReportData["waitingLists"] }) {
   );
 }
 
-function WaitingLists({ lists }: { lists: ReportData["waitingLists"] }) {
+function WaitingLists({
+  lists,
+  showPrivate,
+}: {
+  lists: ReportData["waitingLists"];
+  showPrivate: boolean;
+}) {
   return (
     <table class="report-table waiting-lists">
       <thead>
@@ -224,7 +254,15 @@ function WaitingLists({ lists }: { lists: ReportData["waitingLists"] }) {
           <th class="num" title="Listed for an operation after clinic (theatres come next)">
             Surgery
           </th>
-          <th class="num" title="Waiting under 18 weeks since referral (NHS standard 92%)">
+          {showPrivate && (
+            <th class="num" title="Of everyone on the list, private patients">
+              Private
+            </th>
+          )}
+          <th
+            class="num"
+            title="NHS patients waiting under 18 weeks since referral (NHS standard 92%)"
+          >
             Under 18 wk
           </th>
           <th class="num" title="The longest wait since referral">
@@ -247,6 +285,7 @@ function WaitingLists({ lists }: { lists: ReportData["waitingLists"] }) {
               </td>
               <td class="num">{l.followUps}</td>
               <td class="num">{l.surgery}</td>
+              {showPrivate && <td class="num">{l.private}</td>}
               <td class={`num${s !== null && s < RTT_TARGET ? " bad" : ""}`}>
                 {pct(l.within18w, l.pathways)}
               </td>
@@ -306,6 +345,12 @@ const INCOME_LINES: { key: keyof Ledger; kind: string; label: string; title: str
     kind: "outpatients",
     label: "Outpatient tariff",
     title: "Clinic appointments, at full tariff",
+  },
+  {
+    key: "private",
+    kind: "private",
+    label: "Private patients",
+    title: "Facility fees from insurers and self-pay patients (consultants bill their own fees)",
   },
 ];
 const COST_LINES: { key: keyof Ledger; kind: string; label: string }[] = [

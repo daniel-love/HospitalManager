@@ -529,8 +529,7 @@ export function leave(state: SimState, p: Patient, outcome: Outcome): void {
     // A planned inpatient's stay is planned care, paid in full.
     if (condition.planned) {
       earnPlanned(state, condition.admission?.tariff ?? 0, p.elective?.payer ?? "nhs");
-    }
-    else earnEmergency(state, condition.admission?.tariff ?? 0);
+    } else earnEmergency(state, condition.admission?.tariff ?? 0);
     return;
   }
   if (p.elective) {

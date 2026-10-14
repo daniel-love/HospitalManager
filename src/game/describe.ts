@@ -47,7 +47,14 @@ import { inCare } from "@sim/systems/curtains";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { annualCost } from "@sim/systems/finance";
 import { formatWait, inAE } from "@sim/systems/patients";
-import { canDo, operates, roleTitle, runsClinics, staffTitle } from "@sim/systems/staffing";
+import {
+  canDo,
+  MAX_WEEK_SESSIONS,
+  operates,
+  roleTitle,
+  runsClinics,
+  staffTitle,
+} from "@sim/systems/staffing";
 import { describeJobPlan, jobPlan } from "@sim/systems/clinics";
 import { MAX_CLINIC_SESSIONS, MAX_FIXED_SESSIONS, MAX_THEATRE_SESSIONS } from "@data/outpatients";
 import { analysers, pendingResults } from "@sim/systems/diagnostics";
@@ -61,11 +68,13 @@ import {
   TICKS_PER_MINUTE,
 } from "@sim/time";
 import { dailyBlock } from "@sim/systems/funding";
+import { reputationFactor } from "@sim/systems/reputation";
+import { PRIVATE } from "@data/economy";
 import { NURSE_BANDS, SHIFTS } from "@data/staff";
 import { inClinic, liveSessions } from "@sim/systems/outpatients";
 import { describeRota, nextShift, rotaSummary } from "@sim/systems/rota";
 import { emergencyOpOf, inTheatre } from "@sim/systems/theatres";
-import { waitingLists } from "@sim/systems/referrals";
+import { privateIncomeShare, waitingLists } from "@sim/systems/referrals";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
 import { roomAt, roomOfObject } from "@sim/world/rooms";
 import { porterJob } from "@sim/systems/escorts";
@@ -913,6 +922,7 @@ export function describeStaff(state: SimState, s: Staff): AgentInfo {
     ...(s.role === "consultant" && s.contract === "resident" ? { meDuty: s.meDuty } : {}),
     ...(runsClinics(s) ? { clinics: clinicPlan(state, s) } : {}),
     ...(operates(s) ? { theatre: theatrePlan(state, s) } : {}),
+    ...privatePlans(state, s),
   };
 }
 
@@ -945,6 +955,38 @@ function theatrePlan(state: SimState, s: Staff) {
       MAX_FIXED_SESSIONS - (runsClinics(s) ? s.clinicSessions : 0),
     ),
     note,
+  };
+}
+
+/** A Hybrid trust's employed consultants: their private sessions, on top of their NHS job plan. */
+function privatePlans(state: SimState, s: Staff) {
+  if (state.funding !== "hybrid" || s.role !== "consultant" || s.contract !== "resident") return {};
+  const nhs = (runsClinics(s) ? s.clinicSessions : 0) + (operates(s) ? s.theatreSessions : 0);
+  const free = MAX_WEEK_SESSIONS - nhs;
+  const slots = jobPlan(state, s).filter((p) => p.private);
+  const when = (kind: "clinic" | "theatre") => {
+    const mine = slots.filter((p) => p.kind === kind);
+    return mine.length > 0 ? `${describeJobPlan(mine)}. ` : "";
+  };
+  return {
+    ...(runsClinics(s)
+      ? {
+          privateClinics: {
+            sessions: s.privateClinicSessions,
+            max: free - s.privateTheatreSessions,
+            note: `${when("clinic")}Private patients, in a Private Patient Unit clinic room: the hospital earns the facility fee and they bill their own. Outside their NHS job plan, but they can't be in two places at once.`,
+          },
+        }
+      : {}),
+    ...(operates(s)
+      ? {
+          privateTheatre: {
+            sessions: s.privateTheatreSessions,
+            max: free - s.privateClinicSessions,
+            note: `${when("theatre")}Private operations, in a Private Patient Unit theatre${s.specialty === "anaesthetics" ? ", paired with surgeons' private lists" : ""}.`,
+          },
+        }
+      : {}),
   };
 }
 
@@ -992,6 +1034,7 @@ export function describeRoster(state: SimState): RosterData {
     })),
     payroll: staff.reduce((sum, s) => sum + annualCost(s), 0),
     rotas: state.settings.rotas,
+    funding: state.funding,
     gapFill: state.policies.gapFill,
     temps: {
       bank: staff.filter((s) => s.contract === "bank").length,
@@ -1042,6 +1085,11 @@ export function describeReport(state: SimState): ReportData {
     today: state.today,
     history: state.history,
     blockDue: dailyBlock(state),
+    funding: state.funding,
+    reputation: state.reputation,
+    reputationFactor: reputationFactor(state),
+    privateShare: privateIncomeShare(state),
+    privateCap: PRIVATE.incomeCap,
     month: statement(state.month),
     lastMonth: last ? statement(last) : null,
     now: [...counts]

@@ -20,7 +20,7 @@ import { applyCommand, type Command, type CommandResult } from "@sim/commands";
 import { addToPlan, buildPreview, commitPlan, planDiff, type PlanPreview } from "@sim/plan";
 import { roomsPatientsCantReach } from "@sim/places";
 import { tick } from "@sim/sim";
-import { createSimState, type GapFill, type SimState } from "@sim/state";
+import { createSimState, type Funding, type GapFill, type SimState } from "@sim/state";
 import { siteView } from "@sim/world/site";
 import { coverageView, stationsSeeing, bedCover } from "@sim/systems/monitoring";
 import { setCover } from "@sim/systems/rota";
@@ -33,7 +33,14 @@ import {
   TICKS_PER_SECOND_1X,
 } from "@sim/time";
 import { itemsAt } from "@sim/world/objects";
-import { roomAt, setEmergencyTheatre, setRoomSpecialty } from "@sim/world/rooms";
+import {
+  PRIVATE_ROOM_TYPES,
+  roomAt,
+  setEmergencyTheatre,
+  setPrivateRoom,
+  setRoomSpecialty,
+} from "@sim/world/rooms";
+import { PRIVATE } from "@data/economy";
 import { CameraControls, isPanModifier } from "@render/cameraControls";
 import { TILE_SIZE } from "@render/constants";
 import { tagSpot } from "@render/deathMarks";
@@ -280,6 +287,30 @@ export class Game {
     this.publishInspector();
   }
 
+  /** Hybrid trusts: puts the selected room in the Private Patient Unit, or takes it out. */
+  setPrivateRoom(on: boolean): void {
+    const tile = this.selectedTile;
+    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    if (!room || this.state.funding !== "hybrid" || !PRIVATE_ROOM_TYPES.has(room.typeId)) return;
+    setPrivateRoom(this.state, room, on);
+    if (this.preview) this.rebuildPreview();
+    this.publishInspector();
+  }
+
+  /** Private care: the self-pay price level (a hospital policy). */
+  setPriceLevel(level: number): void {
+    const [lo, hi] = PRIVATE.priceLevels;
+    this.state.policies.priceLevel = Math.max(lo, Math.min(hi, level));
+    this.refreshPanels();
+  }
+
+  /** Private Hospitals: whether to take NHS referrals for a specialty. */
+  setNhsReferrals(specialty: SpecialtyId, on: boolean): void {
+    if (on) this.state.policies.nhsReferrals[specialty] = true;
+    else delete this.state.policies.nhsReferrals[specialty];
+    this.refreshPanels();
+  }
+
   /** Centres the camera on a tile (e.g. from a notification). */
   focus(at: { x: number; y: number }): void {
     this.renderer.camera.centreOn((at.x + 0.5) * TILE_SIZE, (at.y + 0.5) * TILE_SIZE);
@@ -398,9 +429,9 @@ export class Game {
     this.publishInspector();
   }
 
-  newGame(): void {
+  newGame(funding: Funding = "nhs"): void {
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
-    const state = createSimState({ seed, site: true, rotas: true });
+    const state = createSimState({ seed, site: true, rotas: true, funding });
     this.loadState(state);
     if (state.site) this.focus(siteView(state.site));
     // Until it's saved, a reload starts afresh rather than resuming the old hospital.
@@ -792,6 +823,9 @@ export class Game {
             }
           : {}),
         ...(room.typeId === "theatre" ? { emergency: room.emergency } : {}),
+        ...(this.state.funding === "hybrid" && PRIVATE_ROOM_TYPES.has(room.typeId)
+          ? { private: room.private }
+          : {}),
       };
       this.renderer.setSelection(
         room.tiles.map((i) => ({ x: i % grid.width, y: Math.floor(i / grid.width) })),

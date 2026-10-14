@@ -1784,6 +1784,10 @@ body.planning #game::after {
 .money-swatch.income {
   background: #2a9d8f;
 }
+.money-fill.private,
+.money-swatch.private {
+  background: #d4b04a;
+}
 .money-fill.supplies,
 .money-swatch.supplies {
   background: #c46c9a;
@@ -2180,4 +2184,65 @@ body.planning #game::after {
 }
 .waiting-lists th.num {
   text-align: right;
+}
+
+/* ---------- New hospital ---------- */
+.new-game {
+  width: min(860px, calc(100vw - 32px));
+}
+.funding-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.modal .funding-card {
+  white-space: normal;
+  height: auto;
+  align-items: stretch;
+}
+.funding-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.funding-card strong {
+  font-size: 15px;
+}
+.funding-card.active {
+  border-color: var(--accent);
+  background: rgba(59, 130, 196, 0.18);
+}
+.funding-tagline {
+  color: var(--text-dim);
+}
+.funding-card ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  line-height: 1.4;
+}
+.new-game-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.price-level {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  margin: 6px 0 10px;
+}
+.nhs-referrals {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 }

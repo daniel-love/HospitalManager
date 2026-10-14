@@ -124,7 +124,8 @@ const listCache = new WeakMap<SimState, { key: string; weeks: Map<number, Theatr
 function weekLists(state: SimState, weekStart: number): TheatreList[] {
   let key = `${state.layoutVersion}|${JSON.stringify(state.roomSpecialties)}|${Object.keys(state.emergencyTheatres)}|${Object.keys(state.privateRooms)}|${state.funding}|`;
   for (const s of Object.values(state.staff)) {
-    const n = s.theatreSessions + s.clinicSessions + s.privateTheatreSessions + s.privateClinicSessions;
+    const n =
+      s.theatreSessions + s.clinicSessions + s.privateTheatreSessions + s.privateClinicSessions;
     if (n > 0) {
       key += `${s.id}:${s.clinicSessions}:${s.theatreSessions}:${s.privateClinicSessions}:${s.privateTheatreSessions},`;
     }

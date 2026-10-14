@@ -12,7 +12,7 @@ import {
   listSaves,
   type SaveSlot,
 } from "@save/saveManager";
-import { saveDialogOpen, showToast } from "./store";
+import { newGameOpen, saveDialogOpen, showToast } from "./store";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
@@ -98,9 +98,8 @@ function SaveDialogBody({ game }: { game: Game }) {
   };
 
   const onNewGame = () => {
-    if (!confirm("Start a new hospital? Anything unsaved will be lost.")) return;
-    game.newGame();
     close();
+    newGameOpen.value = true;
   };
 
   return (

@@ -54,10 +54,17 @@ export const PRIVATE = {
   /**
    * Private demand, as shares of the NHS GP referral rate for the catchment:
    * about one in nine people in the UK have private medical insurance, and
-   * some more pay for themselves.
+   * more pay for themselves while NHS waits are long…
    */
   insuredShare: 0.12,
   selfPayShare: 0.05,
+  /**
+   * …and a private hospital draws them from a much wider area than one NHS
+   * trust's catchment (several trusts' worth), so private demand is this
+   * many times the local catchment's. Calibrated so private spending comes
+   * to about the UK's £120 a head a year (`npm run balance`).
+   */
+  catchmentFactor: 6,
   /**
    * In a Private Hospital accepting NHS referrals for a specialty: the share
    * of the catchment's NHS GP referrals that choose it (NHS patients may

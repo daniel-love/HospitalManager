@@ -76,8 +76,7 @@ export function earnPrivate(
   state.today.ledger.private += fee;
   useSupplies(
     state,
-    nhsTariff *
-      (outpatient ? RUNNING_COSTS.outpatientSuppliesShare : RUNNING_COSTS.suppliesShare),
+    nhsTariff * (outpatient ? RUNNING_COSTS.outpatientSuppliesShare : RUNNING_COSTS.suppliesShare),
   );
 }
 

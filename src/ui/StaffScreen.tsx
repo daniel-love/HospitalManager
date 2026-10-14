@@ -353,21 +353,23 @@ function HireTab({ game, data }: { game: Game; data: RosterData }) {
       <div class="hire-columns">
         {data.groups.map((g) => (
           <ListSection key={g.name} title={g.name}>
-            {g.roles.map((r) =>
-              r.specialist ? (
-                <SpecialistRow key={r.id} game={game} role={r} data={data} />
-              ) : r.bands ? (
-                <NurseRow key={r.id} game={game} role={r} rotas={data.rotas} />
-              ) : (
-                <RoleRow
-                  key={r.id}
-                  role={r}
-                  rotas={data.rotas}
-                  pay={r.annualCost}
-                  onHire={() => game.applyStaff({ type: "hire_staff", role: r.id })}
-                />
-              ),
-            )}
+            {g.roles
+              .filter((r) => data.funding !== "private" || r.id !== "registrar")
+              .map((r) =>
+                r.specialist ? (
+                  <SpecialistRow key={r.id} game={game} role={r} data={data} />
+                ) : r.bands ? (
+                  <NurseRow key={r.id} game={game} role={r} rotas={data.rotas} />
+                ) : (
+                  <RoleRow
+                    key={r.id}
+                    role={r}
+                    rotas={data.rotas}
+                    pay={r.annualCost}
+                    onHire={() => game.applyStaff({ type: "hire_staff", role: r.id })}
+                  />
+                ),
+              )}
           </ListSection>
         ))}
       </div>
@@ -475,26 +477,51 @@ function SpecialistRow({ game, role, data }: { game: Game; role: RosterRole; dat
   const counts = specialties
     .filter((sp) => (role.bySpecialty?.[sp.id] ?? 0) > 0)
     .map((sp) => `${sp.name} ${role.bySpecialty![sp.id]}`);
-  const hire = (onCall: boolean) =>
-    game.applyStaff({ type: "hire_staff", role: role.id, specialty, onCall });
+  const hire = (contract: "resident" | "on_call" | "privileges") =>
+    game.applyStaff({
+      type: "hire_staff",
+      role: role.id,
+      specialty,
+      onCall: contract === "on_call",
+      privileges: contract === "privileges",
+    });
   const consultant = role.id === "consultant";
+  // A Private Hospital's consultants have practising privileges; an NHS trust employs its own;
+  // a Hybrid trust can do either.
+  const privateOnly = consultant && data.funding === "private";
+  const privileges = consultant && data.funding !== "nhs";
   return (
     <RoleRow
       role={role}
       rotas={data.rotas}
-      pay={role.annualCost}
+      pay={privateOnly ? 0 : role.annualCost}
       payNote={
-        consultant
-          ? ` · on call ${formatMoney(ON_CALL.retainer)} + ${formatMoney(ON_CALL.hourly)}/h`
-          : ""
+        privateOnly
+          ? " · practising privileges: they bill their own patients"
+          : consultant
+            ? ` · on call ${formatMoney(ON_CALL.retainer)} + ${formatMoney(ON_CALL.hourly)}/h`
+            : ""
       }
-      onHire={() => hire(false)}
-      hireLabel={consultant ? "Resident" : "Hire"}
+      onHire={() => hire(privateOnly ? "privileges" : "resident")}
+      hireLabel={privateOnly ? "Grant privileges" : consultant ? "Resident" : "Hire"}
       extraButton={
-        consultant && (
-          <button class="small-button" onMouseDown={noFocus} onClick={() => hire(true)}>
-            On call
-          </button>
+        consultant &&
+        !privateOnly && (
+          <>
+            <button class="small-button" onMouseDown={noFocus} onClick={() => hire("on_call")}>
+              On call
+            </button>
+            {privileges && (
+              <button
+                class="small-button"
+                title="Practising privileges: no salary; they see private patients in the Private Patient Unit and bill their own fees"
+                onMouseDown={noFocus}
+                onClick={() => hire("privileges")}
+              >
+                Privileges
+              </button>
+            )}
+          </>
         )
       }
     >

@@ -128,17 +128,29 @@ export function privateReferralsPerDay(
   state: SimState,
   specialty: SpecialtyId,
 ): { insured: number; selfPay: number } {
-  const base = referralsPerDay(state, specialty) * reputationFactor(state);
+  const base =
+    referralsPerDay(state, specialty) * PRIVATE.catchmentFactor * reputationFactor(state);
   const price = state.policies.priceLevel ** -PRIVATE.priceElasticity;
   return { insured: base * PRIVATE.insuredShare, selfPay: base * PRIVATE.selfPayShare * price };
+}
+
+/**
+ * Referrals a day this hospital can expect to a specialty's clinics, NHS
+ * and private, for what it offers now (the Help panel's capacity guide).
+ */
+export function clinicDemandPerDay(state: SimState, specialty: SpecialtyId): number {
+  let n = offersClinic(state, specialty) ? nhsReferralsPerDay(state, specialty) : 0;
+  if (offersPrivateClinic(state, specialty)) {
+    const p = privateReferralsPerDay(state, specialty);
+    n += p.insured + p.selfPay;
+  }
+  return n;
 }
 
 /** NHS referrals a day to this specialty here (a Private Hospital gets those who choose it). */
 function nhsReferralsPerDay(state: SimState, specialty: SpecialtyId): number {
   const all = referralsPerDay(state, specialty);
-  return state.funding === "private"
-    ? all * PRIVATE.nhsChoiceShare * reputationFactor(state)
-    : all;
+  return state.funding === "private" ? all * PRIVATE.nhsChoiceShare * reputationFactor(state) : all;
 }
 
 /** GP referrals a day to this specialty's clinics, for the catchment. */
@@ -384,6 +396,8 @@ export interface ListSummary {
   followUps: number;
   /** Waiting for surgery (from step 7, the theatre lists). */
   surgery: number;
+  /** Of everyone on the list, private patients. */
+  private: number;
   /** RTT clocks running, and how many under 18 weeks. */
   pathways: number;
   within18w: number;
@@ -399,7 +413,7 @@ export function waitingLists(state: SimState): ListSummary[] {
   for (const sp of content.specialties) {
     if (!sp.outpatients) continue;
     const mine = Object.values(state.referrals).filter((r) => r.specialty === sp.id);
-    const open = offersClinic(state, sp.id);
+    const open = offersClinic(state, sp.id) || offersPrivateClinic(state, sp.id);
     if (mine.length === 0 && !open) continue;
     const s: ListSummary = {
       specialty: sp.id,
@@ -408,6 +422,7 @@ export function waitingLists(state: SimState): ListSummary[] {
       booked: 0,
       followUps: 0,
       surgery: 0,
+      private: 0,
       pathways: 0,
       within18w: 0,
       longestWeeks: 0,
@@ -419,7 +434,9 @@ export function waitingLists(state: SimState): ListSummary[] {
         if (r.booking) s.booked++;
       } else if (r.kind === "follow_up") s.followUps++;
       else s.surgery++;
-      if (r.clockStart === null) continue;
+      if (r.payer !== "nhs") s.private++;
+      // The 18-week standard is for NHS patients.
+      if (r.clockStart === null || r.payer !== "nhs") continue;
       const days = (state.tick - r.clockStart) / TICKS_PER_DAY;
       s.pathways++;
       if (days < RTT_TARGET_DAYS) s.within18w++;

@@ -10,6 +10,7 @@ import { PlanBar } from "./PlanBar";
 import { ReportsPanel } from "./ReportsPanel";
 import { SaveDialog } from "./SaveDialog";
 import { SettingsDialog } from "./SettingsDialog";
+import { NewGameDialog } from "./NewGameDialog";
 import { PatientsDialog } from "./PatientsDialog";
 import { StaffScreen } from "./StaffScreen";
 import { planning } from "./store";
@@ -33,7 +34,11 @@ export function App({ game }: { game: Game }) {
         onTheatreSessions={(id, sessions) =>
           game.applyStaff({ type: "set_theatre_sessions", id, sessions })
         }
+        onPrivateSessions={(id, kind, sessions) =>
+          game.applyStaff({ type: "set_private_sessions", id, kind, sessions })
+        }
         onEmergencyTheatre={(on) => game.setEmergencyTheatre(on)}
+        onPrivateRoom={(on) => game.setPrivateRoom(on)}
       />
       {/* Strips under the top bar stack rather than overlap. */}
       <div class="under-topbar">
@@ -57,6 +62,7 @@ export function App({ game }: { game: Game }) {
       <MapHelp />
       <PaletteHelp />
       <SaveDialog game={game} />
+      <NewGameDialog game={game} />
       <SettingsDialog game={game} />
     </>
   );

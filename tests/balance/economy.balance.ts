@@ -16,6 +16,7 @@ import { applyStaffCommand } from "@sim/systems/staffing";
 import { TICKS_PER_DAY } from "@sim/time";
 import { buildHospital } from "../fixtures/hospital";
 import { buildMajorsAE } from "../fixtures/majorsAE";
+import { buildPlannedCare, grantPrivileges } from "../fixtures/plannedCare";
 import { FIXTURE_MONEY } from "../fixtures/smallAE";
 
 type Cover = [StaffRoleId, number, number, { band?: NurseBand; specialty?: SpecialtyId }?];
@@ -114,6 +115,10 @@ function report(name: string, state: SimState, days: number): void {
       admissions: stat("admissions"),
       fourHour: avg((d) => (100 * d.stats.within4h) / Math.max(1, d.stats.departures)),
       plannedOps: stat("electiveOps"),
+      private: line("private"),
+      privateSeen: stat("privateSeen"),
+      privateOps: stat("privateOps"),
+      reputation: Math.round(state.reputation),
       clinicAppointments: avg((d) => d.stats.firstAppointments + d.stats.followUps),
     }),
   );
@@ -140,6 +145,44 @@ function hospital(catchment: number): SimState {
   return state;
 }
 
+/** A Private Hospital: clinics, two theatres, three side rooms; a lean planned-care rota. */
+function privateHospital(catchment: number, nhs: boolean): SimState {
+  const state = buildPlannedCare(1, "private");
+  state.settings.catchment = catchment;
+  staff(state, [
+    ["nurse", 3, 2],
+    ["nurse", 1, 0, { band: 7 }],
+    ["junior_doctor", 1, 1],
+    ["receptionist", 1, 0],
+    ["cleaner", 1, 1],
+    ["porter", 1, 1],
+    ["theatre_practitioner", 2, 0],
+  ]);
+  grantPrivileges(state, [
+    { specialty: "cardiology", clinics: 4, lists: 0 },
+    { specialty: "trauma_orthopaedics", clinics: 3, lists: 3 },
+    { specialty: "general_surgery", clinics: 3, lists: 2 },
+    { specialty: "anaesthetics", clinics: 0, lists: 4 },
+    { specialty: "anaesthetics", clinics: 0, lists: 1 },
+  ]);
+  if (nhs) {
+    for (const sp of ["cardiology", "trauma_orthopaedics", "general_surgery"] as const) {
+      state.policies.nhsReferrals[sp] = true;
+    }
+  }
+  return state;
+}
+
 it("A&E and a six-bed ward, 80k", () => report("ae80k", aeOnly(80_000), 42), 900_000);
 it("whole hospital, 80k", () => report("hospital80k", hospital(80_000), 56), 900_000);
 it("whole hospital, 40k", () => report("hospital40k", hospital(40_000), 56), 900_000);
+it(
+  "private hospital, 80k",
+  () => report("private80k", privateHospital(80_000, false), 56),
+  900_000,
+);
+it(
+  "private hospital with NHS referrals, 80k",
+  () => report("privateNhs80k", privateHospital(80_000, true), 56),
+  900_000,
+);

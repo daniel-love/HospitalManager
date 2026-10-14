@@ -14,12 +14,13 @@ import {
 } from "@data/patients";
 import type { ConditionDef, SpecialtyId, StaffRoleId } from "@data/schema";
 import { holder, missingRoom, roomsPatientsCantReach } from "@sim/places";
-import type { SimState } from "@sim/state";
+import type { Funding, SimState } from "@sim/state";
 import { parkingSpaces } from "@sim/systems/ambulances";
 import { dailyDemand } from "@sim/systems/arrivals";
 import { monitorsCovering, observedBeds, stationsSeeing } from "@sim/systems/monitoring";
 import { outpatientDesks } from "@sim/systems/outpatients";
-import { offersClinic, referralsPerDay } from "@sim/systems/referrals";
+import { clinicDemandPerDay, offersClinic, offersPrivateClinic } from "@sim/systems/referrals";
+import { PRIVATE } from "@data/economy";
 import { dailyBlock } from "@sim/systems/funding";
 import { formatMoney } from "./tools";
 import { SLOTS } from "@sim/systems/rota";
@@ -58,6 +59,7 @@ export interface AdviceData {
   next: AdviceItem | null;
   demand: { walkIns: number; ambulances: number; catchment: number };
   capacity: CapacityRow[];
+  funding: Funding;
 }
 
 /**
@@ -465,17 +467,97 @@ export function describeAdvice(state: SimState): AdviceData {
     ],
   };
 
-  const groups = [
-    essentials,
-    diagnostics,
-    majors,
-    admissions,
-    outpatients,
-    theatres,
-    afterDeath,
-    staffAreas,
-    money,
-  ];
+  const funding = state.funding;
+  const staff = Object.values(state.staff);
+  const privateClinics = staff.some((s) =>
+    funding === "private"
+      ? s.contract === "privileges" && s.clinicSessions > 0
+      : s.privateClinicSessions > 0,
+  );
+  const privateLists = staff.some((s) =>
+    funding === "private"
+      ? s.contract === "privileges" && s.theatreSessions > 0 && s.specialty !== "anaesthetics"
+      : s.privateTheatreSessions > 0 && s.specialty !== "anaesthetics",
+  );
+  const unit = (type: string) =>
+    state.rooms.some((r) => r.valid && r.typeId === type && (funding === "private" || r.private));
+  const privateCare: AdviceGroup = {
+    heading: funding === "private" ? "Private hospital" : "Private Patient Unit",
+    intro:
+      funding === "private"
+        ? `Insured and self-pay patients come for clinics and planned operations, as many as your reputation (${Math.round(state.reputation)}) and prices draw. You earn the facility fee; consultants bill their own. You can also take NHS patients who choose you, at tariff (Settings).`
+        : `Private patients in rooms set aside as the Private Patient Unit (in each room's inspector), seen in your consultants' private sessions on top of their NHS work. Private income can't pass ${Math.round(PRIVATE.incomeCap * 100)}% of all income.`,
+    items: [
+      item(
+        funding === "private" ? hasRoom("outpatient_clinic") : unit("outpatient_clinic"),
+        funding === "private"
+          ? "Outpatient clinic rooms and Outpatients Reception"
+          : "A clinic room in the Private Patient Unit",
+        "Private patients' first appointments and follow-ups.",
+      ),
+      item(
+        privateClinics,
+        funding === "private"
+          ? "Consultants with practising privileges and clinic sessions"
+          : "Consultants with private clinic sessions",
+        funding === "private"
+          ? "Grant privileges in the Staff screen, then set their sessions in their inspector. They aren't paid by you, and come in only for their sessions."
+          : "Set in a consultant's inspector, alongside their NHS job plan. They can't be in two places at once.",
+      ),
+      item(
+        funding === "private" ? hasRoom("theatre") : unit("theatre"),
+        funding === "private"
+          ? "Theatres for private lists"
+          : "A theatre in the Private Patient Unit",
+        "Planned operations: day cases, and stays in a room of their own. Recovery and a Day Surgery Unit as for any theatre.",
+        true,
+      ),
+      item(
+        privateLists,
+        "Surgeons with private theatre lists, and an anaesthetist for each",
+        "The best-paid private work.",
+        true,
+      ),
+      item(
+        unit("side_room"),
+        funding === "private"
+          ? "Side rooms for inpatients"
+          : "Side rooms in the Private Patient Unit",
+        "A private inpatient has a room of their own: without a free one, their operation is cancelled on the day.",
+        true,
+      ),
+      ...(funding === "private"
+        ? [
+            item(
+              staffCount("junior_doctor") > 0,
+              "A resident doctor on every shift",
+              "A junior doctor looks after inpatients day and night, as a private hospital's resident medical officer does.",
+              true,
+            ),
+          ]
+        : []),
+    ],
+  };
+  if (funding === "private") {
+    money.intro = `A private hospital earns facility fees: insurers pay their negotiated rates, self-pay patients your prices (Settings), and NHS patients who choose you pay tariff. There's no block contract, and no A&E. Consultants with practising privileges cost you nothing; nurses, theatre staff and the building do.`;
+    money.items = money.items.filter((i) => i.text !== "Wards, and doctors to admit to them");
+  }
+
+  const groups =
+    funding === "private"
+      ? [privateCare, diagnostics, outpatients, theatres, afterDeath, staffAreas, money]
+      : [
+          essentials,
+          diagnostics,
+          majors,
+          admissions,
+          outpatients,
+          theatres,
+          ...(funding === "hybrid" ? [privateCare] : []),
+          afterDeath,
+          staffAreas,
+          money,
+        ];
   const next = groups.flatMap((g) => g.items).find((i) => i.status === "todo") ?? null;
   const demand = dailyDemand(state);
   return {
@@ -487,6 +569,7 @@ export function describeAdvice(state: SimState): AdviceData {
       catchment: state.settings.catchment,
     },
     capacity: capacityGuide(state, demand),
+    funding: state.funding,
   };
 }
 
@@ -512,6 +595,8 @@ export function capacityGuide(
   state: SimState,
   demand: { walkIns: number; ambulances: number },
 ): CapacityRow[] {
+  // A Private Hospital has no A&E: only its clinics and theatres to plan for.
+  if (state.funding === "private") return [...clinicCapacity(state), ...theatreCapacity(state)];
   const perDay = new Map<ConditionDef, number>();
   for (const ch of ["walk_in", "ambulance"] as const) {
     const total = content.conditions.reduce((n, c) => n + c.channels[ch], 0);
@@ -651,13 +736,13 @@ function clinicCapacity(state: SimState): CapacityRow[] {
   const rows: CapacityRow[] = [];
   for (const sp of content.specialties) {
     const o = sp.outpatients;
-    if (!o || !offersClinic(state, sp.id)) continue;
-    const firsts = referralsPerDay(state, sp.id) * 7;
+    if (!o || !(offersClinic(state, sp.id) || offersPrivateClinic(state, sp.id))) continue;
+    const firsts = clinicDemandPerDay(state, sp.id) * 7;
     const followUps = o.followUpChance / (1 - o.followUpChance);
     const mins = firsts * (o.firstSlotMins + followUps * o.followUpSlotMins);
     const have = Object.values(state.staff)
       .filter((s) => s.specialty === sp.id && runsClinics(s))
-      .reduce((n, s) => n + s.clinicSessions, 0);
+      .reduce((n, s) => n + s.clinicSessions + s.privateClinicSessions, 0);
     rows.push({
       label: `${sp.name} clinics a week`,
       have,
@@ -685,13 +770,14 @@ function theatreCapacity(state: SimState): CapacityRow[] {
     if (!op || !clinic) continue;
     const have = staff
       .filter((s) => s.specialty === sp.id)
-      .reduce((n, s) => n + s.theatreSessions, 0);
+      .reduce((n, s) => n + s.theatreSessions + s.privateTheatreSessions, 0);
     surgeonLists += have;
     const listed = Object.values(state.referrals).some(
       (r) => r.kind === "surgery" && r.specialty === sp.id,
     );
-    if (!offersClinic(state, sp.id) && have === 0 && !listed) continue;
-    const ops = referralsPerDay(state, sp.id) * 7 * clinic.surgeryChance;
+    const clinics = offersClinic(state, sp.id) || offersPrivateClinic(state, sp.id);
+    if (!clinics && have === 0 && !listed) continue;
+    const ops = clinicDemandPerDay(state, sp.id) * 7 * clinic.surgeryChance;
     const mins = ops * ((op.opMins[0] + op.opMins[1]) / 2 + TURNAROUND_MINS);
     rows.push({
       label: `${sp.name} theatre lists a week`,
