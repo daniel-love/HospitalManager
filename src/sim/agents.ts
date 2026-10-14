@@ -226,6 +226,7 @@ export interface Patient extends AgentBase {
    */
   elective: {
     referralId: number;
+    payer: Payer;
     dayCase: boolean;
     checked: boolean;
     wardBed: number | null;
@@ -264,7 +265,7 @@ export interface Staff extends AgentBase {
    * on-call consultants are only ever on call from home. Bank and agency
    * staff come for one shift to fill a rota gap, and are gone after it.
    */
-  contract: "resident" | "on_call" | "bank" | "agency";
+  contract: "resident" | "on_call" | "bank" | "agency" | "privileges";
   /** Nurses: their Agenda for Change band (5, 6 or 7). Null for everyone else. */
   band: NurseBand | null;
   /** 0–100: how quickly they work (data/staff.ts SKILL). Grows with hours worked. */
@@ -302,6 +303,13 @@ export interface Staff extends AgentBase {
    * are paired with surgeons' lists (systems/theatres.ts).
    */
   theatreSessions: number;
+  /**
+   * Hybrid trusts: private clinic sessions and theatre lists a week, in the
+   * Private Patient Unit, on top of their NHS job plan. (In a Private
+   * Hospital every session is private, and these stay 0.)
+   */
+  privateClinicSessions: number;
+  privateTheatreSessions: number;
   jobId: number | null;
   /** Receptionists: the desk they staff. Nurses: the nurse station they wait at. */
   desk: number | null;
@@ -487,6 +495,8 @@ export interface Ledger {
   elective: number;
   /** NHS tariff for outpatient appointments. */
   outpatients: number;
+  /** Private patients' facility fees (insurers and self-pay). */
+  private: number;
   salaries: number;
   /** Bank staff filling rota gaps, by the hour. */
   bank: number;
@@ -583,6 +593,10 @@ export interface FlowStats {
   /** Of the emergency operations, those started by the time they were due. */
   emergencyOnTime: number;
   bumped: number;
+  /** Private referrals received, private appointments attended and private operations done. */
+  privateReferrals: number;
+  privateSeen: number;
+  privateOps: number;
 }
 
 /**
@@ -612,6 +626,12 @@ export interface Outpatient extends AgentBase {
  * A booked outpatient appointment: the clinician's session (a day and
  * half-day) and when in it, as a tick.
  */
+/**
+ * Who pays for someone's care: the NHS, a private medical insurer, or the
+ * patient themselves.
+ */
+export type Payer = "nhs" | "insured" | "self_pay";
+
 export interface Booking {
   day: number;
   half: "am" | "pm";
@@ -631,6 +651,8 @@ export interface Referral {
   id: number;
   name: string;
   specialty: SpecialtyId;
+  /** NHS, or a private patient (insured or self-pay). */
+  payer: Payer;
   kind: "first" | "follow_up" | "surgery";
   /** Referred as suspected cancer: to be seen within 2 weeks. */
   urgent: boolean;
@@ -681,6 +703,8 @@ export interface DayReport {
   day: number;
   ledger: Ledger;
   stats: FlowStats;
+  /** Reputation at the end of the day. */
+  reputation: number;
 }
 
 /** A calendar month's money and activity so far (or, once filed, the whole month). */
@@ -709,6 +733,7 @@ export function emptyLedger(): Ledger {
     tariff: 0,
     elective: 0,
     outpatients: 0,
+    private: 0,
     salaries: 0,
     bank: 0,
     agency: 0,
@@ -770,6 +795,9 @@ export function emptyStats(): FlowStats {
     emergencyOps: 0,
     emergencyOnTime: 0,
     bumped: 0,
+    privateReferrals: 0,
+    privateSeen: 0,
+    privateOps: 0,
   };
 }
 
@@ -778,7 +806,7 @@ export function net(l: Ledger): number {
 }
 
 export function income(l: Ledger): number {
-  return l.block + l.tariff + l.elective + l.outpatients;
+  return l.block + l.tariff + l.elective + l.outpatients + l.private;
 }
 
 export function costs(l: Ledger): number {

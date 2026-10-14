@@ -5,7 +5,7 @@
  * flow are filed as a daily report (the P&L).
  */
 import { equipmentById, staffRoleById } from "@data/catalogue";
-import { DAYS_PER_MONTH, NHS_FUNDING, RUNNING_COSTS } from "@data/economy";
+import { DAYS_PER_MONTH, NHS_FUNDING, PRIVATE, RUNNING_COSTS } from "@data/economy";
 import { FloorType } from "../world/grid";
 import { AGENCY, BANK, NURSE_BANDS, ON_CALL, UNSOCIAL } from "@data/staff";
 import {
@@ -17,11 +17,14 @@ import {
   net,
   onSite,
   type DayReport,
+  type Payer,
   type Staff,
 } from "../agents";
 import { emit } from "../events";
 import { emptyMonth, type SimState } from "../state";
 import { dailyBlock } from "./funding";
+import { overPrivateCap } from "./referrals";
+import { updateReputation } from "./reputation";
 import {
   clockFromTick,
   dateOf,
@@ -55,11 +58,40 @@ export function earnElective(state: SimState, tariff: number): void {
   useSupplies(state, tariff * RUNNING_COSTS.suppliesShare);
 }
 
+/**
+ * A private patient's facility fee (the consultant bills their own fee):
+ * a multiple of the NHS tariff for the same care, at insurers' rates or the
+ * hospital's self-pay prices. Supplies are as for the NHS care.
+ */
+export function earnPrivate(
+  state: SimState,
+  nhsTariff: number,
+  payer: Exclude<Payer, "nhs">,
+  outpatient = false,
+): void {
+  const factor =
+    payer === "insured" ? PRIVATE.insurerFactor : PRIVATE.selfPayFactor * state.policies.priceLevel;
+  const fee = nhsTariff * factor * (outpatient ? PRIVATE.outpatientFacilityShare : 1);
+  state.money += fee;
+  state.today.ledger.private += fee;
+  useSupplies(
+    state,
+    nhsTariff *
+      (outpatient ? RUNNING_COSTS.outpatientSuppliesShare : RUNNING_COSTS.suppliesShare),
+  );
+}
+
 /** An outpatient appointment's tariff, paid in full. */
 export function earnOutpatient(state: SimState, tariff: number): void {
   state.money += tariff;
   state.today.ledger.outpatients += tariff;
   useSupplies(state, tariff * RUNNING_COSTS.outpatientSuppliesShare);
+}
+
+/** A planned operation's income: tariff for the NHS, a facility fee for a private patient. */
+export function earnPlanned(state: SimState, tariff: number, payer: Payer): void {
+  if (payer === "nhs") earnElective(state, tariff);
+  else earnPrivate(state, tariff, payer);
 }
 
 /** Drugs and clinical supplies used in a treatment. */
@@ -97,7 +129,8 @@ export function rolePay(s: Staff): number {
  */
 export function annualCost(s: Staff): number {
   if (s.contract === "on_call") return ON_CALL.retainer;
-  if (s.contract === "bank" || s.contract === "agency") return 0;
+  // Paid by the hour, or (practising privileges) by their own patients.
+  if (s.contract === "bank" || s.contract === "agency" || s.contract === "privileges") return 0;
   return rolePay(s);
 }
 
@@ -188,14 +221,24 @@ export function updateFinance(state: SimState): void {
 
 /** Files today's report (it's just turned midnight) and starts a new day. */
 function closeDay(state: SimState): void {
+  updateReputation(state, state.today.stats);
   const report: DayReport = {
     day: clockFromTick(state.tick - 1).day,
     ledger: state.today.ledger,
     stats: state.today.stats,
+    reputation: state.reputation,
   };
   state.history.push(report);
   if (state.history.length > HISTORY_DAYS) state.history.shift();
   state.today = { ledger: emptyLedger(), stats: emptyStats() };
+
+  if (overPrivateCap(state)) {
+    emit(
+      state,
+      `Private income is over ${Math.round(PRIVATE.incomeCap * 100)}% of all income: the regulator won't let an NHS trust's private work outgrow its NHS work, so the Private Patient Unit takes no new referrals until it's back under`,
+      "warn",
+    );
+  }
 
   const month = state.month;
   addInto(month.ledger, report.ledger);

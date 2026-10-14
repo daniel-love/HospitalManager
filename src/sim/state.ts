@@ -4,7 +4,7 @@
  * (see save/codec.ts), except for fields marked "derived", which are rebuilt
  * after loading.
  */
-import { STARTING_CASH } from "@data/economy";
+import { REPUTATION, STARTING_CASH } from "@data/economy";
 import type { SpecialtyId } from "@data/schema";
 import { DEFAULT_CATCHMENT } from "@data/patients";
 import {
@@ -31,7 +31,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 29;
+export const SIM_STATE_VERSION = 30;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -72,6 +72,8 @@ export interface Room {
   specialty: SpecialtyId | null;
   /** Operating theatres: kept for emergencies (see SimState.emergencyTheatres). */
   emergency: boolean;
+  /** Hybrid trusts: part of the Private Patient Unit (see SimState.privateRooms). */
+  private: boolean;
   /**
    * Advisory: equipment some conditions need here, beyond being valid
    * (e.g. an ECG for chest pain). Doesn't affect `valid`.
@@ -137,6 +139,12 @@ export interface SimState {
   roomSpecialties: Record<string, SpecialtyId>;
   /** Operating theatres kept for emergencies, pinned to a tile like roomSpecialties. */
   emergencyTheatres: Record<string, true>;
+  /** Hybrid trusts: rooms in the Private Patient Unit, pinned to a tile like roomSpecialties. */
+  privateRooms: Record<string, true>;
+  /** How the hospital is funded (GAME_DESIGN §2.2), chosen when the game starts. */
+  funding: Funding;
+  /** 0–100: what patients and GPs think of the hospital (systems/reputation.ts). */
+  reputation: number;
   /**
    * Cover levels (systems/rota.ts): how many of each rota group the player
    * wants on each day and night shift, keyed by group ("nurse",
@@ -191,7 +199,18 @@ export type GapFill = "none" | "bank" | "bank_agency";
 
 export interface Policies {
   gapFill: GapFill;
+  /** Private care: the self-pay price level, as a multiple of the standard price (PRIVATE.priceLevels). */
+  priceLevel: number;
+  /** Private Hospitals: specialties taking NHS-funded referrals (patient choice), at tariff. */
+  nhsReferrals: Partial<Record<SpecialtyId, true>>;
 }
+
+/**
+ * NHS Trust: NHS funding only. Private Hospital: private patients (and NHS
+ * referrals it chooses to take), consultants with practising privileges, no
+ * emergency department. Hybrid: an NHS trust with a Private Patient Unit.
+ */
+export type Funding = "nhs" | "private" | "hybrid";
 
 /** People wanted on each day shift and each night shift. */
 export interface Cover {
@@ -208,6 +227,7 @@ export interface NewGameOptions {
   site?: boolean;
   /** Staff work shifts. Off for test maps, where everyone works around the clock. */
   rotas?: boolean;
+  funding?: Funding;
 }
 
 export const DEFAULT_MAP_SIZE = 200;
@@ -258,8 +278,11 @@ export function createSimState(opts: NewGameOptions): SimState {
     dirt: {},
     roomSpecialties: {},
     emergencyTheatres: {},
+    privateRooms: {},
+    funding: opts.funding ?? "nhs",
+    reputation: REPUTATION.start,
     cover: {},
-    policies: { gapFill: "bank" },
+    policies: { gapFill: "bank", priceLevel: 1, nhsReferrals: {} },
     today: { ledger: emptyLedger(), stats: emptyStats() },
     history: [],
     month: emptyMonth(0, opts.money ?? STARTING_CASH),

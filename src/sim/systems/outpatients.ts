@@ -42,7 +42,7 @@ import { sessionsOn, type Session } from "./clinics";
 import { ticksFor, unassignJob } from "./jobBoard";
 import { headTo } from "./movement";
 import { bookAppointments, serviceOf } from "./referrals";
-import { earnOutpatient } from "./finance";
+import { earnOutpatient, earnPrivate } from "./finance";
 
 /** Chance of not attending: first appointments, follow-ups (NHS about 7%). */
 export const DNA_CHANCE = { first: 0.06, follow_up: 0.08 };
@@ -344,7 +344,7 @@ function seen(state: SimState, o: Outpatient): void {
   r.booking = null;
   if (r.kind === "first") {
     stats.firstAppointments++;
-    earnOutpatient(state, service.firstTariff);
+    earnAppointment(state, r, service.firstTariff);
     if (r.urgent) {
       stats.urgentSeen++;
       if (state.tick - (r.clockStart ?? r.added) <= URGENT_TARGET_DAYS * TICKS_PER_DAY) {
@@ -361,7 +361,7 @@ function seen(state: SimState, o: Outpatient): void {
     }
   } else {
     stats.followUps++;
-    earnOutpatient(state, service.followUpTariff);
+    earnAppointment(state, r, service.followUpTariff);
   }
   if (chance(state.rng, service.followUpChance)) {
     // Treatment has started (or it's monitoring): the clock stops.
@@ -374,6 +374,15 @@ function seen(state: SimState, o: Outpatient): void {
     return;
   }
   delete state.referrals[r.id]; // Discharged back to their GP.
+}
+
+/** An appointment's income: tariff for the NHS, a facility fee for a private patient. */
+function earnAppointment(state: SimState, r: Referral, tariff: number): void {
+  if (r.payer === "nhs") earnOutpatient(state, tariff);
+  else {
+    earnPrivate(state, tariff, r.payer, true);
+    state.today.stats.privateSeen++;
+  }
 }
 
 function goHome(state: SimState, o: Outpatient): void {

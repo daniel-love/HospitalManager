@@ -234,6 +234,8 @@ export function freeCouches(
   roomType: string,
   capabilities: readonly string[],
   from: Point,
+  /** For a private patient. In a Hybrid trust, Private Patient Unit rooms are only for them. */
+  forPrivate = false,
 ): PlacedObject[] {
   return objectsIn(state, roomType, isCouch)
     .filter((o) => {
@@ -241,6 +243,7 @@ export function freeCouches(
         return false;
       }
       const room = roomOfObject(state, o.id)!;
+      if (state.funding === "hybrid" && room.private !== forPrivate) return false;
       return capabilities.every((c) => room.capabilities.includes(c));
     })
     .sort((a, b) => manhattan(a, from) - manhattan(b, from) || a.id - b.id);

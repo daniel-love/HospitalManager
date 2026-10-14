@@ -57,7 +57,7 @@ import {
   releasedToFuneralDirector,
   startCollection,
 } from "./collections";
-import { earnElective, earnEmergency } from "./finance";
+import { earnEmergency, earnPlanned } from "./finance";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo, stop } from "./movement";
 import { recordDeparture, releaseSeat } from "./patients";
@@ -126,7 +126,11 @@ export function die(state: SimState, p: Patient, expected: boolean, verified: bo
   const condition = conditionById.get(p.conditionId)!;
   // The attendance or inpatient spell is still paid for.
   if (condition.planned) {
-    earnElective(state, wasAdmitted ? (condition.admission?.tariff ?? 0) : condition.tariff);
+    earnPlanned(
+      state,
+      wasAdmitted ? (condition.admission?.tariff ?? 0) : condition.tariff,
+      p.elective?.payer ?? "nhs",
+    );
   } else if (wasAdmitted) earnEmergency(state, condition.admission?.tariff ?? 0);
   else {
     recordDeparture(state, p);

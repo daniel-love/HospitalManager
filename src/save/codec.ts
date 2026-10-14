@@ -11,6 +11,7 @@
  */
 import { z } from "zod";
 import { conditionById, objectDef } from "@data/catalogue";
+import { PRIVATE } from "@data/economy";
 import { specialtyIds, staffRoleIds } from "@data/schema";
 import { SIM_STATE_VERSION, type PlacedObject, type SimState } from "@sim/state";
 import { clockFromTick, formatClock } from "@sim/time";
@@ -111,6 +112,7 @@ const commandSchema = z.discriminatedUnion("type", [
 
 const num = z.number().finite();
 const nullableInt = int.nullable();
+const payerSchema = z.enum(["nhs", "insured", "self_pay"]);
 
 const agentFields = {
   id: int.positive(),
@@ -216,6 +218,7 @@ const patientSchema = z.object({
   elective: z
     .object({
       referralId: int.positive(),
+      payer: payerSchema,
       dayCase: z.boolean(),
       checked: z.boolean(),
       wardBed: nullableInt,
@@ -237,7 +240,7 @@ const staffSchema = z.object({
   ...agentFields,
   role: z.enum(staffRoleIds),
   specialty: z.enum(specialtyIds).nullable(),
-  contract: z.enum(["resident", "on_call", "bank", "agency"]),
+  contract: z.enum(["resident", "on_call", "bank", "agency", "privileges"]),
   band: z.union([z.literal(5), z.literal(6), z.literal(7)]).nullable(),
   skill: num.min(0).max(100),
   fatigue: num.min(0).max(100),
@@ -252,6 +255,8 @@ const staffSchema = z.object({
   meDuty: z.boolean(),
   clinicSessions: int.min(0),
   theatreSessions: int.min(0),
+  privateClinicSessions: int.min(0),
+  privateTheatreSessions: int.min(0),
   jobId: nullableInt,
   desk: nullableInt,
   hiredTick: int.min(0),
@@ -346,6 +351,7 @@ const ledgerSchema = z.object({
   tariff: num,
   elective: num,
   outpatients: num,
+  private: num,
   salaries: num,
   bank: num,
   agency: num,
@@ -410,6 +416,9 @@ const statsSchema = z.object({
   emergencyOps: int.min(0),
   emergencyOnTime: int.min(0),
   bumped: int.min(0),
+  privateReferrals: int.min(0),
+  privateSeen: int.min(0),
+  privateOps: int.min(0),
 });
 const monthSchema = z.object({
   ...monthSchemaFields,
@@ -448,6 +457,7 @@ const referralSchema = z.object({
   id: int.positive(),
   name: z.string(),
   specialty: z.enum(specialtyIds),
+  payer: payerSchema,
   kind: z.enum(["first", "follow_up", "surgery"]),
   urgent: z.boolean(),
   clockStart: nullableInt,
@@ -509,9 +519,23 @@ const saveSchema = z.object({
       z.string().regex(/^[a-z_]+(:[a-z0-9_]+)?$/),
       z.object({ day: int.min(0).max(99), night: int.min(0).max(99) }),
     ),
-    policies: z.object({ gapFill: z.enum(["none", "bank", "bank_agency"]) }),
+    policies: z.object({
+      gapFill: z.enum(["none", "bank", "bank_agency"]),
+      priceLevel: num.min(PRIVATE.priceLevels[0]).max(PRIVATE.priceLevels[1]),
+      nhsReferrals: z.partialRecord(z.enum(specialtyIds), z.literal(true)),
+    }),
+    privateRooms: z.record(z.string().regex(/^\d+:\d+$/), z.literal(true)),
+    funding: z.enum(["nhs", "private", "hybrid"]),
+    reputation: num.min(0).max(100),
     today: z.object({ ledger: ledgerSchema, stats: statsSchema }),
-    history: z.array(z.object({ day: int.positive(), ledger: ledgerSchema, stats: statsSchema })),
+    history: z.array(
+      z.object({
+        day: int.positive(),
+        ledger: ledgerSchema,
+        stats: statsSchema,
+        reputation: num.min(0).max(100),
+      }),
+    ),
     month: monthSchema,
     months: z.array(monthSchema),
     settings: z.object({
@@ -588,6 +612,9 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       emergencyTheatres: state.emergencyTheatres,
       cover: state.cover,
       policies: state.policies,
+      privateRooms: state.privateRooms,
+      funding: state.funding,
+      reputation: state.reputation,
       today: state.today,
       history: state.history,
       month: state.month,
@@ -655,7 +682,10 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     roomSpecialties: { ...s.roomSpecialties },
     emergencyTheatres: { ...s.emergencyTheatres },
     cover: { ...s.cover },
-    policies: { ...s.policies },
+    policies: { ...s.policies, nhsReferrals: { ...s.policies.nhsReferrals } },
+    privateRooms: { ...s.privateRooms },
+    funding: s.funding,
+    reputation: s.reputation,
     today: s.today,
     history: s.history,
     month: s.month,

@@ -29,6 +29,7 @@ import {
   WEEKDAY_NAMES,
   type GameClock,
 } from "../time";
+import { jobPlan } from "./clinics";
 import { operates, runsClinics, staffTitle } from "./staffing";
 import { callsInSick, endOfShift, fillGaps } from "./workforce";
 
@@ -59,7 +60,7 @@ function clash(a: number, b: number): boolean {
 
 /** Doctors who work weekdays: consultants, and registrars with clinics or theatre lists. */
 export function worksWeekdays(s: Staff): boolean {
-  if (s.role === "consultant") return true;
+  if (s.role === "consultant") return s.contract !== "privileges";
   return (
     s.role === "registrar" &&
     ((runsClinics(s) && s.clinicSessions > 0) || (operates(s) && s.theatreSessions > 0))
@@ -291,9 +292,13 @@ const isSick = (state: SimState, s: Staff) => s.sickUntil !== null && state.tick
 /** Once a minute: shifts start and end, and consultants go on and off call. */
 export function updateShifts(state: SimState): void {
   if (state.tick % T !== 0) return;
+  const c = clockFromTick(state.tick);
+  for (const s of Object.values(state.staff)) {
+    if (s.contract === "privileges") privilegesDuty(state, s, c);
+  }
   if (!state.settings.rotas) {
     for (const s of Object.values(state.staff)) {
-      if (s.contract === "on_call") continue;
+      if (s.contract === "on_call" || s.contract === "privileges") continue;
       if (s.duty !== "on" || s.onCall) comeIn(state, s, null);
       s.shiftEnd = null;
     }
@@ -301,9 +306,8 @@ export function updateShifts(state: SimState): void {
   }
   const plan = rota(state);
   const now = shiftsAt(state.tick);
-  const c = clockFromTick(state.tick);
   for (const s of Object.values(state.staff)) {
-    if (s.contract === "on_call") continue;
+    if (s.contract === "on_call" || s.contract === "privileges") continue;
     if (worksWeekdays(s)) weekdayDuty(state, s, c);
     else rosteredDuty(state, s, plan.get(s.id) ?? 0, now);
   }
@@ -331,6 +335,19 @@ function rosteredDuty(state: SimState, s: Staff, mask: number, now: ShiftTime[])
       comeIn(state, s, starting.end);
     }
   }
+}
+
+/**
+ * Consultants with practising privileges aren't employed: they come in on
+ * weekdays they have a session (08:00 to 18:00), and aren't on call.
+ */
+function privilegesDuty(state: SimState, s: Staff, c: GameClock): void {
+  const today = inWeekdayHours(c) && jobPlan(state, s).some((p) => p.weekday === c.weekday);
+  if (today) {
+    if (s.duty !== "on" || s.shiftEnd === null) {
+      comeIn(state, s, tickAt(c.day, 0) + SHIFTS.weekdayEnd * T);
+    }
+  } else finish(s);
 }
 
 function weekdayDuty(state: SimState, s: Staff, c: GameClock): void {
@@ -364,6 +381,11 @@ function weekdayDuty(state: SimState, s: Staff, c: GameClock): void {
  * is short right now (fewer at work than the cover, or nobody without one).
  */
 export function startOnRota(state: SimState, s: Staff): void {
+  if (s.contract === "privileges") {
+    // In for their sessions only (privilegesDuty).
+    s.duty = "off";
+    return;
+  }
   if (!state.settings.rotas || s.contract === "on_call") return;
   s.duty = "off";
   if (worksWeekdays(s)) {
@@ -449,6 +471,9 @@ export function rotaSummary(state: SimState): RotaGroupSummary[] {
 /** Someone's working pattern, for the inspector: "Mon day, Wed night, Sat night". */
 export function describeRota(state: SimState, s: Staff): string {
   if (s.contract === "on_call") return "On call from home whenever they're needed";
+  if (s.contract === "privileges") {
+    return "Practising privileges: in on weekdays with a clinic or list, not on call";
+  }
   if (s.contract === "bank" || s.contract === "agency") {
     return `One ${s.contract} shift, filling a rota gap`;
   }

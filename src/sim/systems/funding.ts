@@ -139,6 +139,8 @@ export function deliveredValuePerDay(state: SimState): number | null {
  * actually been doing.
  */
 export function dailyBlock(state: SimState): number {
+  // A Private Hospital has no NHS emergency contract.
+  if (state.funding === "private") return 0;
   let value = emergencyValuePerDay(state);
   const delivered = deliveredValuePerDay(state);
   if (delivered !== null) value = Math.min(value, delivered * NHS_FUNDING.activityTolerance);

@@ -46,6 +46,7 @@ export function detectRooms(state: SimState): void {
         valid: false,
         specialty: null,
         emergency: false,
+        private: false,
         forConditions: [],
       });
     }
@@ -96,8 +97,32 @@ export function detectRooms(state: SimState): void {
     const room = id === 0 ? undefined : rooms[id - 1];
     if (room?.typeId === "theatre") room.emergency = true;
   }
+  for (const key of Object.keys(state.privateRooms)) {
+    const [floor, tile] = key.split(":").map(Number);
+    const id = state.floors[floor!]?.roomId[tile!] ?? 0;
+    const room = id === 0 ? undefined : rooms[id - 1];
+    if (room && PRIVATE_ROOM_TYPES.has(room.typeId)) room.private = true;
+  }
   state.rooms = rooms;
   state.objectRoom = objectRoom;
+}
+
+/**
+ * Rooms a Hybrid trust can put in its Private Patient Unit: clinic rooms
+ * for private clinics, theatres for private lists, and wards and side rooms
+ * for private inpatients.
+ */
+export const PRIVATE_ROOM_TYPES = new Set(["outpatient_clinic", "theatre", "ward", "side_room"]);
+
+/** Puts a room in the Private Patient Unit, or takes it out. */
+export function setPrivateRoom(state: SimState, room: Room, on: boolean): void {
+  const grid = state.floors[room.floor]!;
+  for (const key of Object.keys(state.privateRooms)) {
+    const [floor, tile] = key.split(":").map(Number);
+    if (floor === room.floor && grid.roomId[tile!] === room.id) delete state.privateRooms[key];
+  }
+  if (on) state.privateRooms[`${room.floor}:${room.tiles[0]!}`] = true;
+  room.private = on;
 }
 
 /** Keeps a theatre for emergencies, or opens it to planned lists again. */

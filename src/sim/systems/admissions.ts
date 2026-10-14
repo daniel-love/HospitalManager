@@ -260,6 +260,7 @@ export function claimWardBed(state: SimState, job: Job): Point | null {
   const from = tileOf(p);
   const wheeled = onTrolley(state, p);
   const reachable = (b: PlacedObject) => !wheeled || trolleyStop(state, from, b) !== null;
+  const isPrivate = !!p.elective && p.elective.payer !== "nhs";
   // At the end of life, a side room for privacy if one's free.
   const bed =
     (p.endOfLife
@@ -268,7 +269,7 @@ export function claimWardBed(state: SimState, job: Job): Point | null {
     bestWardBed(
       state,
       p,
-      freeCouches(state, job.roomType, job.capabilities, from).filter(reachable),
+      freeCouches(state, job.roomType, job.capabilities, from, isPrivate).filter(reachable),
     );
   if (!bed) return null;
   reserve(state, bed.id, 0, p.id);

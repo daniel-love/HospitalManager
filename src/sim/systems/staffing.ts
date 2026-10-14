@@ -45,6 +45,12 @@ export type StaffCommand =
       onCall?: boolean;
       /** Nurses: their band (5 if not given). */
       band?: NurseBand;
+      /**
+       * Consultants, in a Private Hospital or Hybrid trust: practising
+       * privileges rather than employment (no salary; they bill their own
+       * patients, and the hospital earns the facility fee).
+       */
+      privileges?: boolean;
     }
   | { type: "dismiss_staff"; id: number }
   /** Gives a resident consultant the Medical Examiner duty, or takes it away. */
@@ -52,7 +58,9 @@ export type StaffCommand =
   /** Sets how many outpatient clinic sessions a week are in a doctor's job plan. */
   | { type: "set_clinic_sessions"; id: number; sessions: number }
   /** Sets how many theatre lists a week a surgeon or anaesthetist does. */
-  | { type: "set_theatre_sessions"; id: number; sessions: number };
+  | { type: "set_theatre_sessions"; id: number; sessions: number }
+  /** Hybrid trusts: a consultant's private clinic sessions or theatre lists a week, in the Private Patient Unit. */
+  | { type: "set_private_sessions"; id: number; kind: "clinic" | "theatre"; sessions: number };
 
 export type StaffResult = { ok: true; staff: Staff } | { ok: false; error: string };
 
@@ -76,18 +84,24 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
     if (cmd.band !== undefined && cmd.role !== "nurse") {
       return { ok: false, error: "Only nurses have a band" };
     }
+    const refused = cantHire(state, cmd);
+    if (refused) return { ok: false, error: refused };
     const staff = createStaff(state, {
       role: cmd.role,
       specialty: role.specialist ? cmd.specialty! : null,
       band: cmd.role === "nurse" ? (cmd.band ?? 5) : null,
-      contract: cmd.onCall ? "on_call" : "resident",
+      contract: cmd.privileges ? "privileges" : cmd.onCall ? "on_call" : "resident",
     });
     const at = { x: staff.x, y: staff.y };
     startOnRota(state, staff);
     const first = onSite(staff) || staff.onCall ? null : nextShift(state, staff);
+    const joined =
+      staff.contract === "privileges"
+        ? `${staff.name} has practising privileges as a ${staffTitle(staff)}`
+        : `${staff.name} joined as ${staffTitle(staff)}`;
     emit(
       state,
-      `${staff.name} joined as ${staffTitle(staff)}${first ? `: first shift ${first}` : ""}`,
+      `${joined}${first ? `: first shift ${first}` : ""}`,
       "info",
       onSite(staff) ? at : undefined,
     );
@@ -96,7 +110,7 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
   const staff = state.staff[cmd.id];
   if (!staff) return { ok: false, error: "No such member of staff" };
   if (cmd.type === "set_me_duty") {
-    if (cmd.on && (staff.role !== "consultant" || staff.contract === "on_call")) {
+    if (cmd.on && (staff.role !== "consultant" || staff.contract !== "resident")) {
       return { ok: false, error: "Only resident consultants can be Medical Examiners" };
     }
     staff.meDuty = cmd.on;
@@ -125,8 +139,67 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
     staff.theatreSessions = clamp(cmd.sessions, Math.min(MAX_THEATRE_SESSIONS, room));
     return { ok: true, staff };
   }
+  if (cmd.type === "set_private_sessions") {
+    if (
+      state.funding !== "hybrid" ||
+      staff.role !== "consultant" ||
+      staff.contract !== "resident"
+    ) {
+      return {
+        ok: false,
+        error: "Private sessions are for a Hybrid trust's employed consultants",
+      };
+    }
+    if (cmd.kind === "clinic" ? !runsClinics(staff) : !operates(staff)) {
+      return {
+        ok: false,
+        error:
+          cmd.kind === "clinic"
+            ? "Their specialty has no clinics"
+            : "Only surgeons and anaesthetists do theatre lists",
+      };
+    }
+    const other =
+      cmd.kind === "clinic" ? staff.privateTheatreSessions : staff.privateClinicSessions;
+    const room = MAX_WEEK_SESSIONS - fixedSessionsOf(staff) - other;
+    const n = clamp(cmd.sessions, Math.max(0, room));
+    if (cmd.kind === "clinic") staff.privateClinicSessions = n;
+    else staff.privateTheatreSessions = n;
+    return { ok: true, staff };
+  }
   removeStaff(state, staff);
   return { ok: true, staff };
+}
+
+/** Half-day sessions in a working week: Monday to Friday, mornings and afternoons. */
+export const MAX_WEEK_SESSIONS = 10;
+
+/** NHS clinic sessions and theatre lists in someone's job plan. */
+function fixedSessionsOf(s: Staff): number {
+  return (runsClinics(s) ? s.clinicSessions : 0) + (operates(s) ? s.theatreSessions : 0);
+}
+
+/** Why a hire isn't allowed under the hospital's funding model, or null. */
+function cantHire(
+  state: SimState,
+  cmd: Extract<StaffCommand, { type: "hire_staff" }>,
+): string | null {
+  if (cmd.privileges && cmd.role !== "consultant") {
+    return "Only consultants have practising privileges";
+  }
+  if (cmd.privileges && cmd.onCall) return "Practising privileges aren't an on-call contract";
+  if (state.funding === "nhs" && cmd.privileges) {
+    return "An NHS trust employs its consultants (practising privileges are for private care)";
+  }
+  if (state.funding === "private") {
+    if (cmd.role === "registrar") {
+      return "Specialty registrars are NHS training posts: a private hospital's resident doctors (junior doctors) cover its wards";
+    }
+    if (cmd.role === "consultant" && !cmd.privileges) {
+      return "A private hospital's consultants work with practising privileges rather than as employees";
+    }
+  }
+  return null;
 }
 
 /**
@@ -161,6 +234,8 @@ export function createStaff(
     meDuty: false,
     clinicSessions: 0,
     theatreSessions: 0,
+    privateClinicSessions: 0,
+    privateTheatreSessions: 0,
     x: at.x,
     y: at.y,
     prevX: at.x,
@@ -197,8 +272,8 @@ const clamp = (n: number, max: number) => Math.max(0, Math.min(max, Math.round(n
  * of a surgical specialty, or of Anaesthetics.
  */
 export function operates(s: Staff): boolean {
-  if ((s.role !== "consultant" && s.role !== "registrar") || s.contract !== "resident")
-    return false;
+  if (s.role !== "consultant" && s.role !== "registrar") return false;
+  if (s.contract !== "resident" && s.contract !== "privileges") return false;
   if (!s.specialty) return false;
   return s.specialty === "anaesthetics" || !!specialtyById.get(s.specialty)?.surgery;
 }
@@ -208,7 +283,7 @@ export function runsClinics(s: Staff): boolean {
   const specialty = s.specialty && specialtyById.get(s.specialty);
   return (
     (s.role === "consultant" || s.role === "registrar") &&
-    s.contract === "resident" &&
+    (s.contract === "resident" || s.contract === "privileges") &&
     !!specialty?.outpatients
   );
 }
@@ -225,13 +300,15 @@ export function staffTitle(s: Staff): string {
   const role = band ? `${band.title} (Band ${band.band})` : staffRoleById.get(s.role)!.name;
   const specialty = s.specialty ? `${specialtyById.get(s.specialty)!.name} ` : "";
   const contract =
-    s.contract === "on_call"
-      ? " (on call)"
-      : s.contract === "bank"
-        ? " (bank)"
-        : s.contract === "agency"
-          ? " (agency)"
-          : "";
+    s.contract === "privileges"
+      ? " (practising privileges)"
+      : s.contract === "on_call"
+        ? " (on call)"
+        : s.contract === "bank"
+          ? " (bank)"
+          : s.contract === "agency"
+            ? " (agency)"
+            : "";
   return `${specialty}${role}${contract}${s.meDuty ? ", Medical Examiner" : ""}`;
 }
 

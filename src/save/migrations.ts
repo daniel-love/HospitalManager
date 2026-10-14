@@ -627,6 +627,54 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v30: funding models (an old hospital is an NHS trust), reputation, private care.
+  // Defaults only where missing: tests upgrade saves written by this version.
+  29: (save) => {
+    type Ledgered = { ledger: object };
+    type Day = Ledgered & { stats?: object };
+    type Patient = { elective: object | null };
+    const state = save.state as {
+      staff?: object[];
+      patients?: Patient[];
+      referrals?: object[];
+      policies?: object;
+      privateRooms?: object;
+      funding?: string;
+      reputation?: number;
+      today: Day;
+      history: Day[];
+      month?: Day;
+      months?: Day[];
+    };
+    const ledger = <T extends Ledgered>(d: T) => ({ ...d, ledger: { private: 0, ...d.ledger } });
+    const stats = <T extends Day>(d: T) => ({
+      ...ledger(d),
+      stats: { privateReferrals: 0, privateSeen: 0, privateOps: 0, ...d.stats },
+    });
+    return {
+      ...save,
+      state: {
+        ...state,
+        staff: (state.staff ?? []).map((s) => ({
+          privateClinicSessions: 0,
+          privateTheatreSessions: 0,
+          ...s,
+        })),
+        patients: (state.patients ?? []).map((p) =>
+          p.elective ? { ...p, elective: { payer: "nhs", ...p.elective } } : p,
+        ),
+        referrals: (state.referrals ?? []).map((r) => ({ payer: "nhs", ...r })),
+        policies: { priceLevel: 1, nhsReferrals: {}, ...state.policies },
+        privateRooms: state.privateRooms ?? {},
+        funding: state.funding ?? "nhs",
+        reputation: state.reputation ?? 60,
+        today: stats(state.today),
+        history: state.history.map((d) => ({ reputation: 60, ...stats(d) })),
+        ...(state.month ? { month: stats(state.month) } : {}),
+        ...(state.months ? { months: state.months.map(stats) } : {}),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

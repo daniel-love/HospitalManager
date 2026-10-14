@@ -99,6 +99,8 @@ export function treatableShare(state: SimState, channel: "walk_in" | "ambulance"
 }
 
 export function updateArrivals(state: SimState): void {
+  // A Private Hospital has no emergency department: 999 calls and walk-ins go to the NHS.
+  if (state.funding === "private") return;
   const demand = dailyDemand(state);
   // Always draw both, so the random sequence doesn't depend on the layout.
   const ambulance = chance(

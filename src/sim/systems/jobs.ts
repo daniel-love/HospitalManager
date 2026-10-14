@@ -88,6 +88,8 @@ export function assignJobs(state: SimState): void {
     (s) =>
       s.jobId === null &&
       s.role !== "receptionist" &&
+      // Consultants with practising privileges only see their own patients, in their sessions.
+      s.contract !== "privileges" &&
       onDuty(s) &&
       !inClinic(state, s) &&
       !inTheatre(state, s),

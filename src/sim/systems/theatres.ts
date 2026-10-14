@@ -86,15 +86,28 @@ export interface TheatreList {
   half: SessionHalf;
   surgeon: Staff;
   anaesthetist: Staff | null;
+  /** A private list (clinics.ts SessionSlot.private). */
+  private: boolean;
   /** The theatre (a Room id), or null with none free. */
   roomId: number | null;
 }
 
-/** Resident anaesthetists who do theatre lists, in hiring order. */
+/** Anaesthetists who do theatre lists, in hiring order. */
 function anaesthetists(state: SimState): Staff[] {
   return Object.values(state.staff)
-    .filter((s) => s.specialty === "anaesthetics" && operates(s) && s.theatreSessions > 0)
+    .filter(
+      (s) =>
+        s.specialty === "anaesthetics" &&
+        operates(s) &&
+        s.theatreSessions + s.privateTheatreSessions > 0,
+    )
     .sort((a, b) => a.id - b.id);
+}
+
+/** An anaesthetist's lists a week of a kind: in a Private Hospital all are private. */
+function anaesthetistQuota(state: SimState, a: Staff, isPrivate: boolean): number {
+  if (state.funding === "private") return a.theatreSessions;
+  return isPrivate ? a.privateTheatreSessions : a.theatreSessions;
 }
 
 function isSurgeon(s: Staff): boolean {
@@ -109,10 +122,11 @@ const listCache = new WeakMap<SimState, { key: string; weeks: Map<number, Theatr
  * then each half-day's lists get theatres.
  */
 function weekLists(state: SimState, weekStart: number): TheatreList[] {
-  let key = `${state.layoutVersion}|${JSON.stringify(state.roomSpecialties)}|${Object.keys(state.emergencyTheatres)}|`;
+  let key = `${state.layoutVersion}|${JSON.stringify(state.roomSpecialties)}|${Object.keys(state.emergencyTheatres)}|${Object.keys(state.privateRooms)}|${state.funding}|`;
   for (const s of Object.values(state.staff)) {
-    if (s.theatreSessions + s.clinicSessions > 0) {
-      key += `${s.id}:${s.clinicSessions}:${s.theatreSessions},`;
+    const n = s.theatreSessions + s.clinicSessions + s.privateTheatreSessions + s.privateClinicSessions;
+    if (n > 0) {
+      key += `${s.id}:${s.clinicSessions}:${s.theatreSessions}:${s.privateClinicSessions}:${s.privateTheatreSessions},`;
     }
   }
   let cache = listCache.get(state);
@@ -124,33 +138,44 @@ function weekLists(state: SimState, weekStart: number): TheatreList[] {
   if (hit) return hit;
 
   const surgeons = Object.values(state.staff)
-    .filter((s) => isSurgeon(s) && s.theatreSessions > 0)
+    .filter((s) => isSurgeon(s) && s.theatreSessions + s.privateTheatreSessions > 0)
     .sort((a, b) => a.id - b.id);
   const lists: TheatreList[] = [];
   for (let d = 0; d < 5; d++) {
     for (const half of ["am", "pm"] as const) {
       for (const s of surgeons) {
-        const slot = jobPlan(state, s).some(
+        const slot = jobPlan(state, s).find(
           (p) => p.kind === "theatre" && p.weekday === d && p.half === half,
         );
         if (slot) {
-          lists.push({ day: weekStart + d, half, surgeon: s, anaesthetist: null, roomId: null });
+          lists.push({
+            day: weekStart + d,
+            half,
+            surgeon: s,
+            anaesthetist: null,
+            private: slot.private,
+            roomId: null,
+          });
         }
       }
     }
   }
-  const quota = new Map(anaesthetists(state).map((a) => [a.id, a.theatreSessions]));
   const team = anaesthetists(state);
+  const quota = new Map<string, number>();
+  for (const a of team) {
+    for (const p of [false, true]) quota.set(`${a.id}:${p}`, anaesthetistQuota(state, a, p));
+  }
   for (const l of lists) {
     const busy = new Set(
       lists
         .filter((o) => o.day === l.day && o.half === l.half && o.anaesthetist)
         .map((o) => o.anaesthetist!.id),
     );
-    const a = team.find((t) => (quota.get(t.id) ?? 0) > 0 && !busy.has(t.id));
+    const k = (t: Staff) => `${t.id}:${l.private && state.funding !== "private"}`;
+    const a = team.find((t) => (quota.get(k(t)) ?? 0) > 0 && !busy.has(t.id));
     if (a) {
       l.anaesthetist = a;
-      quota.set(a.id, quota.get(a.id)! - 1);
+      quota.set(k(a), quota.get(k(a))! - 1);
     }
   }
   const theatres = state.rooms.filter((r) => r.valid && r.typeId === "theatre" && !r.emergency);
@@ -158,12 +183,15 @@ function weekLists(state: SimState, weekStart: number): TheatreList[] {
     for (const half of ["am", "pm"] as const) {
       const free = [...theatres];
       const here = lists.filter((l) => l.day === weekStart + d && l.half === half);
-      const take = (test: (r: (typeof free)[number]) => boolean) => {
-        const i = free.findIndex(test);
+      // In a Hybrid trust, private lists use Private Patient Unit theatres and NHS lists the rest.
+      const take = (l: TheatreList, test: (r: (typeof free)[number]) => boolean) => {
+        const i = free.findIndex(
+          (r) => (state.funding !== "hybrid" || r.private === l.private) && test(r),
+        );
         return i < 0 ? null : free.splice(i, 1)[0]!.id;
       };
-      for (const l of here) l.roomId = take((r) => r.specialty === l.surgeon.specialty);
-      for (const l of here) if (l.roomId === null) l.roomId = take((r) => r.specialty === null);
+      for (const l of here) l.roomId = take(l, (r) => r.specialty === l.surgeon.specialty);
+      for (const l of here) if (l.roomId === null) l.roomId = take(l, (r) => r.specialty === null);
     }
   }
   cache.weeks.set(weekStart, lists);
@@ -301,7 +329,13 @@ function admitElective(state: SimState, r: Referral): Patient {
   p.name = r.name;
   p.specialty = r.specialty;
   p.category = condition.acuity;
-  p.elective = { referralId: r.id, dayCase: r.dayCase, checked: false, wardBed: null };
+  p.elective = {
+    referralId: r.id,
+    payer: r.payer,
+    dayCase: r.dayCase,
+    checked: false,
+    wardBed: null,
+  };
   state.patients[p.id] = p;
   return p;
 }
@@ -385,7 +419,12 @@ function runList(state: SimState, live: LiveList): void {
   if (!p.elective!.dayCase && p.elective!.wardBed === null) {
     const bed = wardBedFor(state, p);
     if (!bed) {
-      cancelOnTheDay(state, r, "no ward bed for afterwards", p);
+      cancelOnTheDay(
+        state,
+        r,
+        r.payer === "nhs" ? "no ward bed for afterwards" : "no private room for afterwards",
+        p,
+      );
       return;
     }
     reserve(state, bed.id, 0, p.id);
@@ -404,8 +443,15 @@ function runList(state: SimState, live: LiveList): void {
   );
 }
 
-/** A free ward bed for after their operation: their specialty's, then any, then another's. */
+/**
+ * A free bed for after their operation. A private patient has a room of
+ * their own: a side room (in a Hybrid trust, in the Private Patient Unit).
+ * An NHS patient goes to a ward: their specialty's, then any, then another's.
+ */
 function wardBedFor(state: SimState, p: Patient): PlacedObject | undefined {
+  if (p.elective?.payer !== "nhs") {
+    return freeCouches(state, "side_room", ["inpatient_bed"], p, true)[0];
+  }
   const beds = freeCouches(state, "ward", ["inpatient_bed"], p);
   const fit = (b: PlacedObject) => {
     const sp = roomOfObject(state, b.id)?.specialty ?? null;
@@ -606,6 +652,7 @@ function recordOperation(state: SimState, p: Patient, op: Operation): void {
   if (op.emergency) return; // Counted when it started (startEmergency).
   stats.electiveOps++;
   if (p.elective?.dayCase) stats.dayCases++;
+  if (p.elective && p.elective.payer !== "nhs") stats.privateOps++;
   if (p.elective) delete state.referrals[p.elective.referralId];
 }
 
@@ -652,7 +699,8 @@ export function recovered(state: SimState, p: Patient): void {
     kind: "transfer",
     roles: ["porter"],
     patientId: p.id,
-    roomType: "ward",
+    // A private patient has a room of their own.
+    roomType: p.elective && p.elective.payer !== "nhs" ? "side_room" : "ward",
     capabilities: ["inpatient_bed"],
     dueTick: state.tick,
     durationTicks: 1,
