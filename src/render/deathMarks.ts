@@ -3,7 +3,8 @@
  * graphic: what changes is the setting around them, so every step reads at a
  * glance:
  *
- *   - In the bay: the curtains are drawn round the bed (it's closed). Until
+ *   - In the bay: the curtains are drawn round the bed, or across a
+ *     cubicle's opening (it's closed). Until
  *     last offices they lie under the bed's blanket; afterwards under a white
  *     sheet with an identification label.
  *   - Above them, a strip of pips, one per step: done steps filled, the step
@@ -30,6 +31,7 @@ import {
   type DeathStatus,
 } from "@sim/systems/deaths";
 import { objectRect } from "@sim/world/objects";
+import { bayScreen } from "./bayCurtains";
 import { TILE_SIZE } from "./constants";
 import { CURTAIN_COLOUR, SELECTED_RING } from "./palette";
 
@@ -103,11 +105,19 @@ function shapeOf(state: SimState, p: Patient): Shape {
       ? { w: 32, h: 18, curtains: null }
       : { w: 18, h: 32, curtains: null };
   }
-  const bed = p.bed === null ? undefined : state.objects[p.bed];
+  const bed = deceasedBed(state, p);
   if (!bed) return { w: 16, h: 26, curtains: { w: T + 10, h: T * 1.4 } };
   const r = objectRect(bed);
   const along = r.w > r.h;
-  return { w: along ? 26 : 16, h: along ? 16 : 26, curtains: bedCurtainSize(bed) };
+  // A cubicle's curtain is drawn across its opening instead (bayCurtains.ts).
+  const curtains = bayScreen(state, bed) ? null : bedCurtainSize(bed);
+  return { w: along ? 26 : 16, h: along ? 16 : 26, curtains };
+}
+
+/** The bed or trolley someone who has died lies on, curtains drawn, if any. */
+export function deceasedBed(state: SimState, p: Patient): PlacedObject | undefined {
+  if (p.stage === "in_mortuary" || wheeled(p) || p.bed === null) return undefined;
+  return state.objects[p.bed];
 }
 
 /** Curtains round a bed: their size in pixels, centred on it. */

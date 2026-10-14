@@ -24,10 +24,12 @@ import { SPACE_L, SPACE_W, withAmbulanceCrew } from "@sim/systems/ambulances";
 import { crewOnFoot } from "@sim/systems/collections";
 import { curtainsDrawn } from "@sim/systems/curtains";
 import { kitsOut } from "@sim/world/sharedKit";
+import { bayScreen, drawBayScreen, type BayScreen } from "./bayCurtains";
 import { TILE_SIZE } from "./constants";
 import {
   bedCurtainSize,
   crewSpot,
+  deceasedBed,
   deceasedLook,
   drawBedCurtains,
   drawCrew,
@@ -81,9 +83,12 @@ export class AgentLayer {
   /** Shared kit (a 12-lead ECG, say) beside whoever has it out. */
   private readonly kits = new Graphics();
   private familiesDrawn = "";
+  /** Cubicles with their curtain drawn across the opening, under everyone in them. */
+  private readonly bays = new Graphics();
+  private baysDrawn = "";
 
   constructor() {
-    this.container.addChild(this.vehicles, this.families, this.kits, this.people);
+    this.container.addChild(this.bays, this.vehicles, this.families, this.kits, this.people);
   }
   selectedId: number | null = null;
 
@@ -94,10 +99,14 @@ export class AgentLayer {
     const wheeled = wheeledPatients(state);
     const blinkOn = Math.floor(performance.now() / BLINK_MS) % 2 === 0;
     const live = new Set<number>();
+    const screened = new Map<number, BayScreen>();
     for (const p of Object.values(state.patients)) {
       live.add(p.id);
       const selected = p.id === this.selectedId;
       if (p.death) {
+        const bed = deceasedBed(state, p);
+        const bay = bed && bayScreen(state, bed);
+        if (bay) screened.set(bed.id, bay);
         this.place(p, alpha, deceasedLook(state, p, selected), (g) =>
           drawDeceased(g, state, p, selected),
         );
@@ -105,7 +114,12 @@ export class AgentLayer {
       }
       const warning = warningOf(p, state.tick, attended.has(p.id), blinkOn);
       const bed = p.bed === null ? undefined : state.objects[p.bed];
-      const curtains = bed && curtainsDrawn(state, bed.id) ? bedCurtainSize(bed) : null;
+      let curtains: Curtains = null;
+      if (bed && curtainsDrawn(state, bed.id)) {
+        const bay = bayScreen(state, bed);
+        if (bay) screened.set(bed.id, bay);
+        else curtains = bedCurtainSize(bed);
+      }
       const moving = onTheMove(p) || wheeled.has(p.id);
       this.place(p, alpha, patientLook(p, selected, warning, curtains, moving), (g) =>
         drawPatient(g, p, selected, warning, curtains, moving),
@@ -142,6 +156,7 @@ export class AgentLayer {
           .get(c.crew.id)!
           .g.position.set((at.x + 0.5) * TILE_SIZE, (at.y + 0.5) * TILE_SIZE);
     }
+    this.drawBays(screened);
     this.updatePrivateAmbulances(state, alpha);
     this.drawKits(state);
     const families = familiesLook(state);
@@ -156,6 +171,17 @@ export class AgentLayer {
         this.views.delete(id);
       }
     }
+  }
+
+  private drawBays(screened: Map<number, BayScreen>): void {
+    const key = [...screened]
+      .map(([id, bay]) => `${id}:${bay.tiles.length}:${bay.openings.length}`)
+      .sort()
+      .join(",");
+    if (key === this.baysDrawn) return;
+    this.baysDrawn = key;
+    this.bays.clear();
+    for (const bay of screened.values()) drawBayScreen(this.bays, bay);
   }
 
   /**
@@ -191,6 +217,8 @@ export class AgentLayer {
 
   clear(): void {
     this.kits.clear();
+    this.bays.clear();
+    this.baysDrawn = "";
     for (const v of this.views.values()) v.g.destroy();
     this.views.clear();
     for (const v of this.ambulances.values()) v.g.destroy();
