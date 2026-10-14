@@ -8,7 +8,7 @@
 import { it } from "vitest";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import type { NurseBand } from "@data/staff";
-import { costs, income, type Ledger } from "@sim/agents";
+import { SERVICE_LINES, costs, income, type Ledger } from "@sim/agents";
 import { tick } from "@sim/sim";
 import type { SimState } from "@sim/state";
 import { setCover } from "@sim/systems/rota";
@@ -120,8 +120,24 @@ function report(name: string, state: SimState, days: number): void {
       privateOps: stat("privateOps"),
       reputation: Math.round(state.reputation),
       clinicAppointments: avg((d) => d.stats.firstAppointments + d.stats.followUps),
+      occupancy: avg((d) => (100 * d.stats.occupiedBedHours) / Math.max(1, d.stats.bedHours)),
+      sickness: avg(
+        (d) => (100 * d.stats.sickShifts) / Math.max(1, d.stats.shifts + d.stats.sickShifts),
+      ),
     }),
   );
+  // Each department's contribution a day, over the whole run (services are kept by month).
+  const months = [...state.months, state.month];
+  const runDays = months.reduce((n, m) => n + m.days, 0);
+  const contribution = Object.fromEntries(
+    SERVICE_LINES.map((l) => [
+      l,
+      Math.round(
+        months.reduce((n, m) => n + income(m.services[l]) - costs(m.services[l]), 0) / runDays,
+      ),
+    ]),
+  );
+  console.log(name, "contribution a day by department", JSON.stringify(contribution));
 }
 
 function aeOnly(catchment: number): SimState {

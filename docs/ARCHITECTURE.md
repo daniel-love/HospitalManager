@@ -42,6 +42,8 @@ src/
   game/
     loop.ts               # fixed-timestep accumulator, speeds, frame budget
     game.ts               # wires sim + loop + renderer + UI; hotkeys
+    describe*.ts          # sim state → what each panel and dialog shows
+    kpis.ts               # the KPIs: standards, how each is measured from a month, RAG ratings
   sim/
     state.ts              # SimState types (the save schema)
     agents.ts             # Patient, Staff, Job, ledger and event types
@@ -73,6 +75,7 @@ src/
       movement.ts         # route following, re-planning after layout changes
       finance.ts          # tariff (emergency at the marginal rate, planned in full), pay, supplies, estates, daily reports, monthly statements
       funding.ts          # the NHS block contract: sized to rooms and beds, capped by delivered activity
+      serviceLines.ts     # service-line reporting: books each ledger entry to a department too
       reputation.ts       # 0–100 reputation: a running average of each day's patient experience
       loans.ts            # DHSC and bank loans, repayments, oversight segments and credit ratings
       grants.ts           # grant offers, conditions, deadlines and clawback
@@ -136,6 +139,8 @@ Key entity kinds and components:
 As built in M3: `arrivals (walk-ins and ambulances) → ambulances (park, turn round, leave) → staffing (desks and nurse stations; on-call callouts from M4) → patients (needs, mood, lifecycle; posts jobs) → transfers (from M4: decisions to transfer out, transfer ambulances collecting) → deterioration (each minute) → wards (discharge reviews, end-of-life deaths) → deaths (the process after a death, mortuary release, morale recovery) → monitoring (posts obs each minute) → jobs (assign; crash calls may pull staff off other work) → movement → jobs (progress and complete) → finance (hourly; daily report at midnight) → alerts (every 30 min)`.
 
 **Agents** (M2) store float positions in tiles (whole numbers are tile centres) plus their position at the start of the tick, so the renderer can interpolate. Systems decide where an agent should be each tick and call `headTo()`, which plans a route once and re-plans when `layoutVersion` changes. Agents never block each other. They refer to places by **object id** (a seat, a couch, a desk), never by room id, because rooms are renumbered on every rebuild; `SimState.reserved` maps `"objectId:slot"` to the agent holding it.
+
+**Money** (M5): income and running costs change `state.money` and are booked with `serviceLines.ts` `book(state, line, amount, where)`, which adds them to today's ledger and to a department's (`today.services`); never write `state.today.ledger` directly, or the Departments tab stops adding up. At midnight `finance.ts` files the day into `history` and the month (`month.ledger`, `month.services`, `month.stats`, and the `month.end` snapshot the KPIs read); on the 1st the month joins `months`. Building, loans and grants are cash flows (`month.flows`), not income or costs.
 
 **Walking speed vs the clock:** the clock runs 60× real time at 1×, so true walking speed (~7 tiles per tick) would look like teleporting. Agents walk at about 5 (patients) and 7 (staff) tiles per in-game minute instead, a ~10× slow-down that also stands in for the overheads of each move (being called, gathering belongings). Tunable in `data/patients.ts`.
 

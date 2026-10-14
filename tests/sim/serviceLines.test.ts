@@ -30,6 +30,7 @@ describe("service lines", () => {
     expect(lineOfRoom("ct_room")).toBe("diagnostics");
     expect(lineOfRoom("corridor")).toBe("support");
     expect(lineOfRoom("mortuary")).toBe("support");
+    expect(lineOfRoom("staff_base")).toBe("support");
     for (const r of content.rooms) expect(SERVICE_LINES).toContain(lineOfRoom(r.id));
   });
 

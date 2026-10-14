@@ -39,8 +39,12 @@ const LINE_OF_DEPARTMENT: Partial<Record<RoomDepartment, ServiceLine>> = {
   Diagnostics: "diagnostics",
 };
 
+/** Rooms whose catalogue department isn't who pays for them: idle staff's bases are shared. */
+const SHARED_ROOMS = new Set(["staff_base"]);
+
 /** The service line a room type belongs to. */
 export function lineOfRoom(typeId: string): ServiceLine {
+  if (SHARED_ROOMS.has(typeId)) return "support";
   const def = roomById.get(typeId);
   return (def && LINE_OF_DEPARTMENT[def.department]) ?? "support";
 }
@@ -68,6 +72,13 @@ const DEFAULT_LINE: Record<StaffRoleId, ServiceLine> = {
   cleaner: "support",
   receptionist: "ae",
 };
+
+/** A role's default department; a Private Hospital has no A&E, so its doctors are ward doctors. */
+function defaultLine(state: SimState, role: StaffRoleId): ServiceLine {
+  const line = DEFAULT_LINE[role];
+  if (line !== "ae" || state.funding !== "private") return line;
+  return role === "receptionist" ? "outpatients" : "wards";
+}
 
 /** Where to book an amount: one department, or shares of several (summing to 1). */
 export type Where = ServiceLine | Partial<Record<ServiceLine, number>>;
@@ -128,7 +139,7 @@ export function staffWhere(state: SimState, s: Staff): Where {
   }
   const w = byStaff.get(s.id);
   const total = w ? SERVICE_LINES.reduce((n, l) => n + (w[l] ?? 0), 0) : 0;
-  if (!w || total === 0) return DEFAULT_LINE[s.role];
+  if (!w || total === 0) return defaultLine(state, s.role);
   const shares: Partial<Record<ServiceLine, number>> = {};
   for (const line of SERVICE_LINES) if (w[line]) shares[line] = w[line] / total;
   return shares;
