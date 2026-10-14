@@ -20,7 +20,13 @@ import { applyCommand, type Command, type CommandResult } from "@sim/commands";
 import { addToPlan, buildPreview, commitPlan, planDiff, type PlanPreview } from "@sim/plan";
 import { roomsPatientsCantReach } from "@sim/places";
 import { tick } from "@sim/sim";
-import { createSimState, type Funding, type GapFill, type SimState } from "@sim/state";
+import {
+  createSimState,
+  type Funding,
+  type GapFill,
+  type SimState,
+  type Visiting,
+} from "@sim/state";
 import { siteView } from "@sim/world/site";
 import { coverageView, stationsSeeing, bedCover } from "@sim/systems/monitoring";
 import { acceptGrant, declineGrant } from "@sim/systems/grants";
@@ -678,6 +684,22 @@ export class Game {
     patientsOpen.value = false;
     financeTab.value = null;
     hospitalTab.value = null;
+  }
+
+  /** Opens or closes escalation beds (Hospital → Escalation). */
+  setEscalation(on: boolean): void {
+    this.state.policies.escalation = on;
+    this.afterMoney();
+  }
+
+  setDischargeBeforeNoon(on: boolean): void {
+    this.state.policies.dischargeBeforeNoon = on;
+    this.afterMoney();
+  }
+
+  setVisiting(visiting: Visiting): void {
+    this.state.policies.visiting = visiting;
+    this.afterMoney();
   }
 
   /** Sets a department's status (Hospital → Departments). */

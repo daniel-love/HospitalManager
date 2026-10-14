@@ -19,12 +19,12 @@
  */
 import { conditionById, equipmentById } from "@data/catalogue";
 import { MOOD_LIFT_DECISION, REFERRAL_MINS, WARD_DISCHARGE_MINS } from "@data/patients";
-import type { Job, Patient, Point, Staff } from "../agents";
+import { onDuty, type Job, type Patient, type Point, type Staff } from "../agents";
 import { emit, warn } from "../events";
 import { bedside, freeCouches, release, reserve, restPoint } from "../places";
 import { chance, nextFloat } from "../rng";
 import type { PlacedObject, SimState } from "../state";
-import { TICKS_PER_MINUTE } from "../time";
+import { clockFromTick, tickAt, TICKS_PER_MINUTE } from "../time";
 import { tileIndex, type FloorGrid } from "../world/grid";
 import { isStandable, objectRect } from "../world/objects";
 import { roomOfObject } from "../world/rooms";
@@ -36,6 +36,7 @@ import { die } from "./deaths";
 import { leave, lift, recordDeparture } from "./patients";
 import { cantOperate } from "./theatres";
 import { cantAdmit, decideToTransfer } from "./transfers";
+import { freeEscalationBeds } from "./escalation";
 
 const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
 
@@ -270,7 +271,9 @@ export function claimWardBed(state: SimState, job: Job): Point | null {
       state,
       p,
       freeCouches(state, job.roomType, job.capabilities, from, isPrivate).filter(reachable),
-    );
+    ) ??
+    // No ward bed: with escalation open, an escalation trolley (corridor care).
+    (isPrivate ? undefined : freeEscalationBeds(state, from).find(reachable));
   if (!bed) return null;
   reserve(state, bed.id, 0, p.id);
   job.objectId = bed.id;
@@ -394,8 +397,19 @@ function arriveOnWard(state: SimState, p: Patient): void {
 /** Inpatients well enough to go home get a doctor's discharge review. */
 export function updateWards(state: SimState): void {
   if (state.tick % TICKS_PER_MINUTE !== 0) return;
+  const c = clockFromTick(state.tick);
+  const minute = c.hour * 60 + c.minute;
+  // Discharge before noon: in the morning, everyone fit to go later today is reviewed now.
+  const morning =
+    state.policies.dischargeBeforeNoon &&
+    minute >= DISCHARGE_ROUND.from &&
+    minute < DISCHARGE_ROUND.to;
+  const endOfDay = tickAt(c.day, 0) + DISCHARGE_ROUND.lastDischarge * TICKS_PER_MINUTE;
+  if (state.policies.dischargeBeforeNoon && minute === DISCHARGE_ROUND.to) rushedRound(state);
   for (const p of Object.values(state.patients)) {
-    if (p.stage !== "on_ward" || p.stayUntil === null || state.tick < p.stayUntil) continue;
+    if (p.stage !== "on_ward" || p.stayUntil === null) continue;
+    const early = morning && p.stayUntil <= endOfDay;
+    if (state.tick < p.stayUntil && !early) continue;
     if (p.emergencyOp && !p.emergencyOp.done) continue; // Not before their operation.
     if (p.endOfLife) {
       die(state, p, true, false);
@@ -410,10 +424,27 @@ export function updateWards(state: SimState): void {
       patientId: p.id,
       objectId: p.bed,
       roomType: roomOfObject(state, p.bed)?.typeId ?? "ward",
-      // A&E's urgent work comes first; the ward round fits in around it.
-      dueTick: p.stayUntil + 4 * TICKS_PER_HOUR,
+      // A&E's urgent work comes first; the ward round fits in around it
+      // (unless it's a morning discharge round).
+      dueTick: early ? state.tick : p.stayUntil + 4 * TICKS_PER_HOUR,
       durationTicks: ticksFor(state.rng, WARD_DISCHARGE_MINS),
     });
+  }
+}
+
+/**
+ * Discharge before noon (a hospital policy): between these times, ward
+ * patients fit to go home before `lastDischarge` today are reviewed at once,
+ * freeing their beds for A&E's afternoon peak. Times are minutes after midnight.
+ */
+const DISCHARGE_ROUND = { from: 8 * 60, to: 12 * 60, lastDischarge: 20 * 60, morale: 1 };
+
+/** The morning's rush costs the ward doctors and nurses on duty a little morale. */
+function rushedRound(state: SimState): void {
+  for (const s of Object.values(state.staff)) {
+    if ((s.role === "junior_doctor" || s.role === "nurse") && onDuty(s)) {
+      s.morale = Math.max(0, s.morale - DISCHARGE_ROUND.morale);
+    }
   }
 }
 

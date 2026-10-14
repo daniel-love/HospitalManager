@@ -735,6 +735,27 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v33: escalation, discharge before noon and visiting hours policies; visitors.
+  32: (save) => {
+    const state = save.state as { policies: object; visitors?: object[]; nextVisitorId?: number };
+    return {
+      ...save,
+      state: {
+        ...state,
+        policies: {
+          escalation: false,
+          dischargeBeforeNoon: false,
+          visiting: "set",
+          ...state.policies,
+        },
+        visitors: state.visitors ?? [],
+        patients: (state as { patients?: object[] }).patients?.map((p) => ({
+          lastVisit: null,
+          ...p,
+        })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

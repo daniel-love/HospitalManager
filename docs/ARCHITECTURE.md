@@ -76,6 +76,9 @@ src/
       reputation.ts       # 0–100 reputation: a running average of each day's patient experience
       loans.ts            # DHSC and bank loans, repayments, oversight segments and credit ratings
       grants.ts           # grant offers, conditions, deadlines and clawback
+      departments.ts      # department statuses (open, divert, closed…) and what each means
+      escalation.ts       # OPEL level and escalation trolleys (corridor care)
+      visitors.ts         # visiting hours: visitors walking in to ward patients
       alerts.ts           # bottleneck warnings; tidies after layout changes
       monitoring.ts       # nurse stations, coverage (cached per layout), obs rounds
       deterioration.ts    # NEWS2, noticing and escalation, cardiac arrest, incidents

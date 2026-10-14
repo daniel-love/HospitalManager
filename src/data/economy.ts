@@ -112,6 +112,8 @@ export const REPUTATION = {
     outpatients: { urgent: 5, closed: 15 },
     theatres: { emergency: 5, closed: 15 },
   },
+  /** Points off a day's score for each patient on an escalation trolley at midnight (corridor care). */
+  corridorCare: 3,
   /** Penalties on a day's score. */
   unexpectedDeath: 8,
   incident: 3,

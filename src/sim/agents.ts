@@ -219,6 +219,8 @@ export interface Patient extends AgentBase {
   investigations: Investigation[];
   /** Their Majors or Resus trolley, kept for them while they're away being scanned. */
   homeBed: number | null;
+  /** On a ward: when they last had a visitor, or null (systems/visitors.ts). */
+  lastVisit: number | null;
   /**
    * In for a planned operation (systems/theatres.ts): their place on the
    * waiting list, whether they go home the same day, whether a nurse has
@@ -608,6 +610,17 @@ export interface FlowStats {
  * they book in at Outpatients Reception, wait, and are called into clinic.
  * Their place on the waiting list is `referralId`.
  */
+/**
+ * A relative or friend visiting a ward patient (systems/visitors.ts): they
+ * come in during visiting hours, sit with them a while, and go home.
+ */
+export interface Visitor extends AgentBase {
+  patientId: number;
+  stage: "arriving" | "visiting" | "leaving";
+  /** When they'll leave. */
+  until: number;
+}
+
 export interface Outpatient extends AgentBase {
   referralId: number;
   specialty: SpecialtyId;

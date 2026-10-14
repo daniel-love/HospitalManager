@@ -128,6 +128,10 @@ export class AgentLayer {
       const selected = o.id === this.selectedId;
       this.place(o, alpha, `outpatient|${selected}`, (g) => drawOutpatient(g, selected));
     }
+    for (const v of Object.values(state.visitors)) {
+      live.add(v.id);
+      this.place(v, alpha, "visitor", drawVisitor);
+    }
     for (const c of Object.values(state.collections)) {
       if (!crewOnFoot(c)) continue;
       live.add(c.crew.id);
@@ -391,6 +395,16 @@ function drawPatient(
 function drawOutpatient(g: Graphics, selected: boolean): void {
   if (selected) g.circle(0, 0, PATIENT_RADIUS + 5).stroke({ width: 2.5, color: SELECTED_RING });
   g.circle(0, 0, PATIENT_RADIUS).fill(PATIENT_COLOUR).stroke({ width: 3, color: OUTPATIENT_RING });
+}
+
+/** A visitor: a member of the public, smaller than a patient, in plain clothes. */
+/** Visitors' clothes: a muted violet, apart from patients and every staff role. */
+const VISITOR_COLOUR = 0x9b8fb8;
+
+function drawVisitor(g: Graphics): void {
+  g.circle(0, 0, PATIENT_RADIUS - 1)
+    .fill(VISITOR_COLOUR)
+    .stroke({ width: 1.5, color: 0xffffff });
 }
 
 function drawStaff(g: Graphics, s: Staff, selected: boolean): void {

@@ -11,6 +11,7 @@
  * - planned care: appointments and operations that went ahead rather than
  *   being cancelled by the hospital;
  * - waiting lists: NHS patients within 18 weeks;
+ * - inpatients: their average mood (visiting helps);
  * less penalties for unexpected deaths, safety incidents and complaints. A
  * day with nothing to judge leaves reputation where it is.
  */
@@ -19,6 +20,7 @@ import { RTT_TARGET_DAYS } from "@data/outpatients";
 import type { FlowStats } from "../agents";
 import type { SimState } from "../state";
 import { TICKS_PER_DAY } from "../time";
+import { patientsInEscalation } from "./escalation";
 
 /** A day's patient-experience score, 0–100, or null if there was nothing to judge. */
 export function dayScore(state: SimState, s: FlowStats): number | null {
@@ -41,6 +43,11 @@ export function dayScore(state: SimState, s: FlowStats): number | null {
     if (state.tick - r.clockStart < RTT_TARGET_DAYS * TICKS_PER_DAY) within++;
   }
   if (pathways > 0) parts.push({ score: (100 * within) / pathways, weight: 1 });
+  // Inpatients' experience: how they're feeling on the wards.
+  const ward = Object.values(state.patients).filter((p) => p.stage === "on_ward" && !p.death);
+  if (ward.length > 0) {
+    parts.push({ score: ward.reduce((n, p) => n + p.mood, 0) / ward.length, weight: 1 });
+  }
   if (parts.length === 0) return null;
   const weights = parts.reduce((n, p) => n + p.weight, 0);
   const score = parts.reduce((n, p) => n + p.score * p.weight, 0) / weights;
@@ -70,7 +77,7 @@ export function statusPenalty(state: SimState): number {
  * else to judge.
  */
 export function updateReputation(state: SimState, s: FlowStats): void {
-  const penalty = statusPenalty(state);
+  const penalty = statusPenalty(state) + REPUTATION.corridorCare * patientsInEscalation(state);
   const day = dayScore(state, s);
   if (day === null && penalty === 0) return;
   const score = Math.max(0, (day ?? state.reputation) - penalty);

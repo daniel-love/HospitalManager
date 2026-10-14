@@ -28,6 +28,7 @@ import {
   type Patient,
   type SimEvent,
   type Staff,
+  type Visitor,
 } from "./agents";
 import type { PlanEntry } from "./plan";
 import { createRng, type RngState } from "./rng";
@@ -36,7 +37,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 32;
+export const SIM_STATE_VERSION = 33;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -126,6 +127,8 @@ export interface SimState {
   nextReferralId: number;
   /** People in for an outpatient appointment today, keyed by id (agent ids). */
   outpatients: Record<number, Outpatient>;
+  /** Relatives and friends visiting ward patients, keyed by id (agent ids). */
+  visitors: Record<number, Visitor>;
   /** Operations under way, keyed by id (systems/theatres.ts). */
   operations: Record<number, Operation>;
   nextOperationId: number;
@@ -224,7 +227,19 @@ export interface Policies {
   priceLevel: number;
   /** Private Hospitals: specialties taking NHS-funded referrals (patient choice), at tariff. */
   nhsReferrals: Partial<Record<SpecialtyId, true>>;
+  /** Escalation beds open: admitted patients with no ward bed go to escalation trolleys. */
+  escalation: boolean;
+  /** Ward patients fit to go home that day are reviewed in the morning. */
+  dischargeBeforeNoon: boolean;
+  /** When relatives may visit ward patients (systems/visitors.ts). */
+  visiting: Visiting;
 }
+
+/**
+ * Visiting hours: open (08:00–20:00), set hours (afternoon and evening),
+ * restricted (one hour in the evening), or none (as in an outbreak).
+ */
+export type Visiting = "open" | "set" | "restricted" | "none";
 
 /**
  * Department statuses (GAME_DESIGN §8.3), a crisis lever. A&E on divert
@@ -320,6 +335,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     referrals: {},
     nextReferralId: 1,
     outpatients: {},
+    visitors: {},
     operations: {},
     nextOperationId: 1,
     nextCollectionId: 1,
@@ -332,7 +348,14 @@ export function createSimState(opts: NewGameOptions): SimState {
     funding: opts.funding ?? "nhs",
     reputation: REPUTATION.start,
     cover: {},
-    policies: { gapFill: "bank", priceLevel: 1, nhsReferrals: {} },
+    policies: {
+      gapFill: "bank",
+      priceLevel: 1,
+      nhsReferrals: {},
+      escalation: false,
+      dischargeBeforeNoon: false,
+      visiting: "set",
+    },
     today: { ledger: emptyLedger(), stats: emptyStats() },
     history: [],
     month: emptyMonth(0, opts.money ?? STARTING_CASH),

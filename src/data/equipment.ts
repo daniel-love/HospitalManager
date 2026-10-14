@@ -250,6 +250,22 @@ export const equipment: EquipmentInput[] = [
     access: BEDSIDE,
     description: "Adjustable bed that reduces pressure-sore risk.",
   },
+  {
+    id: "escalation_trolley",
+    name: "Escalation trolley",
+    category: "bedding",
+    tier: 1,
+    cost: 1800,
+    upkeep: 5,
+    footprint: [1, 2],
+    reliability: 0.999,
+    power: false,
+    capabilities: ["escalation_bed"],
+    glyph: "Es",
+    access: BEDSIDE,
+    description:
+      "A spare trolley for corridor care: put it in a ward or a wide corridor. Used only while escalation beds are open (Hospital → Escalation), for admitted patients with no ward bed. It frees A&E, but corridor care is unsafe and undignified: patients on one lose mood, and each day one is used costs reputation.",
+  },
 
   // Monitoring
   {

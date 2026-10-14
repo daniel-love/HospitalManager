@@ -397,10 +397,11 @@ For each department:
 - **Capacity settings:** escalation beds (corridor care) on/off. This increases capacity but hurts safety and satisfaction.
 - **Visitor policy.**
 - Closing or diverting is a crisis lever. It relieves pressure immediately but costs reputation, target performance and income, and in NHS mode it triggers regulator scrutiny if overused.
+- As built (M5 step 6): statuses for A&E (open, divert, closed), Outpatients (open, urgent referrals only, closed) and Theatres (open, emergencies only, closed), each costing reputation daily and its share of income; an OPEL level; escalation trolleys for corridor care while escalation beds are open. Set in the Hospital dialog.
 
 ### 8.4 Policies (hospital-wide toggles)
 
-Examples: triage priority rules, discharge-before-noon push, infection control level, visiting hours, agency staff cap, elective cancellation rules during surges.
+Examples: triage priority rules, discharge-before-noon push, infection control level, visiting hours, agency staff cap, elective cancellation rules during surges. Built so far: gap filling (bank and agency), discharge before noon, visiting hours (with visitors on the map), and for private care the self-pay price and NHS referrals, all in Hospital → Policies.
 
 ### 8.5 Reports & KPIs
 

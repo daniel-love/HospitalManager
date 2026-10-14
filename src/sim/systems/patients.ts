@@ -80,6 +80,8 @@ import { isEscorted } from "./escorts";
 import { trolleyStop } from "./admissions";
 import { withAmbulanceCrew } from "./ambulances";
 import { hasTeam } from "./staffing";
+import { onEscalationBed } from "./escalation";
+import { hasVisitor, visitedLately } from "./visitors";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
 
@@ -438,11 +440,26 @@ export function lift(p: Patient, amount: number): void {
   p.mood = Math.min(100, p.mood + amount);
 }
 
+/**
+ * Where an inpatient's mood settles: higher if they've had a visitor in the
+ * last day. A visitor with them lifts it; above where it settles, it drifts down.
+ */
+const WARD_MOOD = { visited: 85, unvisited: 65, withVisitor: 10, drift: 2 };
+
 function updateNeeds(state: SimState, p: Patient, beingSeen: boolean): void {
   if (p.stage === "on_ward" && !p.death) {
-    // Settled in a bed and looked after; ward needs (meals, toilets,
-    // washing) are left to the ward team for now.
-    lift(p, MOOD_RECOVERY_ON_WARD / TICKS_PER_HOUR);
+    // On an escalation trolley in a corridor, they don't settle.
+    if (onEscalationBed(state, p)) {
+      p.mood = Math.max(0, p.mood - MOOD_DECAY_IN_CUBICLE / TICKS_PER_HOUR);
+      return;
+    }
+    // Settled in a bed and looked after (ward needs such as meals, toilets
+    // and washing are left to the ward team for now). Visitors keep spirits
+    // up: without one lately, mood settles lower; with someone there, it lifts.
+    const settles = visitedLately(state, p) ? WARD_MOOD.visited : WARD_MOOD.unvisited;
+    if (hasVisitor(state, p.id)) lift(p, WARD_MOOD.withVisitor / TICKS_PER_HOUR);
+    if (p.mood < settles) lift(p, MOOD_RECOVERY_ON_WARD / TICKS_PER_HOUR);
+    else p.mood = Math.max(settles, p.mood - WARD_MOOD.drift / TICKS_PER_HOUR);
     return;
   }
   if (p.death || ["leaving", "collapsed", "transferring"].includes(p.stage)) return;

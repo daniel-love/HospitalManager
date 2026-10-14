@@ -485,7 +485,7 @@ export function describeAdvice(state: SimState): AdviceData {
     heading: funding === "private" ? "Private hospital" : "Private Patient Unit",
     intro:
       funding === "private"
-        ? `Insured and self-pay patients come for clinics and planned operations, as many as your reputation (${Math.round(state.reputation)}) and prices draw. You earn the facility fee; consultants bill their own. You can also take NHS patients who choose you, at tariff (Settings).`
+        ? `Insured and self-pay patients come for clinics and planned operations, as many as your reputation (${Math.round(state.reputation)}) and prices draw. You earn the facility fee; consultants bill their own. You can also take NHS patients who choose you, at tariff (Hospital → Policies).`
         : `Private patients in rooms set aside as the Private Patient Unit (in each room's inspector), seen in your consultants' private sessions on top of their NHS work. Private income can't pass ${Math.round(PRIVATE.incomeCap * 100)}% of all income.`,
     items: [
       item(
@@ -539,7 +539,7 @@ export function describeAdvice(state: SimState): AdviceData {
     ],
   };
   if (funding === "private") {
-    money.intro = `A private hospital earns facility fees: insurers pay their negotiated rates, self-pay patients your prices (Settings), and NHS patients who choose you pay tariff. There's no block contract, and no A&E. Consultants with practising privileges cost you nothing; nurses, theatre staff and the building do.`;
+    money.intro = `A private hospital earns facility fees: insurers pay their negotiated rates, self-pay patients your prices (Hospital → Policies), and NHS patients who choose you pay tariff. There's no block contract, and no A&E. Consultants with practising privileges cost you nothing; nurses, theatre staff and the building do.`;
     money.items = money.items.filter((i) => i.text !== "Wards, and doctors to admit to them");
   }
 

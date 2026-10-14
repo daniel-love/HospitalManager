@@ -233,6 +233,7 @@ const patientSchema = z.object({
     })
     .nullable(),
   retriaged: z.object({ tick: int, from: int.min(1).max(5) }).nullable(),
+  lastVisit: nullableInt,
   outcome: z.enum(["discharged", "lwbs", "transferred", "transferred_out", "died"]).nullable(),
 });
 
@@ -468,6 +469,13 @@ const outpatientSchema = z.object({
   seen: nullableInt,
 });
 
+const visitorSchema = z.object({
+  ...agentFields,
+  patientId: int.positive(),
+  stage: z.enum(["arriving", "visiting", "leaving"]),
+  until: int,
+});
+
 const referralSchema = z.object({
   id: int.positive(),
   name: z.string(),
@@ -524,6 +532,7 @@ const saveSchema = z.object({
     referrals: z.array(referralSchema),
     nextReferralId: int.positive(),
     outpatients: z.array(outpatientSchema),
+    visitors: z.array(visitorSchema),
     operations: z.array(operationSchema),
     nextOperationId: int.positive(),
     reserved: z.record(z.string(), int.positive()),
@@ -538,6 +547,9 @@ const saveSchema = z.object({
       gapFill: z.enum(["none", "bank", "bank_agency"]),
       priceLevel: num.min(PRIVATE.priceLevels[0]).max(PRIVATE.priceLevels[1]),
       nhsReferrals: z.partialRecord(z.enum(specialtyIds), z.literal(true)),
+      escalation: z.boolean(),
+      dischargeBeforeNoon: z.boolean(),
+      visiting: z.enum(["open", "set", "restricted", "none"]),
     }),
     privateRooms: z.record(z.string().regex(/^\d+:\d+$/), z.literal(true)),
     funding: z.enum(["nhs", "private", "hybrid"]),
@@ -649,6 +661,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       referrals: Object.values(state.referrals),
       nextReferralId: state.nextReferralId,
       outpatients: Object.values(state.outpatients),
+      visitors: Object.values(state.visitors),
       operations: Object.values(state.operations),
       nextOperationId: state.nextOperationId,
       nextCollectionId: state.nextCollectionId,
@@ -725,6 +738,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     referrals: byId(s.referrals, "referral"),
     nextReferralId: s.nextReferralId,
     outpatients: byId(s.outpatients, "outpatient"),
+    visitors: byId(s.visitors, "visitor"),
     operations: byId(s.operations, "operation"),
     nextOperationId: s.nextOperationId,
     nextCollectionId: s.nextCollectionId,
