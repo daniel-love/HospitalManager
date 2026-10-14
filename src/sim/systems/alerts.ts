@@ -26,7 +26,7 @@ import type { SimState } from "../state";
 import { clockFromTick, TICKS_PER_MINUTE } from "../time";
 import { sessionsOn } from "./clinics";
 import { outpatientDesks } from "./outpatients";
-import { offersClinic } from "./referrals";
+import { offersClinic, offersPrivateClinic, overPrivateCap } from "./referrals";
 import { listsOn } from "./theatres";
 import { roomOfObject } from "../world/rooms";
 import { ambulancesWaiting, needsTrolley } from "./ambulances";
@@ -214,7 +214,14 @@ export function updateAlerts(state: SimState): void {
   }
   const stranded = new Map<string, number>();
   for (const r of Object.values(state.referrals)) {
-    if (r.kind === "surgery" || offersClinic(state, r.specialty)) continue;
+    if (r.kind === "surgery") continue;
+    // NHS and private patients wait for clinics of their own kind.
+    const running =
+      r.payer === "nhs"
+        ? offersClinic(state, r.specialty) ||
+          (state.funding === "private" && offersPrivateClinic(state, r.specialty))
+        : offersPrivateClinic(state, r.specialty) || overPrivateCap(state);
+    if (running) continue;
     const name = specialtyById.get(r.specialty)?.name ?? r.specialty;
     stranded.set(name, (stranded.get(name) ?? 0) + 1);
   }

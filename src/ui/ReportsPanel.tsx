@@ -60,8 +60,8 @@ export function ReportsPanel({ onShow }: { onShow: (at: { x: number; y: number }
         <div class="reports-cols">
           <div>
             <h3>Today so far</h3>
-            <MoneySection ledger={today.ledger} blockDue={data.blockDue} />
-            <FlowSections stats={today.stats} />
+            <MoneySection ledger={today.ledger} blockDue={data.blockDue} funding={data.funding} />
+            <FlowSections stats={today.stats} ae={data.funding !== "private"} />
           </div>
           <div>
             <h3>In the department now</h3>
@@ -136,27 +136,29 @@ function Headlines({ data }: { data: ReportData }) {
   const harm = s.incidents + s.unexpectedDeaths + s.complaints;
   return (
     <div class="kpis">
-      <Tile
-        label="4-hour standard"
-        title="Share of patients leaving A&E within 4 hours of arriving. Constitutional standard 95%, interim target 78%."
-        value={four === null ? "—" : `${Math.round(four * 100)}%`}
-        status={fourStatus}
-        note={
-          <>
-            {STATUS_WORDS[fourStatus]}
-            {data.fourHourWeek !== null && ` · 7 days ${Math.round(data.fourHourWeek * 100)}%`}
-          </>
-        }
-      >
-        <div class="kpi-meter">
-          <div
-            class={`kpi-meter-fill ${fourStatus}`}
-            style={{ width: `${Math.round((four ?? 0) * 100)}%` }}
-          />
-          <span class="kpi-tick" style={{ left: `${FOUR_HOUR_INTERIM * 100}%` }} />
-          <span class="kpi-tick" style={{ left: `${FOUR_HOUR_TARGET * 100}%` }} />
-        </div>
-      </Tile>
+      {data.funding !== "private" && (
+        <Tile
+          label="4-hour standard"
+          title="Share of patients leaving A&E within 4 hours of arriving. Constitutional standard 95%, interim target 78%."
+          value={four === null ? "—" : `${Math.round(four * 100)}%`}
+          status={fourStatus}
+          note={
+            <>
+              {STATUS_WORDS[fourStatus]}
+              {data.fourHourWeek !== null && ` · 7 days ${Math.round(data.fourHourWeek * 100)}%`}
+            </>
+          }
+        >
+          <div class="kpi-meter">
+            <div
+              class={`kpi-meter-fill ${fourStatus}`}
+              style={{ width: `${Math.round((four ?? 0) * 100)}%` }}
+            />
+            <span class="kpi-tick" style={{ left: `${FOUR_HOUR_INTERIM * 100}%` }} />
+            <span class="kpi-tick" style={{ left: `${FOUR_HOUR_TARGET * 100}%` }} />
+          </div>
+        </Tile>
+      )}
       <Tile
         label="Net today"
         value={formatMoney(n)}
@@ -189,12 +191,14 @@ function Headlines({ data }: { data: ReportData }) {
           }
         />
       )}
-      <Tile
-        label="Patients"
-        value={String(s.arrivals)}
-        status="none"
-        note={`arrived · ${s.discharged} discharged · ${s.admissions} admitted`}
-      />
+      {data.funding !== "private" && (
+        <Tile
+          label="Patients"
+          value={String(s.arrivals)}
+          status="none"
+          note={`arrived · ${s.discharged} discharged · ${s.admissions} admitted`}
+        />
+      )}
       <Tile
         label="Safety"
         title="Patient safety incidents, unexpected deaths and complaints today"
@@ -367,7 +371,15 @@ const COST_LINES: { key: keyof Ledger; kind: string; label: string }[] = [
  * Today's money. The block contract is paid at midnight, so until then it's
  * shown as due (`blockDue`) and counted in the net.
  */
-function MoneySection({ ledger, blockDue }: { ledger: Ledger; blockDue: number }) {
+function MoneySection({
+  ledger,
+  blockDue,
+  funding,
+}: {
+  ledger: Ledger;
+  blockDue: number;
+  funding: ReportData["funding"];
+}) {
   const l = { ...ledger, block: ledger.block + blockDue };
   const n = net(l);
   const scale = Math.max(income(l), costs(l), 1);
@@ -388,7 +400,10 @@ function MoneySection({ ledger, blockDue }: { ledger: Ledger; blockDue: number }
       </div>
       <table class="report-table">
         <tbody>
-          {INCOME_LINES.filter((line) => l[line.key] > 0 || line.key === "tariff").map((line) => (
+          {INCOME_LINES.filter(
+            (line) =>
+              l[line.key] > 0 || line.key === (funding === "private" ? "private" : "tariff"),
+          ).map((line) => (
             <Row
               key={line.key}
               title={line.title}
@@ -525,123 +540,131 @@ function Swatch({ kind, children }: { kind: string; children: ComponentChildren 
   );
 }
 
-function FlowSections({ stats: s }: { stats: FlowStats }) {
+/** Today's activity: A&E's sections only for a hospital with one (`ae`). */
+function FlowSections({ stats: s, ae }: { stats: FlowStats; ae: boolean }) {
   const handover = avg(s.handoverMins, s.handovers);
   const triage = avg(s.triageWaitMins, s.triaged);
   return (
     <>
-      <div class="report-group">
-        <h4>Front door</h4>
-        <table class="report-table">
-          <tbody>
-            <Row label="Arrivals" value={s.arrivals} />
-            <Row label="By ambulance" value={s.ambulances} />
-            {s.deflected > 0 && (
-              <Row
-                label="Sent elsewhere by ambulance control"
-                title="Ambulance control took them to another hospital because crews were already queueing outside"
-                value={s.deflected}
-                bad
-              />
-            )}
-            <Row
-              label="Average ambulance handover"
-              title={`Ambulance arrival to handover to A&E staff (target ${HANDOVER_TARGET} min)`}
-              value={mins(handover)}
-              target={`${HANDOVER_TARGET}`}
-              bad={handover !== null && handover > HANDOVER_TARGET}
-            />
-            <Row
-              label="Handovers over 30 min"
-              title="Handovers taking over 30 minutes (and over 60)"
-              value={s.handoversOver30}
-              extra={s.handoversOver60 > 0 ? `${s.handoversOver60} over 60` : undefined}
-              bad={s.handoversOver30 > 0}
-            />
-            <Row
-              label="Average wait for triage"
-              title={`Arrival to start of triage (target ${TRIAGE_TARGET} min)`}
-              value={mins(triage)}
-              target={`${TRIAGE_TARGET}`}
-              bad={triage !== null && triage > TRIAGE_TARGET}
-            />
-          </tbody>
-        </table>
-      </div>
-
-      <div class="report-group">
-        <h4>Outcomes</h4>
-        <table class="report-table">
-          <tbody>
-            <Row label="Treated and discharged" value={s.discharged} />
-            <Row
-              label="Left without being seen"
-              value={s.lwbs}
-              extra={pct(s.lwbs, s.departures)}
-              bad={s.lwbs > 0}
-            />
-            <Row label="Transferred to intensive care" value={s.transferred} />
-            <Row label="Average time in A&E" value={mins(avg(s.timeInDeptMins, s.departures))} />
-          </tbody>
-        </table>
-      </div>
-
-      <div class="report-group">
-        <h4>Admissions</h4>
-        <table class="report-table">
-          <tbody>
-            <Row
-              label="Specialty reviews in A&E"
-              title="Referred patients reviewed by a specialty registrar or consultant"
-              value={s.referrals}
-            />
-            {s.referrals > 0 && (
-              <Row
-                label="Average referral to decision"
-                title="From referral to the specialty until their review ends in a decision to admit"
-                value={mins(avg(s.referralMins, s.referrals))}
-              />
-            )}
-            <Row label="Admitted to a ward" value={s.admissions} />
-            <Row
-              label="Average wait for a ward bed"
-              title="Decision to admit until leaving A&E for the ward"
-              value={mins(avg(s.bedWaitMins, s.admissions))}
-            />
-            <Row
-              label="Trolley waits over 4 hours"
-              title="Admitted patients who waited over 4 hours (and over 12) on an A&E trolley"
-              value={s.bedWaitsOver4h}
-              extra={s.bedWaitsOver12h > 0 ? `${s.bedWaitsOver12h} over 12` : undefined}
-              bad={s.bedWaitsOver4h > 0}
-            />
-            {s.transfersOut > 0 && (
-              <>
+      {ae && (
+        <>
+          <div class="report-group">
+            <h4>Front door</h4>
+            <table class="report-table">
+              <tbody>
+                <Row label="Arrivals" value={s.arrivals} />
+                <Row label="By ambulance" value={s.ambulances} />
+                {s.deflected > 0 && (
+                  <Row
+                    label="Sent elsewhere by ambulance control"
+                    title="Ambulance control took them to another hospital because crews were already queueing outside"
+                    value={s.deflected}
+                    bad
+                  />
+                )}
                 <Row
-                  label="Transferred to another hospital"
-                  title="Couldn't be treated or admitted here"
-                  value={s.transfersOut}
-                  bad
+                  label="Average ambulance handover"
+                  title={`Ambulance arrival to handover to A&E staff (target ${HANDOVER_TARGET} min)`}
+                  value={mins(handover)}
+                  target={`${HANDOVER_TARGET}`}
+                  bad={handover !== null && handover > HANDOVER_TARGET}
                 />
                 <Row
-                  label="Average wait to be transferred"
-                  title="Decision to transfer until the transfer ambulance took them"
-                  value={mins(avg(s.transferWaitMins, s.transfersOut))}
+                  label="Handovers over 30 min"
+                  title="Handovers taking over 30 minutes (and over 60)"
+                  value={s.handoversOver30}
+                  extra={s.handoversOver60 > 0 ? `${s.handoversOver60} over 60` : undefined}
+                  bad={s.handoversOver30 > 0}
                 />
-              </>
-            )}
-            {s.outliers > 0 && (
-              <Row
-                label="Outliers"
-                title="Admitted to another specialty's ward because theirs was full"
-                value={s.outliers}
-                bad
-              />
-            )}
-            <Row label="Discharged home from a ward" value={s.wardDischarges} />
-          </tbody>
-        </table>
-      </div>
+                <Row
+                  label="Average wait for triage"
+                  title={`Arrival to start of triage (target ${TRIAGE_TARGET} min)`}
+                  value={mins(triage)}
+                  target={`${TRIAGE_TARGET}`}
+                  bad={triage !== null && triage > TRIAGE_TARGET}
+                />
+              </tbody>
+            </table>
+          </div>
+
+          <div class="report-group">
+            <h4>Outcomes</h4>
+            <table class="report-table">
+              <tbody>
+                <Row label="Treated and discharged" value={s.discharged} />
+                <Row
+                  label="Left without being seen"
+                  value={s.lwbs}
+                  extra={pct(s.lwbs, s.departures)}
+                  bad={s.lwbs > 0}
+                />
+                <Row label="Transferred to intensive care" value={s.transferred} />
+                <Row
+                  label="Average time in A&E"
+                  value={mins(avg(s.timeInDeptMins, s.departures))}
+                />
+              </tbody>
+            </table>
+          </div>
+
+          <div class="report-group">
+            <h4>Admissions</h4>
+            <table class="report-table">
+              <tbody>
+                <Row
+                  label="Specialty reviews in A&E"
+                  title="Referred patients reviewed by a specialty registrar or consultant"
+                  value={s.referrals}
+                />
+                {s.referrals > 0 && (
+                  <Row
+                    label="Average referral to decision"
+                    title="From referral to the specialty until their review ends in a decision to admit"
+                    value={mins(avg(s.referralMins, s.referrals))}
+                  />
+                )}
+                <Row label="Admitted to a ward" value={s.admissions} />
+                <Row
+                  label="Average wait for a ward bed"
+                  title="Decision to admit until leaving A&E for the ward"
+                  value={mins(avg(s.bedWaitMins, s.admissions))}
+                />
+                <Row
+                  label="Trolley waits over 4 hours"
+                  title="Admitted patients who waited over 4 hours (and over 12) on an A&E trolley"
+                  value={s.bedWaitsOver4h}
+                  extra={s.bedWaitsOver12h > 0 ? `${s.bedWaitsOver12h} over 12` : undefined}
+                  bad={s.bedWaitsOver4h > 0}
+                />
+                {s.transfersOut > 0 && (
+                  <>
+                    <Row
+                      label="Transferred to another hospital"
+                      title="Couldn't be treated or admitted here"
+                      value={s.transfersOut}
+                      bad
+                    />
+                    <Row
+                      label="Average wait to be transferred"
+                      title="Decision to transfer until the transfer ambulance took them"
+                      value={mins(avg(s.transferWaitMins, s.transfersOut))}
+                    />
+                  </>
+                )}
+                {s.outliers > 0 && (
+                  <Row
+                    label="Outliers"
+                    title="Admitted to another specialty's ward because theirs was full"
+                    value={s.outliers}
+                    bad
+                  />
+                )}
+                <Row label="Discharged home from a ward" value={s.wardDischarges} />
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       <div class="report-group">
         <h4>Diagnostics</h4>

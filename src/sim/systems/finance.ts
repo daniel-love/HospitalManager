@@ -264,7 +264,9 @@ function closeDay(state: SimState): void {
   emit(
     state,
     `${formatDate(report.day)} closed: ${n >= 0 ? "surplus" : "deficit"} ${money.format(Math.abs(n))} · ` +
-      `${s.discharged} treated, ${s.lwbs} left unseen${fourHour}${clinics}`,
+      (state.funding === "private"
+        ? `${seen} seen in clinic · ${plural(s.electiveOps, "operation")}`
+        : `${s.discharged} treated, ${s.lwbs} left unseen${fourHour}${clinics}`),
     n >= 0 ? "info" : "warn",
   );
 }
@@ -292,3 +294,5 @@ function closeMonth(state: SimState, nextIndex: number): void {
     n >= 0 ? "info" : "warn",
   );
 }
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
