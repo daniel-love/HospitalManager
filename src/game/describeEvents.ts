@@ -8,6 +8,7 @@ import { pressureEventById, type EventFrequency, type StrikeDef } from "@data/pr
 import type { SimState } from "@sim/state";
 import { intensity, isCooled, knownEvents } from "@sim/systems/pressure";
 import { strikeCounts } from "@sim/systems/strikes";
+import { outbreakRooms } from "@sim/systems/outbreaks";
 import { clockFromTick, formatDate, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 
 export interface EventChip {
@@ -50,6 +51,8 @@ export interface EventsData {
     coming: number;
     calledIn: number;
   } | null;
+  /** Rooms with norovirus cases now. */
+  outbreak: ReturnType<typeof outbreakRooms>;
   /** In the heat: patient rooms without enough cooling. */
   uncooled: { name: string; count: number }[] | null;
   past: { name: string; dates: string }[];
@@ -141,6 +144,7 @@ export function describeEvents(state: SimState): EventsData {
   return {
     frequency: state.settings.eventFrequency,
     majorIncident: majorIncident(state),
+    outbreak: outbreakRooms(state),
     active: knownEvents(state).map((e) => {
       const def = pressureEventById.get(e.defId)!;
       const w = when(state, e.start, e.end);

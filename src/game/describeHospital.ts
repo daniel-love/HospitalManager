@@ -5,6 +5,7 @@
 import { content } from "@data/catalogue";
 import { PRIVATE, REPUTATION } from "@data/economy";
 import { FLU_VACCINATION } from "@data/pressure";
+import { NOROVIRUS } from "@data/infection";
 import type { SpecialtyId } from "@data/schema";
 import type { GapFill, SimState, Visiting } from "@sim/state";
 import { STATUS_TEXT, type Department } from "@sim/systems/departments";
@@ -50,6 +51,9 @@ export interface HospitalData {
     nhsReferrals: { id: SpecialtyId; name: string; on: boolean }[];
     fluVaccination: boolean;
     fluVaccinationCost: number;
+    infectionControl: boolean;
+    infectionControlCost: number;
+    outbreakClosures: "ipc" | "manual";
   };
   events: EventsData;
   performance: {
@@ -113,6 +117,9 @@ export function describeHospital(state: SimState): HospitalData {
         .map((sp) => ({ id: sp.id, name: sp.name, on: !!state.policies.nhsReferrals[sp.id] })),
       fluVaccination: state.policies.fluVaccination,
       fluVaccinationCost: FLU_VACCINATION.costPerHead,
+      infectionControl: state.policies.infectionControl,
+      infectionControlCost: NOROVIRUS.enhancedCostPerBedDay,
+      outbreakClosures: state.policies.outbreakClosures,
     },
     events: describeEvents(state),
     performance: performance(state),

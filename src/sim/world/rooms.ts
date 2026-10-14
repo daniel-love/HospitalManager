@@ -47,6 +47,7 @@ export function detectRooms(state: SimState): void {
         specialty: null,
         emergency: false,
         private: false,
+        closed: false,
         forConditions: [],
       });
     }
@@ -102,6 +103,12 @@ export function detectRooms(state: SimState): void {
     const id = state.floors[floor!]?.roomId[tile!] ?? 0;
     const room = id === 0 ? undefined : rooms[id - 1];
     if (room && PRIVATE_ROOM_TYPES.has(room.typeId)) room.private = true;
+  }
+  for (const key of Object.keys(state.closedRooms)) {
+    const [floor, tile] = key.split(":").map(Number);
+    const id = state.floors[floor!]?.roomId[tile!] ?? 0;
+    const room = id === 0 ? undefined : rooms[id - 1];
+    if (room && (room.typeId === "ward" || room.typeId === "side_room")) room.closed = true;
   }
   state.rooms = rooms;
   state.objectRoom = objectRoom;

@@ -40,6 +40,7 @@ import { cantAdmit, decideToTransfer } from "./transfers";
 import { freeEscalationBeds } from "./escalation";
 import { majorIncidentDeclared } from "./majorIncident";
 import { fitForDischarge, planDischarge } from "./discharge";
+import { admissionSeed } from "./outbreaks";
 
 const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
 
@@ -363,6 +364,11 @@ export function runTransfer(state: SimState, job: Job, porter: Staff, p: Patient
   porter.dest = null;
   if (arrival !== "arrived") return;
   removeJob(state, job);
+  // Moved into a side room for isolation: the same stay carries on.
+  if (job.kind === "isolate") {
+    p.stage = "on_ward";
+    return;
+  }
   arriveOnWard(state, p);
 }
 
@@ -377,7 +383,11 @@ function arriveOnWard(state: SimState, p: Patient): void {
   const [lo, hi] = condition.admission?.stayHours ?? [24, 48];
   p.stayUntil = state.tick + Math.round((lo + (hi - lo) * nextFloat(state.rng)) * TICKS_PER_HOUR);
   // Back from theatre to the same stay: their discharge plan carries on.
-  if (!p.discharge) planDischarge(state, p);
+  if (!p.discharge) {
+    planDischarge(state, p);
+    // Norovirus going round: some come in carrying it.
+    admissionSeed(state, p);
+  }
   // A planned operation's inpatient never came through A&E: no A&E figures,
   // and the inpatient tariff is paid on discharge. Nor does someone coming
   // back from an emergency operation they went to from the ward.

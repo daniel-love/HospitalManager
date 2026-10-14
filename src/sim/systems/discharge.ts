@@ -23,6 +23,7 @@ import { clockFromTick, TICKS_PER_MINUTE } from "../time";
 import { dirtyCouch, jobsForPatient, postJob, ticksFor } from "./jobBoard";
 import { headTo } from "./movement";
 import { leave } from "./patients";
+import { infectionHold } from "./outbreaks";
 
 const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
 
@@ -144,14 +145,18 @@ export function updateDischarges(state: SimState): void {
     }
     if (p.stage !== "on_ward" || p.death) continue;
     if (hourly && delayedDischarge(state, p)) state.today.stats.delayedBedHours++;
-    const ready = d.needsCare
-      ? d.careReady !== null && state.tick >= Math.max(d.careReady, d.goAt!)
-      : state.tick >= d.goAt!;
+    // Not with norovirus, until 48 hours symptom-free.
+    const held = infectionHold(state, p);
+    const ready =
+      !held &&
+      (d.needsCare
+        ? d.careReady !== null && state.tick >= Math.max(d.careReady, d.goAt!)
+        : state.tick >= d.goAt!);
     if (ready) {
       const bed = p.bed;
       leave(state, p, "discharged");
       if (bed !== null && state.objects[bed]) dirtyCouch(state, bed);
-    } else if (!d.needsCare && p.bed !== null && loungeOpen(state)) {
+    } else if (!d.needsCare && !held && p.bed !== null && loungeOpen(state)) {
       toLounge(state, p, p.bed);
     }
   }

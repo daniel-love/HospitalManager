@@ -870,6 +870,36 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v38: norovirus outbreaks, room closures and the infection control policies.
+  37: (save) => {
+    type Day = { stats: object };
+    const state = save.state as {
+      patients?: object[];
+      policies: object;
+      closedRooms?: object;
+      today: Day;
+      history: Day[];
+      month: Day;
+      months: Day[];
+    };
+    const stats = <T extends Day>(d: T) => ({
+      ...d,
+      stats: { hospitalInfections: 0, closedBedHours: 0, ...d.stats },
+    });
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients?.map((p) => ({ infection: null, ...p })),
+        policies: { infectionControl: false, outbreakClosures: "ipc", ...state.policies },
+        closedRooms: state.closedRooms ?? {},
+        today: stats(state.today),
+        history: state.history.map(stats),
+        month: stats(state.month),
+        months: state.months.map(stats),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

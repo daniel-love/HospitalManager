@@ -40,7 +40,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 37;
+export const SIM_STATE_VERSION = 38;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -83,6 +83,8 @@ export interface Room {
   emergency: boolean;
   /** Hybrid trusts: part of the Private Patient Unit (see SimState.privateRooms). */
   private: boolean;
+  /** Wards and side rooms: closed to admissions in an outbreak (see SimState.closedRooms). */
+  closed: boolean;
   /**
    * Advisory: equipment some conditions need here, beyond being valid
    * (e.g. an ECG for chest pain). Doesn't affect `valid`.
@@ -152,6 +154,12 @@ export interface SimState {
   emergencyTheatres: Record<string, true>;
   /** Hybrid trusts: rooms in the Private Patient Unit, pinned to a tile like roomSpecialties. */
   privateRooms: Record<string, true>;
+  /**
+   * Inpatient rooms closed to admissions in an outbreak, keyed like
+   * privateRooms: when, and by the infection control team or the player
+   * (systems/outbreaks.ts).
+   */
+  closedRooms: Record<string, { since: number; by: "ipc" | "player" }>;
   /** Each department's status (GAME_DESIGN §8.3): open, or less than fully open. */
   departments: Departments;
   /** How the hospital is funded (GAME_DESIGN §2.2), chosen when the game starts. */
@@ -286,6 +294,10 @@ export interface Policies {
   visiting: Visiting;
   /** Vaccinate staff against flu each autumn (data/pressure.ts FLU_VACCINATION). */
   fluVaccination: boolean;
+  /** Enhanced infection control: halves norovirus spread, at a daily cost (data/infection.ts). */
+  infectionControl: boolean;
+  /** Who closes rooms in an outbreak: the infection control team, or the player. */
+  outbreakClosures: "ipc" | "manual";
 }
 
 /**
@@ -401,6 +413,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     roomSpecialties: {},
     emergencyTheatres: {},
     privateRooms: {},
+    closedRooms: {},
     departments: { ae: "open", outpatients: "open", theatres: "open" },
     funding: opts.funding ?? "nhs",
     reputation: REPUTATION.start,
@@ -413,6 +426,8 @@ export function createSimState(opts: NewGameOptions): SimState {
       dischargeBeforeNoon: false,
       visiting: "set",
       fluVaccination: false,
+      infectionControl: false,
+      outbreakClosures: "ipc",
     },
     today: { ledger: emptyLedger(), stats: emptyStats(), services: emptyServices() },
     history: [],

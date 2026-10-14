@@ -244,6 +244,8 @@ export function freeCouches(
       }
       const room = roomOfObject(state, o.id)!;
       if (state.funding === "hybrid" && room.private !== forPrivate) return false;
+      // Closed in an outbreak: no admissions.
+      if (room.closed) return false;
       return capabilities.every((c) => room.capabilities.includes(c));
     })
     .sort((a, b) => manhattan(a, from) - manhattan(b, from) || a.id - b.id);

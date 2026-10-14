@@ -16,7 +16,8 @@ export type PressureEventId =
   | "strike_nurses"
   | "strike_diagnostics"
   | "strike_facilities"
-  | "social_care_crisis";
+  | "social_care_crisis"
+  | "norovirus_season";
 
 /**
  * Industrial action (systems/strikes.ts). A walkout: the roles don't come
@@ -71,6 +72,8 @@ export interface PressureEventDef {
   heat: boolean;
   /** Social care takes this many times as long to arrange (data/discharge.ts). */
   careDelay?: number;
+  /** Norovirus going round the community: it comes in with patients and visitors (data/infection.ts). */
+  community?: boolean;
   /** Industrial action: who strikes, and how. */
   strike?: StrikeDef;
   /** The hour it starts on its first day (default 08:00; strikes start at 07:00). */
@@ -185,6 +188,33 @@ PRESSURE_EVENTS.push({
   sickness: 1,
   heat: false,
   careDelay: 2.5,
+});
+
+PRESSURE_EVENTS.push({
+  id: "norovirus_season",
+  name: "Norovirus going round",
+  short: "Norovirus",
+  description:
+    "The winter vomiting bug is going round the community. Patients come in carrying it and visitors bring it in; on the wards it spreads fast in shared bays, and staff catch it too. Bays with cases are closed to admissions until they're clear.",
+  levers: [
+    "Isolate cases in side rooms: nurses move them into a free one",
+    "Enhanced infection control halves the spread (Hospital → Policies)",
+    "Restrict visiting, so fewer visitors bring it in (Hospital → Policies)",
+    "Close a bay early yourself (select the room), or decide closures yourself (Hospital → Policies)",
+  ],
+  // November to March: most winters.
+  months: [7, 8, 9, 10, 11],
+  perSeason: 1.5,
+  maxPerSeason: 1,
+  gapDays: 60,
+  leadDays: 5,
+  days: [42, 70],
+  shape: "wave",
+  arrivals: { walk_in: 1, ambulance: 1 },
+  conditions: {},
+  sickness: 1,
+  heat: false,
+  community: true,
 });
 
 /** Industrial action: any time of year, with the two weeks' notice the law requires. */

@@ -231,6 +231,11 @@ export interface Patient extends AgentBase {
   stayUntil: number | null;
   /** Inpatients: getting them home (systems/discharge.ts). Null for everyone else. */
   discharge: DischargePlan | null;
+  /**
+   * Norovirus (systems/outbreaks.ts): when they caught it, when symptoms
+   * start and stop, and whether they caught it here. Null if they haven't.
+   */
+  infection: { caught: number; symptoms: number; clears: number; acquired: boolean } | null;
   /** Admitted for end-of-life care: they'll die (expectedly) on the ward. */
   endOfLife: boolean;
   /** Tick their bay's curtain stays drawn until, after care there; null if not drawn. */
@@ -382,6 +387,8 @@ export type JobKind =
   | "recovery"
   /** A discharge coordinator (or a nurse) arranges social care for an inpatient. */
   | "discharge_planning"
+  /** A porter (or nurse) moves an inpatient with norovirus to a side room (systems/outbreaks.ts). */
+  | "isolate"
   /** A porter releases the deceased to the funeral director at the mortuary. */
   | "release_body"
   /** Wheeling shared kit (a 12-lead ECG, say) back to where it's kept. */
@@ -645,6 +652,10 @@ export interface FlowStats {
   corridorNights: number;
   /** Hours of ward beds held by patients fit to go but waiting for social care (sampled hourly). */
   delayedBedHours: number;
+  /** Patients who caught norovirus here and developed symptoms. */
+  hospitalInfections: number;
+  /** Hours of ward beds in rooms closed to admissions (sampled hourly). */
+  closedBedHours: number;
 }
 
 /**
@@ -956,6 +967,8 @@ export function emptyStats(): FlowStats {
     resignations: 0,
     corridorNights: 0,
     delayedBedHours: 0,
+    hospitalInfections: 0,
+    closedBedHours: 0,
   };
 }
 

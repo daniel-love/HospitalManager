@@ -194,6 +194,9 @@ const patientSchema = z.object({
       goAt: nullableInt,
     })
     .nullable(),
+  infection: z
+    .object({ caught: int, symptoms: int, clears: int, acquired: z.boolean() })
+    .nullable(),
   endOfLife: z.boolean(),
   curtainUntil: nullableInt,
   transfer: z
@@ -303,6 +306,7 @@ const jobSchema = z.object({
     "pre_op_check",
     "recovery",
     "discharge_planning",
+    "isolate",
     "return_kit",
     "escort",
     "debrief",
@@ -462,6 +466,8 @@ const statsSchema = z.object({
   resignations: int.min(0),
   corridorNights: int.min(0),
   delayedBedHours: int.min(0),
+  hospitalInfections: int.min(0),
+  closedBedHours: int.min(0),
 });
 const servicesSchema = z.object(
   Object.fromEntries(SERVICE_LINES.map((l) => [l, ledgerSchema])) as Record<
@@ -591,8 +597,14 @@ const saveSchema = z.object({
       dischargeBeforeNoon: z.boolean(),
       visiting: z.enum(["open", "set", "restricted", "none"]),
       fluVaccination: z.boolean(),
+      infectionControl: z.boolean(),
+      outbreakClosures: z.enum(["ipc", "manual"]),
     }),
     privateRooms: z.record(z.string().regex(/^\d+:\d+$/), z.literal(true)),
+    closedRooms: z.record(
+      z.string().regex(/^\d+:\d+$/),
+      z.object({ since: int, by: z.enum(["ipc", "player"]) }),
+    ),
     funding: z.enum(["nhs", "private", "hybrid"]),
     departments: z.object({
       ae: z.enum(["open", "divert", "closed"]),
@@ -755,6 +767,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       cover: state.cover,
       policies: state.policies,
       privateRooms: state.privateRooms,
+      closedRooms: state.closedRooms,
       funding: state.funding,
       departments: state.departments,
       reputation: state.reputation,
@@ -833,6 +846,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     cover: { ...s.cover },
     policies: { ...s.policies, nhsReferrals: { ...s.policies.nhsReferrals } },
     privateRooms: { ...s.privateRooms },
+    closedRooms: { ...s.closedRooms },
     funding: s.funding,
     departments: { ...s.departments },
     reputation: s.reputation,

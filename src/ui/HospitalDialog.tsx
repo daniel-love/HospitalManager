@@ -200,6 +200,36 @@ function Policies({ game, data }: { game: Game; data: HospitalData }) {
         <Toggle on={p.fluVaccination} onChange={(on) => game.setFluVaccination(on)} />
       </PolicyCard>
       <PolicyCard
+        title="Enhanced infection control"
+        note={`Chlorine cleaning, more hand-hygiene audits and aprons and gloves at every bedside: halves the spread of norovirus on the wards, at about £${p.infectionControlCost} a day per inpatient.`}
+      >
+        <Toggle on={p.infectionControl} onChange={(on) => game.setInfectionControl(on)} />
+      </PolicyCard>
+      <PolicyCard
+        title="Outbreak closures"
+        note="Who closes ward rooms to admissions in a norovirus outbreak. The infection control team closes any with two cases at once and reopens them after a deep clean once clear. Deciding yourself, they only advise: you close and reopen rooms (select one). Either way, you can close a room early."
+      >
+        <div class="chips" role="radiogroup" aria-label="Outbreak closures">
+          {(
+            [
+              ["ipc", "Infection control team"],
+              ["manual", "You decide"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              role="radio"
+              aria-checked={p.outbreakClosures === id}
+              class={p.outbreakClosures === id ? "active" : ""}
+              onMouseDown={noFocus}
+              onClick={() => game.setOutbreakClosures(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </PolicyCard>
+      <PolicyCard
         title="Discharge before noon"
         note="In the morning, ward patients fit to go home later that day are reviewed at once, freeing beds before A&E's afternoon peak. The rushed round costs ward doctors and nurses a little morale."
       >
@@ -435,6 +465,21 @@ function Events({ game, data }: { game: Game; data: HospitalData["events"] }) {
           </ul>
         </div>
       ))}
+      {data.outbreak.length > 0 && (
+        <div class="report-group">
+          <h4>Norovirus on the wards</h4>
+          <ul class="event-levers">
+            {data.outbreak.map((r, i) => (
+              <li key={i}>
+                <button class="link-button" onClick={() => game.focus(r.at)}>
+                  {r.name}
+                </button>
+                : {r.cases} with symptoms{r.closed ? ", closed to admissions" : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {data.uncooled && (
         <div class="report-group">
           <h4>Rooms without enough cooling</h4>

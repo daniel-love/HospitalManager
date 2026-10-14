@@ -153,6 +153,14 @@ function pullOffWork(state: SimState, job: Job): Staff[] {
  */
 function claimPlace(state: SimState, job: Job): Point | null {
   if (job.kind === "transfer") return claimWardBed(state, job);
+  if (job.kind === "isolate") {
+    // To their bed: they're wheeled to the side room bed already kept for them.
+    const p = job.patientId === null ? undefined : state.patients[job.patientId];
+    if (!p || p.stage !== "on_ward" || p.bed === null || !state.objects[job.objectId ?? -1])
+      return null;
+    job.step = 1;
+    return p;
+  }
   if (DEATH_JOBS.has(job.kind)) return claimDeathPlace(state, job);
   if (DIAGNOSTIC_JOBS.has(job.kind)) return claimDiagnosticPlace(state, job);
   if (job.kind === "escort") {
@@ -308,7 +316,7 @@ export function runJobs(state: SimState): void {
       runAtPatient(state, job, staff, patient!);
       continue;
     }
-    if (job.kind === "transfer") {
+    if (job.kind === "transfer" || job.kind === "isolate") {
       runTransfer(state, job, staff, patient!);
       continue;
     }
@@ -490,6 +498,7 @@ function complete(state: SimState, job: Job, obj: PlacedObject): void {
       dischargeFromWard(state, patient!, obj);
       break;
     case "transfer":
+    case "isolate":
       break; // Handled by runTransfer.
     case "handover": {
       handoverDone(state, patient!, obj.id);

@@ -6,6 +6,7 @@
  * In plan mode, commands go into the build plan instead (see sim/plan.ts), and
  * the map, tools and inspector all show the plan preview ("viewState").
  */
+import { roomClosure, setRoomClosed } from "@sim/systems/outbreaks";
 import { declare, standDown } from "@sim/systems/majorIncident";
 import type { EventFrequency } from "@data/pressure";
 import { content, equipmentById, objectDef, roomById } from "@data/catalogue";
@@ -306,6 +307,27 @@ export class Game {
     setEmergencyTheatre(this.state, room, on);
     if (this.preview) this.rebuildPreview();
     this.publishInspector();
+  }
+
+  /** Closes the selected ward room or side room to admissions, or reopens it. */
+  setRoomClosed(closed: boolean): void {
+    const tile = this.selectedTile;
+    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    if (!room || (room.typeId !== "ward" && room.typeId !== "side_room")) return;
+    setRoomClosed(this.state, room, closed, "player");
+    this.publishInspector();
+  }
+
+  /** Enhanced infection control (Hospital → Policies). */
+  setInfectionControl(on: boolean): void {
+    this.state.policies.infectionControl = on;
+    this.afterMoney();
+  }
+
+  /** Who closes rooms in an outbreak (Hospital → Policies). */
+  setOutbreakClosures(by: "ipc" | "manual"): void {
+    this.state.policies.outbreakClosures = by;
+    this.afterMoney();
   }
 
   /** Hybrid trusts: puts the selected room in the Private Patient Unit, or takes it out. */
@@ -963,6 +985,9 @@ export class Game {
             }
           : {}),
         ...(room.typeId === "theatre" ? { emergency: room.emergency } : {}),
+        ...(room.typeId === "ward" || room.typeId === "side_room"
+          ? { closure: roomClosure(this.state, room) }
+          : {}),
         ...(this.state.funding === "hybrid" && PRIVATE_ROOM_TYPES.has(room.typeId)
           ? { private: room.private }
           : {}),

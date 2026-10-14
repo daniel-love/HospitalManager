@@ -8,6 +8,7 @@
  * (systems/reputation.ts). Open visiting does that best; no visiting, as in
  * an outbreak, leaves patients lonelier.
  */
+import { visitSeed } from "./outbreaks";
 import { FIRST_NAMES, SURNAMES } from "@data/names";
 import type { Patient, Visitor } from "../agents";
 import { bedside, fallbackEntrance, siteEntrance } from "../places";
@@ -110,8 +111,11 @@ function moveVisitor(state: SimState, v: Visitor): void {
   const bed = state.objects[p!.bed!];
   if (!bed) return;
   const arrival = headTo(state, v, bedside(state, bed));
-  if (arrival === "arrived") v.stage = "visiting";
-  else if (arrival === "no_route") v.stage = "leaving";
+  if (arrival === "arrived") {
+    // Norovirus going round: a visitor can bring it in when they arrive.
+    if (v.stage === "arriving") visitSeed(state, p!);
+    v.stage = "visiting";
+  } else if (arrival === "no_route") v.stage = "leaving";
 }
 
 /** Recently visited (within a day): an inpatient settles better. */

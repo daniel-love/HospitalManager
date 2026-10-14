@@ -4,6 +4,7 @@
  * of SimState, so they're easy to test.
  */
 import { delayedDischarge } from "@sim/systems/discharge";
+import { symptomatic } from "@sim/systems/outbreaks";
 import {
   conditionById,
   equipmentById,
@@ -758,6 +759,9 @@ export function staffState(state: SimState, s: Staff): StaffState {
     case "discharge_planning":
       what = `Arranging social care for ${who} to go home`;
       break;
+    case "isolate":
+      what = `Moving ${who} to a side room: norovirus`;
+      break;
     case "verify_death":
       what = `Verifying the death of ${who}`;
       break;
@@ -1199,6 +1203,14 @@ const DISCHARGE_DELAY_MINS = 120;
  */
 function patientAlerts(state: SimState, p: Patient): string[] {
   const alerts: string[] = [];
+  // Norovirus: only once it shows.
+  if (p.infection && state.tick >= p.infection.symptoms) {
+    alerts.push(
+      symptomatic(state, p)
+        ? `Norovirus: has symptoms${p.infection.acquired ? " (caught here)" : ""}`
+        : "Norovirus: recovering, not to go home until 48 hours symptom-free",
+    );
+  }
   const d = p.deterioration;
   if (p.stage === "collapsed") {
     alerts.push("Cardiac arrest: needs resuscitation");

@@ -163,6 +163,8 @@ export interface InspectorData {
     emergency?: boolean;
     /** Hybrid trusts: in the Private Patient Unit (rooms that can be). */
     private?: boolean;
+    /** Wards and side rooms: closed to admissions in an outbreak, and cases there now. */
+    closure?: { closed: boolean; byTeam: boolean; cases: number };
   };
   object?: {
     id: number;

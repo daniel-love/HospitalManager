@@ -12,6 +12,7 @@ export function Inspector({
   onPrivateSessions,
   onEmergencyTheatre,
   onPrivateRoom,
+  onRoomClosed,
 }: {
   onClose: () => void;
   onMove: (objectId: number) => void;
@@ -22,6 +23,7 @@ export function Inspector({
   onPrivateSessions: PrivateSessionsHandler;
   onEmergencyTheatre: (on: boolean) => void;
   onPrivateRoom: (on: boolean) => void;
+  onRoomClosed: (closed: boolean) => void;
 }) {
   const data = inspector.value;
   if (!data) return null;
@@ -107,6 +109,26 @@ export function Inspector({
               <span class="dim">
                 A CEPOD theatre: no planned lists, so emergencies never cancel anyone's operation.
                 Without one, emergencies take the next free slot on a list.
+              </span>
+            </label>
+          )}
+          {room.closure && (
+            <label class="duty-toggle">
+              <input
+                type="checkbox"
+                checked={room.closure.closed}
+                onChange={(e) => onRoomClosed((e.currentTarget as HTMLInputElement).checked)}
+              />{" "}
+              Closed to admissions
+              <span class={room.closure.cases > 0 ? "warn-text" : "dim"}>
+                {room.closure.cases > 0
+                  ? `Norovirus: ${room.closure.cases} ${room.closure.cases === 1 ? "patient has" : "patients have"} symptoms here. `
+                  : ""}
+                {room.closure.closed
+                  ? room.closure.byTeam
+                    ? "Closed by the infection control team: it reopens after a deep clean, 48 hours after the last case is clear."
+                    : "Closed by you: no admissions until you reopen it (its beds are deep cleaned first)."
+                  : "In an outbreak, closing a room to admissions stops norovirus reaching new patients."}
               </span>
             </label>
           )}
