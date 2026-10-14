@@ -33,6 +33,7 @@ import { jobPlan } from "./clinics";
 import { operates, runsClinics, staffTitle } from "./staffing";
 import { callsInSick, endOfShift, fillGaps } from "./workforce";
 import { isCalledIn } from "./majorIncident";
+import { isStriking } from "./strikes";
 
 /** A week has 14 shifts: slot 2d is weekday d's day shift, 2d + 1 its night. */
 export const SLOTS = 14;
@@ -308,6 +309,11 @@ export function updateShifts(state: SimState): void {
   if (!state.settings.rotas) {
     for (const s of Object.values(state.staff)) {
       if (s.contract === "on_call" || s.contract === "privileges") continue;
+      // On strike: they walk out, and stay out until it's over.
+      if (isStriking(state, s)) {
+        finish(s);
+        continue;
+      }
       if (s.duty !== "on" || s.onCall) comeIn(state, s, null);
       s.shiftEnd = null;
     }
@@ -319,6 +325,11 @@ export function updateShifts(state: SimState): void {
     if (s.contract === "on_call" || s.contract === "privileges") continue;
     // Called in for a major incident: they stay until it's stood down.
     if (isCalledIn(state, s)) continue;
+    // On strike: they finish a shift under way, but don't come in for the next.
+    if (isStriking(state, s)) {
+      if (s.duty === "on" && (s.shiftEnd === null || state.tick >= s.shiftEnd)) finish(s);
+      continue;
+    }
     if (worksWeekdays(s)) weekdayDuty(state, s, c);
     else rosteredDuty(state, s, plan.get(s.id) ?? 0, now);
   }

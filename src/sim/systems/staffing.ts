@@ -35,6 +35,7 @@ import { headTo } from "./movement";
 import { nextShift, startOnRota, updateShifts } from "./rota";
 import { leave, startingSkill } from "./workforce";
 import { forgetStaff } from "./serviceLines";
+import { canActDown, residentDoctorsOnStrike } from "./strikes";
 
 export type StaffCommand =
   | {
@@ -339,8 +340,12 @@ export function hasTeam(state: SimState, specialty: SpecialtyId): boolean {
 }
 
 /** Whether a member of staff could take a job: the right role, and specialty if it needs one. */
-export function canDo(s: Staff, job: Job): boolean {
-  return job.roles.includes(s.role) && (job.specialty === null || s.specialty === job.specialty);
+export function canDo(state: SimState, s: Staff, job: Job): boolean {
+  if (job.roles.includes(s.role) && (job.specialty === null || s.specialty === job.specialty)) {
+    return true;
+  }
+  // A resident doctors' strike: consultants cover their work.
+  return canActDown(state, s, job);
 }
 
 /** Calls an on-call consultant in from home; they arrive after the callout delay. */
@@ -366,14 +371,19 @@ function updateOnCall(state: SimState): void {
   const staff = Object.values(state.staff);
   const onCall = staff.filter((s) => s.onCall !== null);
   if (onCall.length === 0) return;
-  const open = Object.values(state.jobs).filter((j) => j.state === "open" && j.specialty !== null);
+  // In a resident doctors' strike, on-call consultants come in for doctors' work too.
+  const strike = residentDoctorsOnStrike(state);
+  const open = Object.values(state.jobs).filter(
+    (j) =>
+      j.state === "open" && (j.specialty !== null || (strike && j.roles.includes("junior_doctor"))),
+  );
 
   for (const job of open) {
     // A colleague in clinic isn't free to come: the on-call consultant is.
     const here = (s: Staff) =>
       (onDuty(s) && !inClinic(state, s) && !inTheatre(state, s)) || s.onCall?.state === "called";
-    if (staff.some((s) => canDo(s, job) && here(s))) continue;
-    const home = onCall.find((s) => s.onCall!.state === "home" && canDo(s, job));
+    if (staff.some((s) => canDo(state, s, job) && here(s))) continue;
+    const home = onCall.find((s) => s.onCall!.state === "home" && canDo(state, s, job));
     if (home) callIn(state, home);
   }
 
@@ -396,7 +406,7 @@ function updateOnCall(state: SimState): void {
         s.onCall = { state: "in", at: state.tick };
         continue;
       }
-      const wanted = open.some((j) => canDo(s, j));
+      const wanted = open.some((j) => canDo(state, s, j));
       if (c.state === "in") {
         if (wanted) c.at = state.tick;
         else if (state.tick - c.at >= ON_CALL.homeAfterIdleMins * TICKS_PER_MINUTE) {

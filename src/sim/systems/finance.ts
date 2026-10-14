@@ -34,6 +34,7 @@ import { checkCash, repayLoans, reviewRating } from "./loans";
 import { overPrivateCap } from "./referrals";
 import { updateReputation } from "./reputation";
 import { isCalledIn } from "./majorIncident";
+import { actingDownPay, isStriking } from "./strikes";
 import {
   book,
   objectLine,
@@ -177,7 +178,13 @@ function unsocialRateNow(state: SimState): number {
 
 /** One person's pay for the hour just gone, by ledger line. */
 function staffHour(state: SimState, s: Staff, rate: number): HourlyPay {
-  const pay: HourlyPay = { salaries: annualCost(s) / 365 / 24, bank: 0, agency: 0 };
+  // No pay while on strike.
+  const striking = isStriking(state, s) && !onSite(s);
+  const pay: HourlyPay = {
+    salaries: striking ? 0 : annualCost(s) / 365 / 24,
+    bank: 0,
+    agency: 0,
+  };
   const hour = rolePay(s) / UNSOCIAL.hoursPerYear;
   const unsocial = onShift(state, s) ? rate * hour : 0;
   if (s.contract === "on_call") {
@@ -189,6 +196,8 @@ function staffHour(state: SimState, s: Staff, rate: number): HourlyPay {
   } else pay.salaries += unsocial;
   // Called in for a major incident: overtime on top.
   if (onSite(s) && isCalledIn(state, s)) pay.salaries += hour * MAJOR_INCIDENT.overtimeRate;
+  // A consultant covering a resident doctors' strike, at the rate card.
+  pay.salaries += actingDownPay(state, s);
   return pay;
 }
 

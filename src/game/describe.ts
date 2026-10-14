@@ -181,7 +181,7 @@ export function waitReason(state: SimState, p: Patient): string | null {
   if (results) return results;
 
   const reasons: string[] = [];
-  const able = Object.values(state.staff).filter((s) => canDo(s, job));
+  const able = Object.values(state.staff).filter((s) => canDo(state, s, job));
   const qualified = able.filter(onDuty);
   const team = job.specialty ? specialtyById.get(job.specialty)! : null;
   const coming = able.find((s) => s.onCall?.state === "called");

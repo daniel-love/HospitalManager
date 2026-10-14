@@ -426,6 +426,7 @@ function Events({ game, data }: { game: Game; data: HospitalData["events"] }) {
             </div>
           )}
           <span class="hire-desc">{e.description}</span>
+          {e.note && <span class="small-note">{e.note}</span>}
           <strong class="event-levers-title">What you can do</strong>
           <ul class="event-levers">
             {e.levers.map((l) => (

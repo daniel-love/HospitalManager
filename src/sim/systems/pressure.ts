@@ -39,6 +39,7 @@ import {
 } from "../time";
 import { roomAt } from "../world/rooms";
 import { book } from "./serviceLines";
+import { bookAppointments } from "./referrals";
 import { majorIncidentDeclared, planIncident, standbyText } from "./majorIncident";
 
 /** Events start at 08:00 on their first day. */
@@ -188,9 +189,15 @@ function forecast(state: SimState): void {
   }
 }
 
-/** Not already coming or under way, few enough this season, and long enough since the last. */
+/**
+ * Not already coming or under way (nor, for a strike, any other strike),
+ * few enough this season, and long enough since the last.
+ */
 function canStart(state: SimState, def: PressureEventDef, monthIndex: number): boolean {
   if (state.pressure.active.some((e) => e.defId === def.id)) return false;
+  if (def.strike && state.pressure.active.some((e) => pressureEventById.get(e.defId)!.strike)) {
+    return false;
+  }
   const year = Math.floor(monthIndex / 12);
   const thisSeason = state.pressure.past.filter(
     (p) =>
@@ -218,7 +225,10 @@ export function announce(state: SimState, def: PressureEventDef, leadDays?: numb
     start = announced + def.leadMins * TICKS_PER_MINUTE;
   } else {
     const lead = leadDays ?? def.leadDays;
-    start = lead === 0 ? state.tick : tickAt(clockFromTick(state.tick).day + lead, START_HOUR);
+    start =
+      lead === 0
+        ? state.tick
+        : tickAt(clockFromTick(state.tick).day + lead, def.startHour ?? START_HOUR);
   }
   const e: PressureEvent = {
     id: state.pressure.nextId++,
@@ -243,6 +253,8 @@ export function knownEvents(state: SimState): PressureEvent[] {
 
 function forecastNotice(state: SimState, e: PressureEvent): void {
   const def = pressureEventById.get(e.defId)!;
+  // Planned care is rebooked around a strike as soon as notice is given.
+  if (def.strike) bookAppointments(state);
   const days = Math.round((e.end - e.start) / TICKS_PER_DAY);
   const text =
     def.id === "major_incident"
@@ -270,6 +282,7 @@ function started(state: SimState, e: PressureEvent): void {
 
 function ended(state: SimState, e: PressureEvent): void {
   const def = pressureEventById.get(e.defId)!;
+  if (def.strike) bookAppointments(state);
   state.pressure.active = state.pressure.active.filter((a) => a !== e);
   state.pressure.past.push({ defId: e.defId, start: e.start, end: e.end });
   if (state.pressure.past.length > 50) state.pressure.past.shift();

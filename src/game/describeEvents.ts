@@ -4,9 +4,10 @@
  * can do about them, and past ones (systems/pressure.ts).
  */
 import { roomById } from "@data/catalogue";
-import { pressureEventById, type EventFrequency } from "@data/pressure";
+import { pressureEventById, type EventFrequency, type StrikeDef } from "@data/pressure";
 import type { SimState } from "@sim/state";
 import { intensity, isCooled, knownEvents } from "@sim/systems/pressure";
+import { strikeCounts } from "@sim/systems/strikes";
 import { clockFromTick, formatDate, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 
 export interface EventChip {
@@ -25,6 +26,8 @@ export interface EventsData {
     name: string;
     description: string;
     levers: string[];
+    /** A strike: how many will be out, and how many kept at work. */
+    note: string | null;
     coming: boolean;
     when: string;
     /** 0–1 now; a wave builds and fades. */
@@ -51,12 +54,6 @@ export interface EventsData {
   uncooled: { name: string; count: number }[] | null;
   past: { name: string; dates: string }[];
 }
-
-const SHORT: Record<string, string> = {
-  winter_surge: "Flu season",
-  heatwave: "Heatwave",
-  major_incident: "Major incident",
-};
 
 function majorIncident(state: SimState): EventsData["majorIncident"] {
   const mi = state.pressure.majorIncident;
@@ -94,10 +91,24 @@ function when(state: SimState, start: number, end: number): { coming: boolean; t
   return { coming: false, text: `day ${day} of ${of}` };
 }
 
+function strikeNote(state: SimState, strike: StrikeDef, coming: boolean): string {
+  const { out, working } = strikeCounts(state, strike);
+  if (strike.mode === "planned_only") {
+    return `${out} consultants ${coming ? "will strike" : "on strike"}: no clinics or planned operations ${coming ? "on strike days" : "until it's over"}.`;
+  }
+  const kept = working > 0 ? `; ${working} kept at work by the derogations` : "";
+  return `${out} of your staff ${coming ? "will walk out" : "are on strike"}${kept}.`;
+}
+
 export function eventChips(state: SimState): EventChip[] {
   return knownEvents(state).map((e) => {
     const w = when(state, e.start, e.end);
-    return { id: e.id, label: SHORT[e.defId] ?? e.defId, when: w.text, coming: w.coming };
+    return {
+      id: e.id,
+      label: pressureEventById.get(e.defId)!.short,
+      when: w.text,
+      coming: w.coming,
+    };
   });
 }
 
@@ -138,6 +149,7 @@ export function describeEvents(state: SimState): EventsData {
         name: def.name,
         description: def.description,
         levers: def.levers,
+        note: def.strike ? strikeNote(state, def.strike, w.coming) : null,
         coming: w.coming,
         when: w.coming
           ? `From ${formatDate(dayOf(e.start))} (${w.text}), until about ${formatDate(dayOf(e.end))}`

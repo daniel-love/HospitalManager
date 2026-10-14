@@ -31,6 +31,7 @@ import { coverFor, groupName, groupOf, slotName, type ShiftTime } from "./rota";
 import { createStaff, removeStaff, staffTitle } from "./staffing";
 import { inTheatre } from "./theatres";
 import { heatFatigue, sicknessFactor } from "./pressure";
+import { roleOnStrike } from "./strikes";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
 
@@ -213,6 +214,13 @@ export function fillGaps(state: SimState, shift: ShiftTime): void {
     );
     const short = want - present.length;
     if (short <= 0) continue;
+    const member = groupMember(key);
+    // The law doesn't allow agency staff to cover strikers, and bank staff are on strike too.
+    if (roleOnStrike(state, member.role)) {
+      state.today.stats.unfilledShifts += short;
+      notes.push(`${groupName(key)}: ${short} short (on strike)`);
+      continue;
+    }
     let bank = 0;
     let agency = 0;
     for (let i = 0; i < short; i++) {
@@ -220,7 +228,6 @@ export function fillGaps(state: SimState, shift: ShiftTime): void {
       if (chance(state.rng, BANK.fillChance)) bank++;
       else if (state.policies.gapFill === "bank_agency") agency++;
     }
-    const member = groupMember(key);
     for (let i = 0; i < bank + agency; i++) {
       const s = createStaff(state, { ...member, contract: i < bank ? "bank" : "agency" });
       s.duty = "on";

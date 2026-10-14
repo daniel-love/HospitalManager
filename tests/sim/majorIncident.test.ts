@@ -39,9 +39,9 @@ describe("major incidents", () => {
     expect(mi.expected).toBeLessThanOrEqual(MAJOR_INCIDENT.casualties[1]);
     expect(mi.casualties.every((c) => c.at >= e.start)).toBe(true);
     const ambulances = mi.casualties.filter((c) => c.channel === "ambulance");
-    expect(ambulances.every((c) => ["major_trauma", "serious_injury"].includes(c.conditionId))).toBe(
-      true,
-    );
+    expect(
+      ambulances.every((c) => ["major_trauma", "serious_injury"].includes(c.conditionId)),
+    ).toBe(true);
     state.tick = e.announced;
     updatePressure(state);
     expect(knownEvents(state)).toEqual([e]);

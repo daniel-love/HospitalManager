@@ -437,6 +437,8 @@ Each event has a **trigger** (scheduled, seasonal, random, or conditional), an *
 
 **As built (M6 step 2, part 1):** a major incident gives 45 minutes' standby, then a wave of P1, P2 and P3 casualties over a few hours; P1s (major trauma) are stabilised and scanned, then sent on to a major trauma centre. Declaring is the player's choice (call in off-duty staff on overtime, stand down planned care, open escalation beds, rapid discharge), as is standing down.
 
+**As built (M6 step 2, part 2):** any staff group can strike, with two weeks' notice: walkouts (doctors, nurses and diagnostics staff with derogations for life-preserving care, porters and cleaners), and consultants' Christmas Day cover. Strikers aren't paid and can't be covered by bank or agency staff; consultants act down to cover resident doctors, at the rate card.
+
 **Scenario framework:** a scenario = starting map (blank or pre-built), funding model, budget, an event script and objectives (e.g. "Achieve 90% 4-hour for 4 consecutive weeks" or "Reach a Good rating within 2 years").
 
 ---

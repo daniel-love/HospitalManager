@@ -11,6 +11,7 @@
  * plan and need Private Patient Unit rooms, while NHS sessions need rooms
  * outside it.
  */
+import { consultantsOnStrikeOn } from "./strikes";
 import { SESSION_ORDER, type SessionHalf } from "@data/outpatients";
 import type { Staff } from "../agents";
 import type { SimState } from "../state";
@@ -96,7 +97,14 @@ export interface Session {
  */
 export function sessionsOn(state: SimState, day: number, half: SessionHalf): Session[] {
   const weekday = (day - 1) % 7;
-  if (weekday > 4 || state.departments.outpatients === "closed") return [];
+  // A consultants' strike: Christmas Day cover, so no clinics.
+  if (
+    weekday > 4 ||
+    state.departments.outpatients === "closed" ||
+    consultantsOnStrikeOn(state, day)
+  ) {
+    return [];
+  }
   // Cached until the layout or anyone's job plan changes.
   let plans = "";
   for (const s of Object.values(state.staff)) {

@@ -100,7 +100,7 @@ export function assignJobs(state: SimState): void {
     .filter((j) => j.state === "open" && j.kind !== "debrief")
     .sort((a, b) => a.dueTick - b.dueTick || a.id - b.id);
   for (const job of open) {
-    let candidates = idle.filter((s) => canDo(s, job) && s.jobId === null);
+    let candidates = idle.filter((s) => canDo(state, s, job) && s.jobId === null);
     if (job.kind === "me_review") {
       const p = job.patientId === null ? undefined : state.patients[job.patientId];
       candidates = candidates.filter((s) => canReviewDeath(state, s, p));
@@ -110,9 +110,14 @@ export function assignJobs(state: SimState): void {
     const place = claimPlace(state, job);
     if (!place) continue;
     // The most preferred role with someone free, then the nearest of them.
-    const best = Math.min(...candidates.map((s) => job.roles.indexOf(s.role)));
+    // (Someone covering another role's work, a consultant acting down, comes last.)
+    const rank = (s: Staff) => {
+      const i = job.roles.indexOf(s.role);
+      return i < 0 ? job.roles.length : i;
+    };
+    const best = Math.min(...candidates.map(rank));
     const staff = nearest(
-      candidates.filter((s) => job.roles.indexOf(s.role) === best),
+      candidates.filter((s) => rank(s) === best),
       place,
     );
     job.staffId = staff.id;

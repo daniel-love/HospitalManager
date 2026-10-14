@@ -23,6 +23,7 @@
  * A surgeon or anaesthetist on a list is off the job board while it has
  * patients to see, like a clinician in clinic.
  */
+import { consultantsOnStrikeOn } from "./strikes";
 import { conditionById, specialtyById } from "@data/catalogue";
 import { CLINIC_SESSIONS, type SessionHalf } from "@data/outpatients";
 import { PLANNED_PREFIX } from "@data/conditions";
@@ -203,7 +204,9 @@ function weekLists(state: SimState, weekStart: number): TheatreList[] {
 export function listsOn(state: SimState, day: number, half: SessionHalf): TheatreList[] {
   const weekday = (day - 1) % 7;
   // For emergencies only, or closed: planned lists stand down.
-  if (weekday > 4 || state.departments.theatres !== "open") return [];
+  // A consultants' strike: Christmas Day cover, so no planned lists.
+  if (weekday > 4 || state.departments.theatres !== "open" || consultantsOnStrikeOn(state, day))
+    return [];
   return weekLists(state, day - weekday).filter((l) => l.day === day && l.half === half);
 }
 
