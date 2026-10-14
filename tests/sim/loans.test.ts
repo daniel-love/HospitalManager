@@ -5,10 +5,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { CREDIT_RATINGS, GRANT_OFFERS, LOANS, OVERSIGHT } from "@data/finance";
-import { emptyFlows, emptyLedger, emptyStats, type MonthReport } from "@sim/agents";
+import { emptyLedger, type MonthReport } from "@sim/agents";
 import { applyCommand } from "@sim/commands";
 import { tick } from "@sim/sim";
-import { createSimState, type Funding, type SimState } from "@sim/state";
+import { createSimState, emptyMonth, type Funding, type SimState } from "@sim/state";
 import { acceptGrant, grantById, progress, updateGrants } from "@sim/systems/grants";
 import {
   bankRate,
@@ -29,13 +29,9 @@ function hospital(funding: Funding = "nhs"): SimState {
 
 function month(income: number, costs: number, cash: number): MonthReport {
   return {
-    monthIndex: 0,
+    ...emptyMonth(0, cash),
     days: 30,
     ledger: { ...emptyLedger(), block: income, salaries: costs },
-    stats: emptyStats(),
-    openingCash: cash,
-    closingCash: cash,
-    flows: emptyFlows(),
   };
 }
 

@@ -52,14 +52,8 @@ export interface Opel {
   drivers: string[];
 }
 
-/**
- * The OPEL level: 1 (steady) to 4 (extreme pressure), from ward bed
- * occupancy, admitted patients waiting in A&E for a bed, ambulances
- * waiting to hand over, and patients in escalation beds.
- */
-export function opel(state: SimState): Opel {
-  let points = 0;
-  const drivers: string[] = [];
+/** Inpatient beds on wards and in side rooms (not escalation trolleys), and how many are taken. */
+export function wardBedUse(state: SimState): { beds: number; used: number } {
   let beds = 0;
   let used = 0;
   for (const r of state.rooms) {
@@ -72,6 +66,18 @@ export function opel(state: SimState): Opel {
       if (holder(state, id, 0) !== undefined) used++;
     }
   }
+  return { beds, used };
+}
+
+/**
+ * The OPEL level: 1 (steady) to 4 (extreme pressure), from ward bed
+ * occupancy, admitted patients waiting in A&E for a bed, ambulances
+ * waiting to hand over, and patients in escalation beds.
+ */
+export function opel(state: SimState): Opel {
+  let points = 0;
+  const drivers: string[] = [];
+  const { beds, used } = wardBedUse(state);
   if (beds > 0) {
     const occ = used / beds;
     if (occ >= 0.98) points += 2;

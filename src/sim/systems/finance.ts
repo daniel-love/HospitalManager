@@ -6,27 +6,40 @@
  */
 import { equipmentById, staffRoleById } from "@data/catalogue";
 import { DAYS_PER_MONTH, NHS_FUNDING, PRIVATE, RUNNING_COSTS } from "@data/economy";
-import { FloorType } from "../world/grid";
 import { AGENCY, BANK, NURSE_BANDS, ON_CALL, UNSOCIAL } from "@data/staff";
+import { RTT_TARGET_DAYS } from "@data/outpatients";
 import {
+  SERVICE_LINES,
   addInto,
+  addServices,
   costs,
   emptyLedger,
+  emptyServices,
   emptyStats,
   income,
   net,
   onSite,
   type DayReport,
+  type MonthEnd,
   type Payer,
   type Staff,
 } from "../agents";
 import { emit } from "../events";
 import { emptyMonth, type SimState } from "../state";
-import { dailyBlock } from "./funding";
+import { patientsInEscalation, wardBedUse } from "./escalation";
+import { dailyBlock, emergencyValueByLine } from "./funding";
 import { updateGrants } from "./grants";
 import { checkCash, repayLoans, reviewRating } from "./loans";
 import { overPrivateCap } from "./referrals";
 import { updateReputation } from "./reputation";
+import {
+  book,
+  objectLine,
+  plannedWhere,
+  staffWhere,
+  tilesByLine,
+  type Where,
+} from "./serviceLines";
 import {
   clockFromTick,
   dateOf,
@@ -35,6 +48,7 @@ import {
   monthName,
   MINUTES_PER_DAY,
   START_MINUTE_OF_DAY,
+  TICKS_PER_DAY,
   TICKS_PER_MINUTE,
 } from "../time";
 
@@ -46,18 +60,17 @@ export const HISTORY_DAYS = 60;
  * An emergency patient's tariff (an A&E attendance, an emergency admission
  * or operation): paid at the marginal rate on top of the block contract.
  */
-export function earnEmergency(state: SimState, tariff: number): void {
-  const amount = tariff * (1 - NHS_FUNDING.blockShare);
-  state.money += amount;
-  state.today.ledger.tariff += amount;
-  useSupplies(state, tariff * RUNNING_COSTS.suppliesShare);
+export function earnEmergency(state: SimState, tariff: number, where: Where): void {
+  book(state, "tariff", tariff * (1 - NHS_FUNDING.blockShare), where);
+  state.money += tariff * (1 - NHS_FUNDING.blockShare);
+  useSupplies(state, tariff * RUNNING_COSTS.suppliesShare, where);
 }
 
 /** A planned operation's tariff, paid in full. */
-export function earnElective(state: SimState, tariff: number): void {
+export function earnElective(state: SimState, tariff: number, where: Where): void {
   state.money += tariff;
-  state.today.ledger.elective += tariff;
-  useSupplies(state, tariff * RUNNING_COSTS.suppliesShare);
+  book(state, "elective", tariff, where);
+  useSupplies(state, tariff * RUNNING_COSTS.suppliesShare, where);
 }
 
 /**
@@ -69,53 +82,43 @@ export function earnPrivate(
   state: SimState,
   nhsTariff: number,
   payer: Exclude<Payer, "nhs">,
+  where: Where,
   outpatient = false,
 ): void {
   const factor =
     payer === "insured" ? PRIVATE.insurerFactor : PRIVATE.selfPayFactor * state.policies.priceLevel;
   const fee = nhsTariff * factor * (outpatient ? PRIVATE.outpatientFacilityShare : 1);
   state.money += fee;
-  state.today.ledger.private += fee;
+  book(state, "private", fee, where);
   useSupplies(
     state,
     nhsTariff * (outpatient ? RUNNING_COSTS.outpatientSuppliesShare : RUNNING_COSTS.suppliesShare),
+    where,
   );
 }
 
 /** An outpatient appointment's tariff, paid in full. */
 export function earnOutpatient(state: SimState, tariff: number): void {
   state.money += tariff;
-  state.today.ledger.outpatients += tariff;
-  useSupplies(state, tariff * RUNNING_COSTS.outpatientSuppliesShare);
+  book(state, "outpatients", tariff, "outpatients");
+  useSupplies(state, tariff * RUNNING_COSTS.outpatientSuppliesShare, "outpatients");
 }
 
-/** A planned operation's income: tariff for the NHS, a facility fee for a private patient. */
-export function earnPlanned(state: SimState, tariff: number, payer: Payer): void {
-  if (payer === "nhs") earnElective(state, tariff);
-  else earnPrivate(state, tariff, payer);
+/**
+ * A planned operation's income: tariff for the NHS, a facility fee for a
+ * private patient. A day case's is all Theatres'; an inpatient's is shared
+ * with Wards for their stay.
+ */
+export function earnPlanned(state: SimState, tariff: number, payer: Payer, dayCase: boolean): void {
+  const where = plannedWhere(dayCase);
+  if (payer === "nhs") earnElective(state, tariff, where);
+  else earnPrivate(state, tariff, payer, where);
 }
 
 /** Drugs and clinical supplies used in a treatment. */
-function useSupplies(state: SimState, cost: number): void {
+function useSupplies(state: SimState, cost: number, where: Where): void {
   state.money -= cost;
-  state.today.ledger.supplies += cost;
-}
-
-const floorCache = new WeakMap<SimState, { version: number; tiles: number }>();
-
-/** Tiles of floor built (foundations), on every floor. */
-export function floorTiles(state: SimState): number {
-  const hit = floorCache.get(state);
-  if (hit && hit.version === state.layoutVersion) return hit.tiles;
-  let tiles = 0;
-  for (const g of state.floors) for (const t of g.floorType) if (t === FloorType.Floor) tiles++;
-  floorCache.set(state, { version: state.layoutVersion, tiles });
-  return tiles;
-}
-
-/** Estates and utilities per hour, £. */
-export function hourlyEstates(state: SimState): number {
-  return (floorTiles(state) * RUNNING_COSTS.estatesPerTileYear) / 365 / 24;
+  book(state, "supplies", cost, where);
 }
 
 /** A role's annual pay with on-costs, by band for nurses. */
@@ -158,23 +161,30 @@ export interface HourlyPay {
  * shift; and bank and agency staff by the hour (with unsocial hours too).
  */
 export function hourlyPay(state: SimState): HourlyPay {
-  let annual = 0;
   const pay: HourlyPay = { salaries: 0, bank: 0, agency: 0 };
+  const rate = unsocialRateNow(state);
+  for (const s of Object.values(state.staff)) addInto(pay, staffHour(state, s, rate));
+  return pay;
+}
+
+/** The unsocial hours rate for the hour just gone. */
+function unsocialRateNow(state: SimState): number {
   const c = clockFromTick(Math.max(0, state.tick - 1));
-  const rate = unsocialRate(c.weekday, c.hour);
-  for (const s of Object.values(state.staff)) {
-    annual += annualCost(s);
-    const hour = rolePay(s) / UNSOCIAL.hoursPerYear;
-    const unsocial = onShift(state, s) ? rate * hour : 0;
-    if (s.contract === "on_call") {
-      if (onSite(s)) pay.salaries += ON_CALL.hourly;
-    } else if (s.contract === "bank") {
-      if (onSite(s)) pay.bank += hour * BANK.payFactor + unsocial;
-    } else if (s.contract === "agency") {
-      if (onSite(s)) pay.agency += (hour + unsocial) * AGENCY.payFactor;
-    } else pay.salaries += unsocial;
-  }
-  pay.salaries += annual / 365 / 24;
+  return unsocialRate(c.weekday, c.hour);
+}
+
+/** One person's pay for the hour just gone, by ledger line. */
+function staffHour(state: SimState, s: Staff, rate: number): HourlyPay {
+  const pay: HourlyPay = { salaries: annualCost(s) / 365 / 24, bank: 0, agency: 0 };
+  const hour = rolePay(s) / UNSOCIAL.hoursPerYear;
+  const unsocial = onShift(state, s) ? rate * hour : 0;
+  if (s.contract === "on_call") {
+    if (onSite(s)) pay.salaries += ON_CALL.hourly;
+  } else if (s.contract === "bank") {
+    if (onSite(s)) pay.bank += hour * BANK.payFactor + unsocial;
+  } else if (s.contract === "agency") {
+    if (onSite(s)) pay.agency += (hour + unsocial) * AGENCY.payFactor;
+  } else pay.salaries += unsocial;
   return pay;
 }
 
@@ -189,39 +199,59 @@ function onShift(state: SimState, s: Staff): boolean {
   return state.settings.rotas && s.role !== "consultant" && onSite(s) && s.onCall === null;
 }
 
-/** Equipment upkeep per hour, £. */
-export function hourlyUpkeep(state: SimState): number {
-  let monthly = 0;
-  for (const o of Object.values(state.objects)) monthly += equipmentById.get(o.defId)?.upkeep ?? 0;
-  return monthly / DAYS_PER_MONTH / 24;
-}
-
 export function updateFinance(state: SimState): void {
   if (state.tick % TICKS_PER_HOUR !== 0) return;
-  const ledger = state.today.ledger;
-  const pay = hourlyPay(state);
-  const upkeep = hourlyUpkeep(state);
-  const estates = hourlyEstates(state);
-  ledger.estates += estates;
-  state.money -= estates;
-  ledger.salaries += pay.salaries;
-  ledger.bank += pay.bank;
-  ledger.agency += pay.agency;
-  ledger.upkeep += upkeep;
-  state.money -= pay.salaries + pay.bank + pay.agency + upkeep;
+  const rate = unsocialRateNow(state);
+  for (const s of Object.values(state.staff)) {
+    const pay = staffHour(state, s, rate);
+    const where = staffWhere(state, s);
+    book(state, "salaries", pay.salaries, where);
+    book(state, "bank", pay.bank, where);
+    book(state, "agency", pay.agency, where);
+    state.money -= pay.salaries + pay.bank + pay.agency;
+  }
+  for (const o of Object.values(state.objects)) {
+    const upkeep = (equipmentById.get(o.defId)?.upkeep ?? 0) / DAYS_PER_MONTH / 24;
+    book(state, "upkeep", upkeep, objectLine(state, o.id));
+    state.money -= upkeep;
+  }
+  const tiles = tilesByLine(state);
+  for (const line of SERVICE_LINES) {
+    const estates = (tiles[line] * RUNNING_COSTS.estatesPerTileYear) / 365 / 24;
+    book(state, "estates", estates, line);
+    state.money -= estates;
+  }
+  sampleBeds(state);
 
   const minuteOfDay = (state.tick / TICKS_PER_MINUTE + START_MINUTE_OF_DAY) % MINUTES_PER_DAY;
   if (minuteOfDay === 0) {
-    // The day's share of the block contract, for what the hospital can do now.
+    // The day's share of the block contract, for what the hospital can do now,
+    // split between departments as it was sized.
     const block = dailyBlock(state);
-    ledger.block += block;
+    book(state, "block", block, blockWhere(state));
     state.money += block;
     closeDay(state);
   }
 }
 
+/** How the block contract splits between departments: as the emergency care it pays for. */
+function blockWhere(state: SimState): Where {
+  const parts = emergencyValueByLine(state);
+  const total = parts.ae + parts.wards + parts.theatres;
+  if (total === 0) return "ae";
+  return { ae: parts.ae / total, wards: parts.wards / total, theatres: parts.theatres / total };
+}
+
+/** Each hour: inpatient beds, and how many are occupied (for bed occupancy). */
+function sampleBeds(state: SimState): void {
+  const { beds, used } = wardBedUse(state);
+  state.today.stats.bedHours += beds;
+  state.today.stats.occupiedBedHours += used;
+}
+
 /** Files today's report (it's just turned midnight) and starts a new day. */
 function closeDay(state: SimState): void {
+  state.today.stats.corridorNights += patientsInEscalation(state);
   updateReputation(state, state.today.stats);
   const report: DayReport = {
     day: clockFromTick(state.tick - 1).day,
@@ -231,7 +261,8 @@ function closeDay(state: SimState): void {
   };
   state.history.push(report);
   if (state.history.length > HISTORY_DAYS) state.history.shift();
-  state.today = { ledger: emptyLedger(), stats: emptyStats() };
+  const services = state.today.services;
+  state.today = { ledger: emptyLedger(), stats: emptyStats(), services: emptyServices() };
 
   if (overPrivateCap(state)) {
     emit(
@@ -244,8 +275,10 @@ function closeDay(state: SimState): void {
   const month = state.month;
   addInto(month.ledger, report.ledger);
   addInto(month.stats, report.stats);
+  addServices(month.services, services);
   month.days++;
   month.closingCash = state.money;
+  month.end = monthEnd(state);
   const next = dateOf(report.day + 1);
   if (next.monthIndex !== month.monthIndex) closeMonth(state, next.monthIndex);
   checkCash(state);
@@ -273,6 +306,21 @@ function closeDay(state: SimState): void {
         : `${s.discharged} treated, ${s.lwbs} left unseen${fourHour}${clinics}`),
     n >= 0 ? "info" : "warn",
   );
+}
+
+/** The KPIs' snapshot figures, as things stand now. */
+export function monthEnd(state: SimState): MonthEnd {
+  let rttWaiting = 0;
+  let rttWithin18w = 0;
+  for (const r of Object.values(state.referrals)) {
+    if (r.clockStart === null || r.payer !== "nhs") continue;
+    rttWaiting++;
+    if (state.tick - r.clockStart < RTT_TARGET_DAYS * TICKS_PER_DAY) rttWithin18w++;
+  }
+  const headcount = Object.values(state.staff).filter(
+    (s) => s.contract !== "bank" && s.contract !== "agency",
+  ).length;
+  return { reputation: state.reputation, rttWaiting, rttWithin18w, headcount };
 }
 
 /** Months of statements kept. */

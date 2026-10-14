@@ -603,6 +603,20 @@ export interface FlowStats {
   privateReferrals: number;
   privateSeen: number;
   privateOps: number;
+  /** Inpatient bed-hours, and of them occupied, sampled each hour (bed occupancy). */
+  bedHours: number;
+  occupiedBedHours: number;
+  /** Sum of admission-to-discharge times of ward discharges (length of stay). */
+  stayMins: number;
+  /** Rostered shifts worked by the hospital's own staff, and shifts lost to sickness. */
+  shifts: number;
+  sickShifts: number;
+  /** Places short of the cover at the start of a shift that no bank or agency staff filled. */
+  unfilledShifts: number;
+  /** Staff handing in their notice. */
+  resignations: number;
+  /** Patients on escalation trolleys at midnight (corridor care). */
+  corridorNights: number;
 }
 
 /**
@@ -737,6 +751,36 @@ export interface MonthReport {
   closingCash: number;
   /** Cash that isn't income or running costs: building, loans and grants. */
   flows: CashFlows;
+  /** The same income and running costs, by department (systems/serviceLines.ts). */
+  services: ServiceLedgers;
+  /** How things stood at the end of the month (or of the last day filed). */
+  end: MonthEnd;
+}
+
+/**
+ * Departments for service-line reporting (GAME_DESIGN §8.1): the four that
+ * see patients and earn income, and two shared services whose costs sit
+ * below the line.
+ */
+export const SERVICE_LINES = [
+  "ae",
+  "wards",
+  "theatres",
+  "outpatients",
+  "diagnostics",
+  "support",
+] as const;
+export type ServiceLine = (typeof SERVICE_LINES)[number];
+export type ServiceLedgers = Record<ServiceLine, Ledger>;
+
+/** Figures that are a snapshot rather than a sum over the month, for the KPIs. */
+export interface MonthEnd {
+  reputation: number;
+  /** NHS patients with an 18-week clock running, and how many are within 18 weeks. */
+  rttWaiting: number;
+  rttWithin18w: number;
+  /** The hospital's own staff (not bank or agency). */
+  headcount: number;
 }
 
 /** Cash in and out beyond income and running costs, over a month. */
@@ -811,6 +855,15 @@ export function emptyLedger(): Ledger {
   };
 }
 
+export function emptyServices(): ServiceLedgers {
+  return Object.fromEntries(SERVICE_LINES.map((l) => [l, emptyLedger()])) as ServiceLedgers;
+}
+
+/** Adds one set of service-line ledgers into another. */
+export function addServices(into: ServiceLedgers, from: ServiceLedgers): void {
+  for (const l of SERVICE_LINES) addInto(into[l], from[l]);
+}
+
 export function emptyStats(): FlowStats {
   return {
     arrivals: 0,
@@ -866,6 +919,14 @@ export function emptyStats(): FlowStats {
     privateReferrals: 0,
     privateSeen: 0,
     privateOps: 0,
+    bedHours: 0,
+    occupiedBedHours: 0,
+    stayMins: 0,
+    shifts: 0,
+    sickShifts: 0,
+    unfilledShifts: 0,
+    resignations: 0,
+    corridorNights: 0,
   };
 }
 

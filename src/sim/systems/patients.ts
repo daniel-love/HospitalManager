@@ -543,15 +543,16 @@ export function leave(state: SimState, p: Patient, outcome: Outcome): void {
   const condition = conditionById.get(p.conditionId)!;
   if (p.times.admitted !== null) {
     stats.wardDischarges++;
+    stats.stayMins += (state.tick - p.times.admitted) / TICKS_PER_MINUTE;
     // A planned inpatient's stay is planned care, paid in full.
     if (condition.planned) {
-      earnPlanned(state, condition.admission?.tariff ?? 0, p.elective?.payer ?? "nhs");
-    } else earnEmergency(state, condition.admission?.tariff ?? 0);
+      earnPlanned(state, condition.admission?.tariff ?? 0, p.elective?.payer ?? "nhs", false);
+    } else earnEmergency(state, condition.admission?.tariff ?? 0, "wards");
     return;
   }
   if (p.elective) {
     // A day case going home: the day-case tariff. They were never in A&E.
-    earnPlanned(state, condition.tariff, p.elective.payer);
+    earnPlanned(state, condition.tariff, p.elective.payer, true);
     return;
   }
   recordDeparture(state, p);
@@ -560,7 +561,7 @@ export function leave(state: SimState, p: Patient, outcome: Outcome): void {
     if (outcome === "transferred") stats.transferred++;
     else if (outcome === "transferred_out") stats.transfersOut++;
     else stats.discharged++;
-    earnEmergency(state, condition.tariff);
+    earnEmergency(state, condition.tariff, "ae");
   }
 }
 

@@ -262,8 +262,10 @@ function comeIn(state: SimState, s: Staff, shiftEnd: number | null): void {
   }
   s.onCall = null;
   s.duty = "on";
-  if (shiftEnd !== null && s.shiftEnd !== shiftEnd)
+  if (shiftEnd !== null && s.shiftEnd !== shiftEnd) {
     s.shiftLoad = { mins: 0, busy: 0, short: false };
+    state.today.stats.shifts++;
+  }
   s.shiftEnd = shiftEnd;
 }
 
@@ -280,6 +282,7 @@ function finish(s: Staff): void {
 function sickFor(state: SimState, s: Staff, until: number, shift: string): boolean {
   if (!callsInSick(state, s)) return false;
   s.sickUntil = until;
+  state.today.stats.sickShifts++;
   emit(state, `${s.name}, ${staffTitle(s)}, has called in sick for ${shift}`, "info", undefined, {
     tab: "team",
     id: s.id,

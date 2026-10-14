@@ -391,7 +391,7 @@ function arriveOnWard(state: SimState, p: Patient): void {
     );
   }
   // The A&E attendance is paid now; the inpatient stay when they go home.
-  earnEmergency(state, condition.tariff);
+  earnEmergency(state, condition.tariff, "ae");
 }
 
 /** Inpatients well enough to go home get a doctor's discharge review. */

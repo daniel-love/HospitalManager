@@ -130,11 +130,12 @@ export function die(state: SimState, p: Patient, expected: boolean, verified: bo
       state,
       wasAdmitted ? (condition.admission?.tariff ?? 0) : condition.tariff,
       p.elective?.payer ?? "nhs",
+      !wasAdmitted,
     );
-  } else if (wasAdmitted) earnEmergency(state, condition.admission?.tariff ?? 0);
+  } else if (wasAdmitted) earnEmergency(state, condition.admission?.tariff ?? 0, "wards");
   else {
     recordDeparture(state, p);
-    earnEmergency(state, condition.tariff);
+    earnEmergency(state, condition.tariff, "ae");
   }
 
   if (expected) {

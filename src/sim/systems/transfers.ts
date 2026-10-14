@@ -29,6 +29,7 @@ import { TICKS_PER_MINUTE } from "../time";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { analysers, leaveScanner } from "./diagnostics";
 import { leave } from "./patients";
+import { book } from "./serviceLines";
 
 /** Doctors who can assess a patient and arrange their transfer, most preferred first. */
 const ARRANGERS = ["junior_doctor", "registrar", "consultant"] as const;
@@ -128,7 +129,7 @@ function depart(state: SimState, p: Patient): void {
   const stats = state.today.stats;
   stats.transferWaitMins += (state.tick - t.decided) / TICKS_PER_MINUTE;
   state.money -= TRANSFER_COST;
-  state.today.ledger.transfers += TRANSFER_COST;
+  book(state, "transfers", TRANSFER_COST, p.times.admitted !== null ? "wards" : "ae");
   leave(state, p, "transferred_out");
   if (bed !== null && state.objects[bed]) dirtyCouch(state, bed);
 }

@@ -13,6 +13,7 @@ import { z } from "zod";
 import { conditionById, objectDef } from "@data/catalogue";
 import { PRIVATE } from "@data/economy";
 import { specialtyIds, staffRoleIds } from "@data/schema";
+import { SERVICE_LINES, type ServiceLine } from "@sim/agents";
 import { SIM_STATE_VERSION, type PlacedObject, type SimState } from "@sim/state";
 import { clockFromTick, formatClock } from "@sim/time";
 import { createFloorGrid, tileIndex, type FloorGrid } from "@sim/world/grid";
@@ -435,11 +436,32 @@ const statsSchema = z.object({
   privateReferrals: int.min(0),
   privateSeen: int.min(0),
   privateOps: int.min(0),
+  bedHours: num,
+  occupiedBedHours: num,
+  stayMins: num,
+  shifts: int.min(0),
+  sickShifts: int.min(0),
+  unfilledShifts: int.min(0),
+  resignations: int.min(0),
+  corridorNights: int.min(0),
 });
+const servicesSchema = z.object(
+  Object.fromEntries(SERVICE_LINES.map((l) => [l, ledgerSchema])) as Record<
+    ServiceLine,
+    typeof ledgerSchema
+  >,
+);
 const monthSchema = z.object({
   ...monthSchemaFields,
   ledger: ledgerSchema,
   stats: statsSchema,
+  services: servicesSchema,
+  end: z.object({
+    reputation: num.min(0).max(100),
+    rttWaiting: int.min(0),
+    rttWithin18w: int.min(0),
+    headcount: int.min(0),
+  }),
 });
 
 const operationSchema = z.object({
@@ -559,7 +581,7 @@ const saveSchema = z.object({
       theatres: z.enum(["open", "emergency", "closed"]),
     }),
     reputation: num.min(0).max(100),
-    today: z.object({ ledger: ledgerSchema, stats: statsSchema }),
+    today: z.object({ ledger: ledgerSchema, stats: statsSchema, services: servicesSchema }),
     history: z.array(
       z.object({
         day: int.positive(),

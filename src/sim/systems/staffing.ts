@@ -34,6 +34,7 @@ import { nurseStations, stationSpot } from "./monitoring";
 import { headTo } from "./movement";
 import { nextShift, startOnRota, updateShifts } from "./rota";
 import { leave, startingSkill } from "./workforce";
+import { forgetStaff } from "./serviceLines";
 
 export type StaffCommand =
   | {
@@ -255,6 +256,7 @@ export function createStaff(
 
 /** Someone leaves at once: any job they were doing goes back on the board. */
 export function removeStaff(state: SimState, staff: Staff): void {
+  forgetStaff(state, staff.id);
   const job = staff.jobId === null ? undefined : state.jobs[staff.jobId];
   if (job) {
     // Back on the board for someone else, keeping its place and patient.

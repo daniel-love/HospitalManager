@@ -24,6 +24,7 @@ import { costs, income, net, type Loan, type MonthReport } from "../agents";
 import { emit } from "../events";
 import type { SimState } from "../state";
 import { TICKS_PER_DAY } from "../time";
+import { book } from "./serviceLines";
 
 /** A Private Hospital overdrawn this many days in a row goes into administration. */
 const OVERDRAWN_DAYS = 30;
@@ -135,7 +136,7 @@ export function repayLoans(state: SimState): void {
       continue;
     }
     state.money -= due;
-    state.today.ledger.interest += interest;
+    book(state, "interest", interest, "support");
     state.month.flows.repaid += principal;
     loan.balance -= principal;
     loan.missed = 0;

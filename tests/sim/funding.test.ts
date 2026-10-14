@@ -70,8 +70,8 @@ describe("the block contract", () => {
 describe("tariff", () => {
   it("pays emergency care at the marginal rate and planned care in full", () => {
     const state = createSimState({ seed: 1 });
-    earnEmergency(state, 1000);
-    earnElective(state, 1000);
+    earnEmergency(state, 1000, "ae");
+    earnElective(state, 1000, "theatres");
     expect(state.today.ledger.tariff).toBeCloseTo(1000 * (1 - NHS_FUNDING.blockShare));
     expect(state.today.ledger.elective).toBe(1000);
   });

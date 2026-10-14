@@ -16,6 +16,8 @@ import {
   type Referral,
   emptyFlows,
   emptyLedger,
+  emptyServices,
+  type ServiceLedgers,
   emptyStats,
   type DayReport,
   type FlowStats,
@@ -37,7 +39,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 33;
+export const SIM_STATE_VERSION = 34;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -165,7 +167,7 @@ export interface SimState {
   policies: Policies;
 
   /** Money and patient flow so far today, and reports for past days (newest last). */
-  today: { ledger: Ledger; stats: FlowStats };
+  today: { ledger: Ledger; stats: FlowStats; services: ServiceLedgers };
   history: DayReport[];
   /**
    * The monthly financial statement: this month so far (filed days only),
@@ -305,6 +307,8 @@ export function emptyMonth(monthIndex: number, cash: number): MonthReport {
     openingCash: cash,
     closingCash: cash,
     flows: emptyFlows(),
+    services: emptyServices(),
+    end: { reputation: REPUTATION.start, rttWaiting: 0, rttWithin18w: 0, headcount: 0 },
   };
 }
 
@@ -356,7 +360,7 @@ export function createSimState(opts: NewGameOptions): SimState {
       dischargeBeforeNoon: false,
       visiting: "set",
     },
-    today: { ledger: emptyLedger(), stats: emptyStats() },
+    today: { ledger: emptyLedger(), stats: emptyStats(), services: emptyServices() },
     history: [],
     month: emptyMonth(0, opts.money ?? STARTING_CASH),
     months: [],

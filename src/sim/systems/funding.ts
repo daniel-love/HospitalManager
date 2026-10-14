@@ -35,15 +35,13 @@ function canAdmit(state: SimState, c: ConditionDef, ward: boolean): boolean {
   return !!c.admission && !!c.specialty && ward && hasOwnTeam(state, c.specialty);
 }
 
-/** An admission's value at full tariff: the stay, plus any emergency operation it can do. */
-function admissionValue(state: SimState, c: ConditionDef): number {
+/** An admission's value at full tariff: the stay, and any emergency operation it can do. */
+function admissionValue(state: SimState, c: ConditionDef): { stay: number; operation: number } {
   const a = c.admission!;
-  let value = a.tariff;
   const op = a.operation;
-  if (op && cantOperate(state, op.specialty ?? c.specialty!) === null) {
-    value += op.chance * op.tariff;
-  }
-  return value;
+  const operation =
+    op && cantOperate(state, op.specialty ?? c.specialty!) === null ? op.chance * op.tariff : 0;
+  return { stay: a.tariff, operation };
 }
 
 /** Inpatient beds on wards and in side rooms. */
@@ -59,6 +57,13 @@ function wardBeds(state: SimState): number {
   return beds;
 }
 
+/** A day's emergency care, £ at full tariff, by the department that gives it. */
+export interface EmergencyValue {
+  ae: number;
+  wards: number;
+  theatres: number;
+}
+
 /**
  * The expected full-tariff value of a day's emergency care the hospital can
  * provide. Commissioners pay for activity a hospital can deliver, so it's
@@ -68,8 +73,15 @@ function wardBeds(state: SimState): number {
  * beds can take them at the average length of stay.
  */
 export function emergencyValuePerDay(state: SimState): number {
+  const v = emergencyValueByLine(state);
+  return v.ae + v.wards + v.theatres;
+}
+
+/** The emergency care the hospital can provide a day, by department: attendances, stays, operations. */
+export function emergencyValueByLine(state: SimState): EmergencyValue {
+  const none = { ae: 0, wards: 0, theatres: 0 };
   // A closed A&E provides none; on divert, none for ambulances.
-  if (state.departments.ae === "closed") return 0;
+  if (state.departments.ae === "closed") return none;
   const demand = dailyDemand(state);
   const treatable = treatableConditions(state);
   const ward = state.rooms.some((r) => r.valid && r.typeId === "ward");
@@ -105,7 +117,8 @@ export function emergencyValuePerDay(state: SimState): number {
 
   let attendances = 0;
   let admissions = 0;
-  let admissionValueSum = 0;
+  let stays = 0;
+  let operations = 0;
   let bedHours = 0;
   for (const [c, all] of perDay) {
     const n = all * Math.min(...c.pathway.map((s) => roomShare.get(s.room) ?? 0));
@@ -114,13 +127,16 @@ export function emergencyValuePerDay(state: SimState): number {
     const a = c.admission!;
     const admitted = n * a.chance;
     admissions += admitted;
-    admissionValueSum += admitted * admissionValue(state, c);
+    const value = admissionValue(state, c);
+    stays += admitted * value.stay;
+    operations += admitted * value.operation;
     bedHours += admitted * ((a.stayHours[0] + a.stayHours[1]) / 2);
   }
-  if (admissions === 0) return attendances;
+  if (admissions === 0) return { ...none, ae: attendances };
   // Ward beds turn over once per average stay.
   const capacity = (wardBeds(state) * 24) / (bedHours / admissions);
-  return attendances + admissionValueSum * Math.min(1, capacity / admissions);
+  const share = Math.min(1, capacity / admissions);
+  return { ae: attendances, wards: stays * share, theatres: operations * share };
 }
 
 /**

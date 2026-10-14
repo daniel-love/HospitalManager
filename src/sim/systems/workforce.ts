@@ -129,6 +129,7 @@ function resignations(state: SimState): void {
       (RESIGNATION.dailyChance * (RESIGNATION.fromMorale - s.morale)) / RESIGNATION.fromMorale;
     if (!chance(state.rng, p)) continue;
     s.leavesAt = state.tick + RESIGNATION.noticeDays * MINUTES_PER_DAY * TICKS_PER_MINUTE;
+    state.today.stats.resignations++;
     emit(
       state,
       `${s.name}, ${staffTitle(s)}, has handed in their notice: low morale. They leave in ${RESIGNATION.noticeDays / 7} weeks.`,
@@ -223,6 +224,7 @@ export function fillGaps(state: SimState, shift: ShiftTime): void {
       s.shiftLoad = { mins: 0, busy: 0, short: false };
     }
     const unfilled = short - bank - agency;
+    state.today.stats.unfilledShifts += unfilled;
     if (unfilled > 0) for (const s of present) if (s.shiftLoad) s.shiftLoad.short = true;
     const name = groupName(key);
     const parts = [

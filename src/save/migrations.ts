@@ -756,6 +756,69 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v34: income and costs by department; bed, length-of-stay and workforce KPIs.
+  33: (save) => {
+    type Day = { stats: object; services?: object; end?: object };
+    const state = save.state as {
+      today: Day;
+      history: Day[];
+      month: Day;
+      months: Day[];
+      reputation: number;
+    };
+    const ledger = () => ({
+      block: 0,
+      tariff: 0,
+      elective: 0,
+      outpatients: 0,
+      private: 0,
+      salaries: 0,
+      bank: 0,
+      agency: 0,
+      upkeep: 0,
+      supplies: 0,
+      estates: 0,
+      interest: 0,
+      transfers: 0,
+    });
+    // Earlier income and costs weren't recorded by department.
+    const services = () =>
+      Object.fromEntries(
+        ["ae", "wards", "theatres", "outpatients", "diagnostics", "support"].map((l) => [
+          l,
+          ledger(),
+        ]),
+      );
+    const stats = <T extends Day>(d: T) => ({
+      ...d,
+      stats: {
+        bedHours: 0,
+        occupiedBedHours: 0,
+        stayMins: 0,
+        shifts: 0,
+        sickShifts: 0,
+        unfilledShifts: 0,
+        resignations: 0,
+        corridorNights: 0,
+        ...d.stats,
+      },
+    });
+    const month = (m: Day) => ({
+      ...stats(m),
+      services: m.services ?? services(),
+      end: m.end ?? { reputation: state.reputation, rttWaiting: 0, rttWithin18w: 0, headcount: 0 },
+    });
+    return {
+      ...save,
+      state: {
+        ...state,
+        today: { ...stats(state.today), services: state.today.services ?? services() },
+        history: state.history.map(stats),
+        month: month(state.month),
+        months: state.months.map(month),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

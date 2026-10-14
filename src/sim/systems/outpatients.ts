@@ -380,7 +380,7 @@ function seen(state: SimState, o: Outpatient): void {
 function earnAppointment(state: SimState, r: Referral, tariff: number): void {
   if (r.payer === "nhs") earnOutpatient(state, tariff);
   else {
-    earnPrivate(state, tariff, r.payer, true);
+    earnPrivate(state, tariff, r.payer, "outpatients", true);
     state.today.stats.privateSeen++;
   }
 }

@@ -150,3 +150,16 @@ export const RESALE_FRACTION = 0.5;
 
 /** Equipment upkeep is quoted per month; charged hourly on this basis. */
 export const DAYS_PER_MONTH = 365 / 12;
+
+/**
+ * Service-line reporting (systems/serviceLines.ts): how income that covers
+ * more than one department is split between them.
+ */
+export const SERVICE_SPLIT = {
+  /**
+   * A planned inpatient's tariff covers their operation and their ward
+   * stay: about half of a typical elective surgical episode's cost is the
+   * bed days, the rest theatre time, the team and implants.
+   */
+  plannedStayShare: 0.5,
+};

@@ -933,5 +933,5 @@ function startEmergency(state: SimState, p: Patient): void {
   const stats = state.today.stats;
   stats.emergencyOps++;
   if (state.tick <= e.due) stats.emergencyOnTime++;
-  earnEmergency(state, emergencyOpOf(p)?.tariff ?? 0);
+  earnEmergency(state, emergencyOpOf(p)?.tariff ?? 0, "theatres");
 }
