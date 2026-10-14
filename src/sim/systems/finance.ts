@@ -342,8 +342,11 @@ function closeMonth(state: SimState, nextIndex: number): void {
     state,
     `${monthName(dateOf(firstDayOf(m.monthIndex)))} statement: income ${money.format(income(m.ledger))}, ` +
       `costs ${money.format(costs(m.ledger))}, ${n >= 0 ? "surplus" : "deficit"} ${money.format(Math.abs(n))}. ` +
-      `Cash ${money.format(m.closingCash)}. See Reports.`,
+      `Cash ${money.format(m.closingCash)}. See Finance.`,
     n >= 0 ? "info" : "warn",
+    undefined,
+    undefined,
+    "statement",
   );
   reviewRating(state, m);
   repayLoans(state);

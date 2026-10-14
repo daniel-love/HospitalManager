@@ -1,6 +1,6 @@
 /**
- * What the Hospital dialog shows: department statuses, escalation and
- * policies.
+ * What the Hospital dialog shows: department statuses, escalation,
+ * policies and performance (game/kpis.ts).
  */
 import { content } from "@data/catalogue";
 import { PRIVATE, REPUTATION } from "@data/economy";
@@ -11,6 +11,11 @@ import { escalationBeds, opel, patientsInEscalation } from "@sim/systems/escalat
 import { holder } from "@sim/places";
 import { statusPenalty } from "@sim/systems/reputation";
 import { VISITING } from "@sim/systems/visitors";
+import { dateOf, firstDayOf, monthName } from "@sim/time";
+import { KPIS, type KpiSection, type Rag } from "./kpis";
+
+/** Months of KPIs shown: this month so far and the ones before. */
+const PERFORMANCE_MONTHS = 4;
 
 export interface HospitalData {
   reputation: number;
@@ -41,6 +46,18 @@ export interface HospitalData {
     priceLevels: readonly [number, number];
     priceElasticity: number;
     nhsReferrals: { id: SpecialtyId; name: string; on: boolean }[];
+  };
+  performance: {
+    /** This month so far first, then earlier months. */
+    months: { name: string; days: number }[];
+    rows: {
+      id: string;
+      section: KpiSection;
+      label: string;
+      standard: string;
+      title: string;
+      cells: { text: string; rag: Rag }[];
+    }[];
   };
 }
 
@@ -90,5 +107,29 @@ export function describeHospital(state: SimState): HospitalData {
         .filter((sp) => sp.outpatients)
         .map((sp) => ({ id: sp.id, name: sp.name, on: !!state.policies.nhsReferrals[sp.id] })),
     },
+    performance: performance(state),
+  };
+}
+
+/** The KPIs for this month so far and the months before, rated against their standards. */
+function performance(state: SimState): HospitalData["performance"] {
+  const months = [state.month, ...state.months.slice(-(PERFORMANCE_MONTHS - 1)).reverse()];
+  const ae = state.funding !== "private";
+  return {
+    months: months.map((m) => ({
+      name: monthName(dateOf(firstDayOf(m.monthIndex))),
+      days: m.days,
+    })),
+    rows: KPIS.filter((k) => ae || !k.ae).map((k) => ({
+      id: k.id,
+      section: k.section,
+      label: k.label,
+      standard: k.standard,
+      title: k.title,
+      cells: months.map((m) => {
+        const v = m.days === 0 ? null : k.value(m);
+        return v === null ? { text: "—", rag: "none" } : { text: k.format(v), rag: k.rate(v) };
+      }),
+    })),
   };
 }

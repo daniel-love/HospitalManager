@@ -54,7 +54,7 @@ export function App({ game }: { game: Game }) {
         onPanel={() => game.refreshPanels()}
         onStaff={() => game.openStaff("team")}
         onPatients={() => game.togglePatients()}
-        onFinance={() => game.openFinance("loans")}
+        onFinance={() => game.openFinance("statement")}
         onHospital={() => game.openHospital("departments")}
       />
       <Notifications game={game} />

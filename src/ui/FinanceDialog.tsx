@@ -1,15 +1,27 @@
 /**
- * The Finance dialog (GAME_DESIGN §8.1): the hospital's rating, its loans
- * and borrowing, and grants. Loans: DHSC capital loans for an NHS or Hybrid
+ * The Finance dialog (GAME_DESIGN §8.1): the hospital's accounts, rating,
+ * loans and grants. Statement: the monthly statement over the last few
+ * months and the year to date. Departments: service-line reporting, each
+ * department's income, direct costs and contribution, and the shared costs
+ * below the line. Loans: DHSC capital loans for an NHS or Hybrid
  * trust, bank loans for a Private Hospital, priced and limited by the
  * rating. Grants: the offer open now (take it on or turn it down), those
  * under way with their progress, and those finished.
  */
+import { Fragment } from "preact";
 import { useState } from "preact/hooks";
-import type { FinanceData } from "@game/describeFinance";
+import type { DepartmentPeriod, DepartmentRow, FinanceData } from "@game/describeFinance";
 import type { Game } from "@game/game";
 import { formatMoney } from "@game/tools";
+import { COST_LINES, INCOME_LINES, StatementTable } from "./Statement";
 import { financeData, financeTab, type FinanceTab } from "./store";
+
+const TABS: { id: FinanceTab; label: string }[] = [
+  { id: "statement", label: "Statement" },
+  { id: "departments", label: "Departments" },
+  { id: "loans", label: "Loans" },
+  { id: "grants", label: "Grants" },
+];
 
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
@@ -21,17 +33,17 @@ export function FinanceDialog({ game }: { game: Game }) {
     <section class="panel people-dialog finance-dialog" role="dialog" aria-label="Finance">
       <header class="people-header">
         <div class="tabs" role="tablist">
-          {(["loans", "grants"] as FinanceTab[]).map((t) => (
+          {TABS.map((t) => (
             <button
-              key={t}
+              key={t.id}
               role="tab"
-              aria-selected={tab === t}
-              class={tab === t ? "active" : ""}
+              aria-selected={tab === t.id}
+              class={tab === t.id ? "active" : ""}
               onMouseDown={noFocus}
-              onClick={() => game.openFinance(t)}
+              onClick={() => game.openFinance(t.id)}
             >
-              {t === "loans" ? "Loans" : "Grants"}
-              {t === "grants" && data.grants.offer && <span class="tab-badge">1</span>}
+              {t.label}
+              {t.id === "grants" && data.grants.offer && <span class="tab-badge">1</span>}
             </button>
           ))}
         </div>
@@ -61,7 +73,10 @@ export function FinanceDialog({ game }: { game: Game }) {
         <p class={`small-note${data.rating.bad ? " warn-text" : " dim"}`}>{data.rating.note}</p>
       </div>
       <div class="staff-tab-scroll">
-        {tab === "loans" ? <Loans game={game} data={data} /> : <Grants game={game} data={data} />}
+        {tab === "statement" && <Statement data={data} />}
+        {tab === "departments" && <Departments data={data} />}
+        {tab === "loans" && <Loans game={game} data={data} />}
+        {tab === "grants" && <Grants game={game} data={data} />}
       </div>
     </section>
   );
@@ -267,6 +282,178 @@ function Grants({ game, data }: { game: Game; data: FinanceData }) {
             </tbody>
           </table>
         </div>
+      )}
+    </>
+  );
+}
+
+function Statement({ data }: { data: FinanceData }) {
+  return (
+    <>
+      <p class="dim small-note">
+        Each month's income and running costs, and the cash that came and went beyond them. The
+        financial year runs from April. This month counts the days filed so far, at midnight each
+        day.
+      </p>
+      <div class="statement-scroll">
+        <StatementTable cols={data.statement} />
+      </div>
+    </>
+  );
+}
+
+/** A department's own ledger lines, for its expanded row. */
+function DepartmentDetail({ row }: { row: DepartmentRow }) {
+  const lines = [
+    ...INCOME_LINES.map((l) => ({ ...l, sign: 1 })),
+    ...COST_LINES.map((l) => ({ ...l, title: undefined, sign: -1 })),
+  ].filter((l) => Math.abs(row.ledger[l.key]) >= 1);
+  return (
+    <ul class="dept-detail">
+      {lines.map((l) => (
+        <li key={l.key} title={l.title}>
+          <span>{l.label}</span>
+          <span class="num">
+            {l.sign < 0 ? "−" : ""}
+            {formatMoney(row.ledger[l.key])}
+          </span>
+        </li>
+      ))}
+      {row.activity && (
+        <li class="dim">
+          <span>
+            {row.activity.count} {row.activity.unit}
+            {row.activity.count === 1 ? "" : "s"}
+          </span>
+          <span class="num">{formatMoney(row.activity.costEach)} each to provide</span>
+        </li>
+      )}
+    </ul>
+  );
+}
+
+const signed = (n: number) => `${n < 0 ? "−" : ""}${formatMoney(Math.abs(n))}`;
+
+/**
+ * Service-line reporting: what each department earns, what it costs
+ * directly, and what's left towards the shared costs.
+ */
+function Departments({ data }: { data: FinanceData }) {
+  const [periodId, setPeriod] = useState<DepartmentPeriod["id"]>("month");
+  const [open, setOpen] = useState<string | null>(null);
+  const period = data.departments.find((p) => p.id === periodId) ?? data.departments[0]!;
+  const rows = [...period.patientFacing, ...period.shared];
+  const scale = Math.max(1, ...rows.map((r) => Math.abs(r.net)));
+  const contribution = period.patientFacing.reduce((n, r) => n + r.net, 0);
+  const row = (r: DepartmentRow) => (
+    <Fragment key={r.line}>
+      <tr
+        class="dept-row"
+        aria-expanded={open === r.line}
+        onClick={() => setOpen(open === r.line ? null : r.line)}
+      >
+        <td title={r.title}>
+          <span class="dept-toggle" aria-hidden="true">
+            {open === r.line ? "▾" : "▸"}
+          </span>
+          {r.name}
+        </td>
+        <td class="num">{r.income > 0 ? formatMoney(r.income) : "—"}</td>
+        <td class="num">−{formatMoney(r.pay)}</td>
+        <td class="num">−{formatMoney(r.other)}</td>
+        <td class={`num ${r.net < 0 ? "bad" : "ok"}`}>{signed(r.net)}</td>
+        <td class="dept-bar-cell" aria-hidden="true">
+          <span
+            class={`dept-bar ${r.net < 0 ? "neg" : "pos"}`}
+            style={{ width: `${(50 * Math.abs(r.net)) / scale}%` }}
+          />
+        </td>
+      </tr>
+      {open === r.line && (
+        <tr class="dept-detail-row">
+          <td colSpan={6}>
+            <DepartmentDetail row={r} />
+          </td>
+        </tr>
+      )}
+    </Fragment>
+  );
+  return (
+    <>
+      <p class="dim small-note">
+        Like an NHS trust's service-line reports. Each department's income is the care it gave; its
+        direct costs are the pay of the staff working in it (hour by hour, wherever they were), and
+        its supplies, equipment and floor space. What's left is its contribution towards the shared
+        costs: Diagnostics (paid for within other departments' tariffs) and support services,
+        corridors, staff areas and loan interest. Click a department for its lines.
+      </p>
+      <div class="chips" role="radiogroup" aria-label="Period">
+        {data.departments.map((p) => (
+          <button
+            key={p.id}
+            role="radio"
+            aria-checked={period.id === p.id}
+            class={period.id === p.id ? "active" : ""}
+            onMouseDown={noFocus}
+            onClick={() => setPeriod(p.id)}
+          >
+            {p.name}
+          </button>
+        ))}
+      </div>
+      {rows.length === 0 ? (
+        <p class="dim">The first figures are filed at midnight.</p>
+      ) : (
+        <table class="report-table dept-table">
+          <thead>
+            <tr>
+              <th>
+                {period.days} {period.days === 1 ? "day" : "days"}
+              </th>
+              <th class="num">Income</th>
+              <th class="num">Pay</th>
+              <th class="num" title="Drugs and supplies, equipment upkeep, estates, transfers">
+                Other costs
+              </th>
+              <th class="num">Contribution</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {period.patientFacing.map(row)}
+            <tr class="subtotal">
+              <td>From departments</td>
+              <td class="num">
+                {formatMoney(period.patientFacing.reduce((n, r) => n + r.income, 0))}
+              </td>
+              <td />
+              <td />
+              <td class={`num ${contribution < 0 ? "bad" : "ok"}`}>{signed(contribution)}</td>
+              <td />
+            </tr>
+            {period.shared.map(row)}
+            {period.unattributed !== 0 && (
+              <tr>
+                <td title="Income and costs from before this save recorded departments">
+                  Not by department
+                </td>
+                <td />
+                <td />
+                <td />
+                <td class="num">{signed(period.unattributed)}</td>
+                <td />
+              </tr>
+            )}
+            <tr class="total">
+              <td>Surplus or deficit</td>
+              <td />
+              <td />
+              <td />
+              <td class={`num ${period.surplus < 0 ? "bad" : "ok"}`}>{signed(period.surplus)}</td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
       )}
     </>
   );

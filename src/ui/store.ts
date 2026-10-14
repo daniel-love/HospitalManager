@@ -382,12 +382,12 @@ export const patientsOpen = signal(false);
 export type StaffTab = "team" | "hire" | "rota";
 export const staffScreen = signal<StaffTab | null>(null);
 /** The Hospital dialog and its tab, and what it shows. */
-export type HospitalTab = "departments" | "escalation" | "policies";
+export type HospitalTab = "departments" | "escalation" | "policies" | "performance";
 export const hospitalTab = signal<HospitalTab | null>(null);
 export const hospitalData = signal<HospitalData | null>(null);
 
 /** The Finance dialog and its tab, and what it shows. */
-export type FinanceTab = "loans" | "grants";
+export type FinanceTab = "statement" | "departments" | "loans" | "grants";
 export const financeTab = signal<FinanceTab | null>(null);
 export const financeData = signal<FinanceData | null>(null);
 

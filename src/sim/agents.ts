@@ -972,7 +972,7 @@ export interface SimEvent {
   /** A staffing matter: the Staff screen tab to open when clicked, and who it's about. */
   staff?: { tab: "team" | "rota"; id?: number };
   /** A money matter: the Finance dialog tab to open when clicked. */
-  finance?: "loans" | "grants";
+  finance?: "statement" | "departments" | "loans" | "grants";
 }
 
 /** In the hospital: not off duty at home, nor on call at home or on the way in. */

@@ -1,12 +1,32 @@
 /**
- * What the Finance dialog shows: ratings, loans and the borrowing on offer,
- * and grants (systems/loans.ts, systems/grants.ts).
+ * What the Finance dialog shows: the monthly statement over several months
+ * and the year to date, income and costs by department (service-line
+ * reporting, systems/serviceLines.ts), ratings, loans and the borrowing on
+ * offer, and grants (systems/loans.ts, systems/grants.ts).
  */
 import { CREDIT_RATINGS, GRANT_OFFERS, LOANS } from "@data/finance";
+import {
+  SERVICE_LINES,
+  addInto,
+  addServices,
+  costs,
+  emptyFlows,
+  emptyLedger,
+  emptyServices,
+  emptyStats,
+  income,
+  type Ledger,
+  type MonthReport,
+  type ServiceLine,
+} from "@sim/agents";
 import type { SimState } from "@sim/state";
 import { grantById, progress } from "@sim/systems/grants";
 import { bankLimit, bankRate, capitalLimit } from "@sim/systems/loans";
-import { formatDate, TICKS_PER_DAY, clockFromTick } from "@sim/time";
+import { dateOf, firstDayOf, formatDate, monthName, TICKS_PER_DAY, clockFromTick } from "@sim/time";
+import type { StatementMonth } from "@ui/store";
+
+/** Months in the Statement tab before the year to date: this one so far and the ones before. */
+const STATEMENT_MONTHS = 6;
 
 const SEGMENT_NOTES = [
   "",
@@ -16,8 +36,40 @@ const SEGMENT_NOTES = [
   "Segment 4: the Recovery Support Programme, under financial special measures. No new capital loans, no agency staff, and building capped each month.",
 ];
 
+/** A department's income, direct costs and what's left, over a period. */
+export interface DepartmentRow {
+  line: ServiceLine;
+  name: string;
+  /** What it's for, for a tooltip. */
+  title: string;
+  ledger: Ledger;
+  income: number;
+  pay: number;
+  /** Supplies, upkeep, estates, transfers and interest. */
+  other: number;
+  /** Income less direct costs: its contribution (shared services: their cost, negative). */
+  net: number;
+  /** Patients or tests it saw, and the direct cost of each. */
+  activity: { count: number; unit: string; costEach: number } | null;
+}
+
+export interface DepartmentPeriod {
+  id: "month" | "last" | "year";
+  name: string;
+  days: number;
+  /** The departments that see patients, and the shared services below the line. */
+  patientFacing: DepartmentRow[];
+  shared: DepartmentRow[];
+  /** Income and costs from before departments were recorded (an older save). */
+  unattributed: number;
+  surplus: number;
+}
+
 export interface FinanceData {
   funding: SimState["funding"];
+  /** This month so far, earlier months, then the financial year to date. */
+  statement: StatementMonth[];
+  departments: DepartmentPeriod[];
   cash: number;
   rating: { label: string; note: string; bad: boolean };
   administration: boolean;
@@ -115,6 +167,8 @@ export function describeFinance(state: SimState): FinanceData {
   const offer = g.offer && grantById.get(g.offer.defId)!;
   return {
     funding: state.funding,
+    statement: statement(state),
+    departments: departments(state),
     cash: state.money,
     rating,
     administration: r.administration !== null,
@@ -173,4 +227,168 @@ export function describeFinance(state: SimState): FinanceData {
       maxActive: GRANT_OFFERS.maxActive,
     },
   };
+}
+
+/** The months of the current financial year (April to March) so far, as one. */
+function yearToDate(state: SimState): MonthReport {
+  const year = Math.floor(state.month.monthIndex / 12);
+  const months = [
+    ...state.months.filter((m) => Math.floor(m.monthIndex / 12) === year),
+    state.month,
+  ];
+  const sum: MonthReport = {
+    monthIndex: months[0]!.monthIndex,
+    days: 0,
+    ledger: emptyLedger(),
+    stats: emptyStats(),
+    openingCash: months[0]!.openingCash,
+    closingCash: state.month.closingCash,
+    flows: emptyFlows(),
+    services: emptyServices(),
+    end: state.month.end,
+  };
+  for (const m of months) {
+    sum.days += m.days;
+    addInto(sum.ledger, m.ledger);
+    addInto(sum.stats, m.stats);
+    addInto(sum.flows, m.flows);
+    addServices(sum.services, m.services);
+  }
+  return sum;
+}
+
+/** The financial year so far: "Year 1 to date". */
+function yearName(monthIndex: number): string {
+  return `Year ${Math.floor(monthIndex / 12) + 1} to date`;
+}
+
+function toStatement(m: MonthReport, name: string): StatementMonth {
+  return {
+    name,
+    days: m.days,
+    ledger: m.ledger,
+    flows: m.flows,
+    openingCash: m.openingCash,
+    closingCash: m.closingCash,
+  };
+}
+
+const nameOf = (m: MonthReport) => monthName(dateOf(firstDayOf(m.monthIndex)));
+
+function statement(state: SimState): StatementMonth[] {
+  const months = [state.month, ...state.months.slice(-(STATEMENT_MONTHS - 1)).reverse()];
+  const cols = months.map((m, i) => toStatement(m, i === 0 ? `${nameOf(m)} so far` : nameOf(m)));
+  // The year to date only adds something once there's an earlier month in it.
+  if (
+    state.months.some(
+      (m) => Math.floor(m.monthIndex / 12) === Math.floor(state.month.monthIndex / 12),
+    )
+  ) {
+    cols.push(toStatement(yearToDate(state), yearName(state.month.monthIndex)));
+  }
+  return cols;
+}
+
+const DEPARTMENTS: Record<ServiceLine, { name: string; title: string; unit: string | null }> = {
+  ae: {
+    name: "A&E",
+    title: "Attendances, the block contract's A&E share, and the A&E team",
+    unit: "attendance",
+  },
+  wards: {
+    name: "Wards",
+    title: "Emergency admissions' stays, the ward share of planned inpatients, and the ward teams",
+    unit: "discharge",
+  },
+  theatres: {
+    name: "Theatres",
+    title: "Operations: planned (day cases, and the theatre share of inpatients) and emergency",
+    unit: "operation",
+  },
+  outpatients: { name: "Outpatients", title: "Clinic appointments", unit: "appointment" },
+  diagnostics: {
+    name: "Diagnostics",
+    title: "X-ray, CT and the lab: paid for within other departments' tariffs, so a shared cost",
+    unit: "test",
+  },
+  support: {
+    name: "Support and overheads",
+    title:
+      "Porters, cleaners, the mortuary, corridors, shared waiting areas and staff areas, and loan interest",
+    unit: null,
+  },
+};
+
+/** Patients or tests a department saw over the period. */
+function activity(line: ServiceLine, m: MonthReport): number {
+  const s = m.stats;
+  switch (line) {
+    case "ae":
+      return s.departures;
+    case "wards":
+      return s.wardDischarges;
+    case "theatres":
+      return s.electiveOps + s.emergencyOps;
+    case "outpatients":
+      return s.firstAppointments + s.followUps;
+    case "diagnostics":
+      return s.xrays + s.ctScans + s.bloodResults;
+    case "support":
+      return 0;
+  }
+}
+
+function departmentRow(line: ServiceLine, m: MonthReport): DepartmentRow {
+  const l = m.services[line];
+  const pay = l.salaries + l.bank + l.agency;
+  const direct = costs(l);
+  const d = DEPARTMENTS[line];
+  const count = activity(line, m);
+  return {
+    line,
+    name: d.name,
+    title: d.title,
+    ledger: l,
+    income: income(l),
+    pay,
+    other: direct - pay,
+    net: income(l) - direct,
+    activity: d.unit && count > 0 ? { count, unit: d.unit, costEach: direct / count } : null,
+  };
+}
+
+function departmentPeriod(
+  id: DepartmentPeriod["id"],
+  name: string,
+  m: MonthReport,
+): DepartmentPeriod {
+  const rows = SERVICE_LINES.map((line) => departmentRow(line, m)).filter(
+    (r) => r.income !== 0 || r.pay + r.other !== 0,
+  );
+  const shared = (r: DepartmentRow) => r.line === "diagnostics" || r.line === "support";
+  const surplus = income(m.ledger) - costs(m.ledger);
+  const attributed = rows.reduce((n, r) => n + r.net, 0);
+  return {
+    id,
+    name,
+    days: m.days,
+    patientFacing: rows.filter((r) => !shared(r)),
+    shared: rows.filter(shared),
+    unattributed: Math.abs(surplus - attributed) < 1 ? 0 : surplus - attributed,
+    surplus,
+  };
+}
+
+function departments(state: SimState): DepartmentPeriod[] {
+  const periods = [departmentPeriod("month", `${nameOf(state.month)} so far`, state.month)];
+  const last = state.months[state.months.length - 1];
+  if (last) periods.push(departmentPeriod("last", nameOf(last), last));
+  if (
+    state.months.some(
+      (m) => Math.floor(m.monthIndex / 12) === Math.floor(state.month.monthIndex / 12),
+    )
+  ) {
+    periods.push(departmentPeriod("year", yearName(state.month.monthIndex), yearToDate(state)));
+  }
+  return periods;
 }

@@ -2,7 +2,8 @@
  * The Hospital dialog (GAME_DESIGN §8.3, §8.4): how the hospital runs.
  * Departments sets each department's status, a crisis lever with a daily
  * cost in income and reputation; Escalation opens escalation beds under
- * pressure; Policies holds hospital-wide choices.
+ * pressure; Policies holds hospital-wide choices; Performance is the
+ * monthly integrated performance report, KPIs against national standards.
  */
 import type { Game } from "@game/game";
 import type { HospitalData } from "@game/describeHospital";
@@ -14,6 +15,7 @@ const TABS: { id: HospitalTab; label: string }[] = [
   { id: "departments", label: "Departments" },
   { id: "escalation", label: "Escalation" },
   { id: "policies", label: "Policies" },
+  { id: "performance", label: "Performance" },
 ];
 
 export function HospitalDialog({ game }: { game: Game }) {
@@ -48,6 +50,7 @@ export function HospitalDialog({ game }: { game: Game }) {
         {tab === "departments" && <Departments game={game} data={data} />}
         {tab === "escalation" && <Escalation game={game} data={data} />}
         {tab === "policies" && <Policies game={game} data={data} />}
+        {tab === "performance" && <Performance data={data.performance} />}
       </div>
     </section>
   );
@@ -288,5 +291,66 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void
         </button>
       ))}
     </div>
+  );
+}
+
+const RAG_WORDS = { ok: "Meeting the standard", warn: "Short of it", bad: "Well short of it" };
+
+/**
+ * The integrated performance report: each KPI this month so far and the
+ * months before, rated against its standard.
+ */
+function Performance({ data }: { data: HospitalData["performance"] }) {
+  const sections = [...new Set(data.rows.map((r) => r.section))];
+  return (
+    <>
+      <p class="dim small-note">
+        What a trust board sees each month: each measure against its national standard (or the usual
+        benchmark), green when it's met, amber when it's short and red when it's well short. This
+        month counts the days filed so far, at midnight each day.
+      </p>
+      <table class="report-table kpi-table">
+        <thead>
+          <tr>
+            <th />
+            <th class="num">Standard</th>
+            {data.months.map((m, i) => (
+              <th key={i} class="num">
+                {m.name}
+                <span class="dim sub">
+                  {i === 0 ? "so far, " : ""}
+                  {m.days} {m.days === 1 ? "day" : "days"}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        {sections.map((section) => (
+          <tbody key={section}>
+            <tr class="kpi-section">
+              <td colSpan={2 + data.months.length}>{section}</td>
+            </tr>
+            {data.rows
+              .filter((r) => r.section === section)
+              .map((r) => (
+                <tr key={r.id}>
+                  <td title={r.title}>{r.label}</td>
+                  <td class="num dim">{r.standard}</td>
+                  {r.cells.map((c, i) => (
+                    <td
+                      key={i}
+                      class={`num kpi-cell ${c.rag}`}
+                      title={c.rag === "none" ? undefined : RAG_WORDS[c.rag]}
+                    >
+                      {c.rag !== "none" && <span class={`rag-dot ${c.rag}`} aria-hidden="true" />}
+                      {c.text}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+          </tbody>
+        ))}
+      </table>
+    </>
   );
 }

@@ -55,8 +55,8 @@ const CENTRED_LABELS: Record<Centred, string> = {
 const CENTRED_HINTS: Record<Centred, string> = {
   staff: "Staff: who's working, hiring and the rota",
   patients: "Every patient's status",
-  hospital: "Hospital: department status, escalation and policies",
-  finance: "Finance: loans, your rating, and grants",
+  hospital: "Hospital: department status, escalation, policies and performance (KPIs)",
+  finance: "Finance: monthly statements, departments' income and costs, loans and grants",
 };
 const SIDE_HINTS: Record<SidePanel, string> = {
   reports: "Today's money and A&E performance",

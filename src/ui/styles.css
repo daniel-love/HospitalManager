@@ -2351,3 +2351,128 @@ body.planning #game::after {
 .dept-card .chips {
   align-self: flex-start;
 }
+
+/* ---------- Hospital → Performance ---------- */
+
+.kpi-table th .sub {
+  display: block;
+  font-weight: 400;
+}
+.kpi-table td:first-child {
+  padding-right: 8px;
+}
+.kpi-table td.num,
+.kpi-table th.num {
+  padding-left: 10px;
+  white-space: nowrap;
+}
+.kpi-table tr.kpi-section td {
+  padding-top: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.report-table .kpi-cell.ok {
+  color: var(--text);
+}
+.report-table .kpi-cell.warn {
+  color: #f2c94c;
+}
+.rag-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: 0;
+}
+.rag-dot.ok {
+  background: var(--ok);
+}
+.rag-dot.warn {
+  background: #f2c94c;
+}
+.rag-dot.bad {
+  background: var(--bad);
+}
+
+/* ---------- Finance → Statement and Departments ---------- */
+
+.report-table tr.subtotal td {
+  font-weight: 600;
+}
+.statement-scroll {
+  overflow-x: auto;
+}
+.statement-scroll .statement th.num,
+.statement-scroll .statement td.num {
+  padding-left: 14px;
+  white-space: nowrap;
+}
+.statement-scroll .statement th .sub {
+  display: block;
+  font-weight: 400;
+}
+.dept-table {
+  margin-top: 10px;
+}
+.dept-table th.num,
+.dept-table td.num {
+  padding-left: 12px;
+  white-space: nowrap;
+}
+.dept-row {
+  cursor: pointer;
+}
+.dept-row:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+.dept-toggle {
+  display: inline-block;
+  width: 14px;
+  color: var(--text-dim);
+}
+.dept-bar-cell {
+  width: 18%;
+  position: relative;
+}
+.dept-bar {
+  position: absolute;
+  top: 50%;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 2px;
+}
+.dept-bar.pos {
+  left: 50%;
+  background: var(--ok);
+}
+.dept-bar.neg {
+  right: 50%;
+  background: var(--bad);
+}
+.dept-bar-cell::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 50%;
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+}
+.dept-detail-row td {
+  padding: 0 0 6px 14px;
+}
+.dept-detail {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.dept-detail li {
+  display: flex;
+  justify-content: space-between;
+  max-width: 360px;
+  padding: 1px 0;
+}
