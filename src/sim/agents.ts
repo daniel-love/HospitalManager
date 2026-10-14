@@ -77,8 +77,28 @@ export type PatientStage =
   | "in_recovery"
   /** A day case back in the Day Surgery Unit, getting ready to go home. */
   | "post_op"
+  /** Discharged, waiting in the discharge lounge for medicines and transport. */
+  | "discharge_lounge"
   /** Heading out of the building. */
   | "leaving";
+
+/**
+ * An inpatient's way home (systems/discharge.ts). Some need social care to
+ * go home (decided on admission, found out when it's planned): a discharge
+ * coordinator asks for it as soon as they're admitted, a nurse only once
+ * they're fit. The rest go once their medicines and transport are ready.
+ */
+export interface DischargePlan {
+  needsCare: boolean;
+  /** Hours social care takes to arrange it, once asked (before any crisis). */
+  careHours: number;
+  /** When care was asked for, and when it's in place; null until then. */
+  planned: number | null;
+  careReady: number | null;
+  /** When the doctor said they're fit to go, and when they can leave. */
+  fit: number | null;
+  goAt: number | null;
+}
 
 /**
  * transferred: to intensive care. transferred_out: to another hospital,
@@ -209,6 +229,8 @@ export interface Patient extends AgentBase {
   specialty: SpecialtyId | null;
   /** Inpatients: the tick they'll be well enough for the discharge review. */
   stayUntil: number | null;
+  /** Inpatients: getting them home (systems/discharge.ts). Null for everyone else. */
+  discharge: DischargePlan | null;
   /** Admitted for end-of-life care: they'll die (expectedly) on the ward. */
   endOfLife: boolean;
   /** Tick their bay's curtain stays drawn until, after care there; null if not drawn. */
@@ -358,6 +380,8 @@ export type JobKind =
   | "pre_op_check"
   /** A nurse looks after a patient coming round in Recovery. */
   | "recovery"
+  /** A discharge coordinator (or a nurse) arranges social care for an inpatient. */
+  | "discharge_planning"
   /** A porter releases the deceased to the funeral director at the mortuary. */
   | "release_body"
   /** Wheeling shared kit (a 12-lead ECG, say) back to where it's kept. */
@@ -619,6 +643,8 @@ export interface FlowStats {
   resignations: number;
   /** Patients on escalation trolleys at midnight (corridor care). */
   corridorNights: number;
+  /** Hours of ward beds held by patients fit to go but waiting for social care (sampled hourly). */
+  delayedBedHours: number;
 }
 
 /**
@@ -929,6 +955,7 @@ export function emptyStats(): FlowStats {
     unfilledShifts: 0,
     resignations: 0,
     corridorNights: 0,
+    delayedBedHours: 0,
   };
 }
 

@@ -63,6 +63,7 @@ const ROLE_NEEDS: Partial<Record<StaffRoleId, string[]>> = {
     "An Operating Theatre and Recovery; they wait in Recovery between operations",
     "Two of them free for every operation",
   ],
+  discharge_coordinator: ["A Ward to work on: they wait there between patients"],
   cleaner: [
     "A Domestic Services Room to wait in between jobs; they find dirty beds, trolleys and toilets themselves",
   ],
@@ -91,6 +92,10 @@ const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
     "Goes with monitored trolley patients to X-ray and CT, and stays for the scan",
     "Admits planned surgery patients in the Day Surgery Unit",
     "Looks after patients coming round in Recovery",
+    "Asks social care for a care package for a patient fit to go, if there's no discharge coordinator",
+  ],
+  discharge_coordinator: [
+    "Asks social care for a care package or care home place for each newly admitted patient who'll need one",
   ],
   junior_doctor: [
     "Leads resuscitation at a cardiac arrest",

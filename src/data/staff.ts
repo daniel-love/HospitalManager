@@ -247,6 +247,15 @@ export const staffRoles: StaffRoleInput[] = [
       "Band 5/6 scrub nurse or operating department practitioner (ODP). Every operation needs two: one scrubbed to pass instruments to the surgeon, one assisting the anaesthetist. They also wheel patients from theatre to Recovery. Without two free, a theatre list can't start.",
   },
   {
+    id: "discharge_coordinator",
+    name: "Discharge Coordinator",
+    short: "Discharge coordinators",
+    group: "nursing",
+    annualCost: 49_500,
+    description:
+      "Band 6, working weekdays 08:00 to 18:00. Sees each newly admitted patient who'll need social care to go home (a package of care, a care home place) and asks for it straight away, so the wait runs alongside their treatment. Without one, a ward nurse asks only once the patient is fit to go, and the whole wait comes after, holding a ward bed.",
+  },
+  {
     id: "porter",
     name: "Porter",
     short: "Porters",

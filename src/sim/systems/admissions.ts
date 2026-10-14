@@ -39,6 +39,7 @@ import { cantOperate } from "./theatres";
 import { cantAdmit, decideToTransfer } from "./transfers";
 import { freeEscalationBeds } from "./escalation";
 import { majorIncidentDeclared } from "./majorIncident";
+import { fitForDischarge, planDischarge } from "./discharge";
 
 const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
 
@@ -375,6 +376,8 @@ function arriveOnWard(state: SimState, p: Patient): void {
   }
   const [lo, hi] = condition.admission?.stayHours ?? [24, 48];
   p.stayUntil = state.tick + Math.round((lo + (hi - lo) * nextFloat(state.rng)) * TICKS_PER_HOUR);
+  // Back from theatre to the same stay: their discharge plan carries on.
+  if (!p.discharge) planDischarge(state, p);
   // A planned operation's inpatient never came through A&E: no A&E figures,
   // and the inpatient tariff is paid on discharge. Nor does someone coming
   // back from an emergency operation they went to from the ward.
@@ -416,6 +419,7 @@ export function updateWards(state: SimState): void {
   const incident = majorIncidentDeclared(state);
   for (const p of Object.values(state.patients)) {
     if (p.stage !== "on_ward" || p.stayUntil === null) continue;
+    if (p.discharge?.fit != null) continue; // Reviewed: on their way home.
     // A declared major incident: everyone due home within a day is reviewed now.
     const early =
       (morning && p.stayUntil <= endOfDay) ||
@@ -461,6 +465,6 @@ function rushedRound(state: SimState): void {
 
 /** Reviewed and well: home, with the inpatient tariff earned. Their bed needs making up. */
 export function dischargeFromWard(state: SimState, p: Patient, bed: PlacedObject): void {
-  leave(state, p, "discharged");
-  dirtyCouch(state, bed.id);
+  // Fit to go: medicines, transport and (for some) social care first (systems/discharge.ts).
+  fitForDischarge(state, p, bed.id);
 }

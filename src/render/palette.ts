@@ -64,6 +64,8 @@ export const ROLE_COLOURS: Record<StaffRoleId, number> = {
   cleaner: 0x3f9a6a,
   // Theatre scrubs: green-teal.
   theatre_practitioner: 0x2e8b7a,
+  // Discharge coordinators: a lighter nursing blue.
+  discharge_coordinator: 0x5b8fd6,
 };
 
 /** Patients wear white until triaged, then show their triage colour as a ring. */

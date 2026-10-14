@@ -15,7 +15,8 @@ export type PressureEventId =
   | "strike_consultants"
   | "strike_nurses"
   | "strike_diagnostics"
-  | "strike_facilities";
+  | "strike_facilities"
+  | "social_care_crisis";
 
 /**
  * Industrial action (systems/strikes.ts). A walkout: the roles don't come
@@ -68,6 +69,8 @@ export interface PressureEventDef {
   sickness: number;
   /** Heat: patients and staff in rooms without cooling suffer (see HEAT). */
   heat: boolean;
+  /** Social care takes this many times as long to arrange (data/discharge.ts). */
+  careDelay?: number;
   /** Industrial action: who strikes, and how. */
   strike?: StrikeDef;
   /** The hour it starts on its first day (default 08:00; strikes start at 07:00). */
@@ -156,6 +159,33 @@ export const PRESSURE_EVENTS: PressureEventDef[] = [
     heat: false,
   },
 ];
+
+PRESSURE_EVENTS.push({
+  id: "social_care_crisis",
+  name: "Social care crisis",
+  short: "Social care crisis",
+  description:
+    "Care homes have closed to admissions and home care agencies are short of carers. Patients who need care to go home wait much longer for it, holding ward beds, and A&E backs up behind them.",
+  levers: [
+    "Discharge Coordinators ask for care from the day a patient is admitted, so less of the wait comes after they're fit (Staff → Hire)",
+    "A Discharge Lounge frees beds hours earlier for everyone else going home",
+    "Open escalation beds for the patients stuck in A&E (Hospital → Escalation)",
+    "Discharge before noon (Hospital → Policies)",
+  ],
+  // Over Christmas and New Year most winters, and now and then at other times.
+  months: [8, 9],
+  perSeason: 1,
+  maxPerSeason: 1,
+  gapDays: 60,
+  leadDays: 3,
+  days: [21, 42],
+  shape: "flat",
+  arrivals: { walk_in: 1, ambulance: 1 },
+  conditions: {},
+  sickness: 1,
+  heat: false,
+  careDelay: 2.5,
+});
 
 /** Industrial action: any time of year, with the two weeks' notice the law requires. */
 function strike(

@@ -118,6 +118,8 @@ export function updatePatients(state: SimState): void {
       case "transferring":
       case "on_ward":
         break; // On a bed; porters move them (systems/admissions.ts).
+      case "discharge_lounge":
+        break; // See systems/discharge.ts.
       case "deceased":
       case "to_mortuary":
       case "in_mortuary":

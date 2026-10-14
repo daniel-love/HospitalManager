@@ -3,6 +3,7 @@
  * of staff is doing, the staff roster, and the daily report. Pure functions
  * of SimState, so they're easy to test.
  */
+import { delayedDischarge } from "@sim/systems/discharge";
 import {
   conditionById,
   equipmentById,
@@ -114,6 +115,7 @@ const STAGE_LABELS: Record<PatientStage, string> = {
   in_theatre: "In theatre: being operated on",
   in_recovery: "In Recovery",
   post_op: "Back in the Day Surgery Unit after an operation",
+  discharge_lounge: "In the discharge lounge, waiting to go home",
   leaving: "Leaving",
 };
 
@@ -753,6 +755,9 @@ export function staffState(state: SimState, s: Staff): StaffState {
     case "ward_discharge":
       what = `Discharge review on the ward: ${who}`;
       break;
+    case "discharge_planning":
+      what = `Arranging social care for ${who} to go home`;
+      break;
     case "verify_death":
       what = `Verifying the death of ${who}`;
       break;
@@ -1178,6 +1183,7 @@ const STAGE_GROUPS: Record<PatientStage, PatientRow["group"]> = {
   in_theatre: "treatment",
   in_recovery: "treatment",
   post_op: "treatment",
+  discharge_lounge: "leaving",
   leaving: "leaving",
 };
 
@@ -1212,12 +1218,26 @@ function patientAlerts(state: SimState, p: Patient): string[] {
     const over = minsSince(state, last) - every;
     if (over > OBS_LATE_MINS) alerts.push(`Observations overdue by ${formatWait(over)}`);
   }
-  if (p.stage === "on_ward" && p.stayUntil !== null && !p.endOfLife) {
+  const plan = p.discharge;
+  if (p.stage === "on_ward" && plan?.fit != null) {
+    if (delayedDischarge(state, p)) {
+      alerts.push(
+        plan.careReady === null
+          ? `Fit to go, but waiting for social care: ${plan.planned === null ? "nobody has asked for it yet" : "being arranged"} (a delayed discharge)`
+          : `Fit to go, waiting for social care: about ${formatLongWait(Math.ceil((plan.careReady - state.tick) / TICKS_PER_MINUTE))} more (a delayed discharge)`,
+      );
+    }
+  } else if (p.stage === "on_ward" && p.stayUntil !== null && !p.endOfLife) {
     const over = minsSince(state, p.stayUntil);
     if (over > DISCHARGE_DELAY_MINS)
       alerts.push(`Fit to go home: discharge review overdue by ${formatWait(over)}`);
   }
   return alerts;
+}
+
+/** A wait in hours and minutes, or in days once it's over two. */
+function formatLongWait(mins: number): string {
+  return mins >= 48 * 60 ? `${Math.round(mins / (24 * 60))} days` : formatWait(mins);
 }
 
 /** One row per patient still in A&E, most urgent first. */
@@ -1238,10 +1258,14 @@ export function describePatientTable(state: SimState): PatientTable {
     const homeIn =
       p.stayUntil === null ? 0 : Math.ceil((p.stayUntil - state.tick) / TICKS_PER_MINUTE);
     const target = onWard
-      ? {
-          text: homeIn > 0 ? `Home in about ${formatWait(homeIn)}` : "Ready to go home",
-          overdue: false,
-        }
+      ? p.discharge?.fit != null
+        ? delayedDischarge(state, p)
+          ? { text: "Fit to go: waiting for social care", overdue: true }
+          : { text: "Going home: medicines and transport", overdue: false }
+        : {
+            text: homeIn > 0 ? `Home in about ${formatWait(homeIn)}` : "Ready to go home",
+            overdue: false,
+          }
       : p.stage === "awaiting_bed" && p.times.decided !== null
         ? {
             text: `Waiting ${formatWait(minsSince(state, p.times.decided))} for a ward bed`,

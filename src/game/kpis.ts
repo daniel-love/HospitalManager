@@ -183,6 +183,17 @@ export const KPIS: Kpi[] = [
     rate: unrated,
   },
   {
+    id: "delayed_discharges",
+    section: "Inpatients",
+    label: "Beds held by delayed discharges",
+    standard: "Under 5%",
+    title:
+      "Ward bed time taken by patients fit to go home but waiting for social care. Across England it's around one bed in eight",
+    value: (m) => share(m.stats.delayedBedHours, m.stats.bedHours),
+    format: pct,
+    rate: atMost(0.05, 0.12),
+  },
+  {
     id: "outliers",
     section: "Inpatients",
     label: "Outliers",

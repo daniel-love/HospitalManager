@@ -146,7 +146,13 @@ function aeOnly(catchment: number): SimState {
   staff(state, AE_COVER);
   consultant(state, "cardiology", 0, 0, true);
   consultant(state, "general_surgery", 0, 0, true);
+  coordinator(state);
   return state;
+}
+
+/** A discharge coordinator (weekdays), so social care is asked for on admission. */
+function coordinator(state: SimState): void {
+  applyStaffCommand(state, { type: "hire_staff", role: "discharge_coordinator" });
 }
 
 function hospital(catchment: number): SimState {
@@ -158,6 +164,7 @@ function hospital(catchment: number): SimState {
   consultant(state, "anaesthetics", 0, 3);
   consultant(state, "general_surgery", 0, 0, true);
   consultant(state, "general_medicine", 0, 0, true);
+  coordinator(state);
   return state;
 }
 

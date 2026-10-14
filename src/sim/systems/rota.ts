@@ -63,6 +63,7 @@ function clash(a: number, b: number): boolean {
 /** Doctors who work weekdays: consultants, and registrars with clinics or theatre lists. */
 export function worksWeekdays(s: Staff): boolean {
   if (s.role === "consultant") return s.contract !== "privileges";
+  if (s.role === "discharge_coordinator") return true;
   return (
     s.role === "registrar" &&
     ((runsClinics(s) && s.clinicSessions > 0) || (operates(s) && s.theatreSessions > 0))

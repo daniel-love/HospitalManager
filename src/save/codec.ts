@@ -155,6 +155,7 @@ const patientSchema = z.object({
     "in_theatre",
     "in_recovery",
     "post_op",
+    "discharge_lounge",
     "leaving",
   ]),
   step: int.min(0),
@@ -183,6 +184,16 @@ const patientSchema = z.object({
   consultants: z.array(int.positive()),
   specialty: z.enum(specialtyIds).nullable(),
   stayUntil: nullableInt,
+  discharge: z
+    .object({
+      needsCare: z.boolean(),
+      careHours: num.min(0),
+      planned: nullableInt,
+      careReady: nullableInt,
+      fit: nullableInt,
+      goAt: nullableInt,
+    })
+    .nullable(),
   endOfLife: z.boolean(),
   curtainUntil: nullableInt,
   transfer: z
@@ -291,6 +302,7 @@ const jobSchema = z.object({
     "release_body",
     "pre_op_check",
     "recovery",
+    "discharge_planning",
     "return_kit",
     "escort",
     "debrief",
@@ -449,6 +461,7 @@ const statsSchema = z.object({
   unfilledShifts: int.min(0),
   resignations: int.min(0),
   corridorNights: int.min(0),
+  delayedBedHours: int.min(0),
 });
 const servicesSchema = z.object(
   Object.fromEntries(SERVICE_LINES.map((l) => [l, ledgerSchema])) as Record<

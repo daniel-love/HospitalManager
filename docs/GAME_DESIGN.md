@@ -439,6 +439,8 @@ Each event has a **trigger** (scheduled, seasonal, random, or conditional), an *
 
 **As built (M6 step 2, part 2):** any staff group can strike, with two weeks' notice: walkouts (doctors, nurses and diagnostics staff with derogations for life-preserving care, porters and cleaners), and consultants' Christmas Day cover. Strikers aren't paid and can't be covered by bank or agency staff; consultants act down to cover resident doctors, at the rate card.
 
+**As built (M6 step 3, part 1):** bed blocking is a constant, as in England: some patients fit to go wait days for social care in a ward bed, more in a social-care crisis. Discharge coordinators plan from admission so the wait overlaps the stay; a discharge lounge frees beds while patients wait for medicines and transport.
+
 **Scenario framework:** a scenario = starting map (blank or pre-built), funding model, budget, an event script and objectives (e.g. "Achieve 90% 4-hour for 4 consecutive weeks" or "Reach a Good rating within 2 years").
 
 ---

@@ -8,6 +8,7 @@
  * Observations and crash calls happen wherever the patient is. A crash call
  * that finds nobody free pulls the nearest qualified person off other work.
  */
+import { dischargePlanned } from "./discharge";
 import { conditionById } from "@data/catalogue";
 import { onDuty, type Job, type Patient, type Point, type Staff } from "../agents";
 import {
@@ -79,6 +80,7 @@ function atPatient(job: Job): boolean {
     job.kind === "recovery" ||
     job.kind === "resus" ||
     job.kind === "arrange_transfer" ||
+    job.kind === "discharge_planning" ||
     (job.kind === "handover" && job.roomType === "")
   );
 }
@@ -400,6 +402,8 @@ function runAtPatient(state: SimState, job: Job, staff: Staff, p: Patient): void
     preOpChecked(p);
   } else if (job.kind === "recovery") {
     recovered(state, p);
+  } else if (job.kind === "discharge_planning") {
+    dischargePlanned(state, p);
   } else if (job.step === 0) {
     // The team leader got there this long after the arrest.
     const startedAfter = (state.tick - job.durationTicks - job.createdTick) / TICKS_PER_MINUTE;

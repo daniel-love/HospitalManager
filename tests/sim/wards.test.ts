@@ -157,13 +157,15 @@ describe("admission", () => {
     const porter = Object.values(state.staff).find((s) => s.role === "porter")!;
     expect(porter.jobId).toBeNull();
 
-    // Well enough: the doctor's discharge review, then home with the inpatient tariff.
+    // Well enough: the doctor's discharge review, medicines and transport, then home
+    // with the inpatient tariff.
     const bed = p.bed!;
     p.stayUntil = state.tick;
-    const before = state.money;
+    p.discharge!.needsCare = false;
+    const before = state.today.ledger.tariff;
     runUntil(state, () => p.stage === "leaving", 8 * HOUR);
     expect(stats.wardDischarges).toBe(1);
-    expect(state.money).toBeGreaterThan(before);
+    expect(state.today.ledger.tariff).toBeGreaterThan(before);
     expect(state.dirt[bed]).toBe(1);
   });
 

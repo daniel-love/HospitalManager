@@ -847,6 +847,29 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v37: discharge plans (bed blocking), the discharge lounge and coordinators.
+  36: (save) => {
+    type Day = { stats: object };
+    const state = save.state as {
+      patients?: object[];
+      today: Day;
+      history: Day[];
+      month: Day;
+      months: Day[];
+    };
+    const stats = <T extends Day>(d: T) => ({ ...d, stats: { delayedBedHours: 0, ...d.stats } });
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients?.map((p) => ({ discharge: null, ...p })),
+        today: stats(state.today),
+        history: state.history.map(stats),
+        month: stats(state.month),
+        months: state.months.map(stats),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

@@ -56,6 +56,7 @@ const FIXED_LINE: Partial<Record<StaffRoleId, ServiceLine>> = {
   radiographer: "diagnostics",
   biomedical_scientist: "diagnostics",
   theatre_practitioner: "theatres",
+  discharge_coordinator: "wards",
 };
 
 /** Where someone's hours go before they've been seen working anywhere. */
@@ -71,6 +72,7 @@ const DEFAULT_LINE: Record<StaffRoleId, ServiceLine> = {
   porter: "support",
   cleaner: "support",
   receptionist: "ae",
+  discharge_coordinator: "wards",
 };
 
 /** A role's default department; a Private Hospital has no A&E, so its doctors are ward doctors. */

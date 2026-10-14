@@ -276,6 +276,7 @@ export function newPatient(
     prevX: at.x,
     prevY: at.y,
     lastVisit: null,
+    discharge: null,
     path: [],
     dest: null,
     pathVersion: state.layoutVersion,

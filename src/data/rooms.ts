@@ -371,6 +371,19 @@ export const rooms: RoomInput[] = [
     description:
       "Patients coming in for a planned operation are admitted here on the day by a nurse, and wait for theatre. Day cases come back here from Recovery to get ready to go home.",
   },
+  {
+    id: "discharge_lounge",
+    code: 26,
+    name: "Discharge Lounge",
+    department: "Inpatient",
+    colour: 0xb7cfe8,
+    minSize: [3, 3],
+    enclosed: false,
+    minSeats: 4,
+    required: [],
+    description:
+      "Ward patients going home wait here for their medicines and transport, from 08:00 to 20:00, freeing their ward bed hours earlier. Patients waiting for social care stay on the ward.",
+  },
 ];
 
 /** Build palette sections for rooms, in display order. */

@@ -79,6 +79,7 @@ src/
       pressure.ts         # pressure events: the calendar, forecasts, intensity and effects (winter, heat)
       majorIncident.ts    # major incidents: casualties, declaring (call-ins, stand-downs), standing down
       strikes.ts          # industrial action: who's out, derogations, acting down, Christmas Day cover
+      discharge.ts        # getting inpatients home: medicines, the lounge, social care and delayed discharges
       reputation.ts       # 0–100 reputation: a running average of each day's patient experience
       loans.ts            # DHSC and bank loans, repayments, oversight segments and credit ratings
       grants.ts           # grant offers, conditions, deadlines and clawback
