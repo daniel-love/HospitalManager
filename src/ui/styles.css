@@ -2308,3 +2308,30 @@ body.planning #game::after {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* ---------- Hospital ---------- */
+.hospital-dialog {
+  height: calc(100% - 140px);
+  width: min(760px, calc(100% - 32px));
+}
+.dept-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.dept-card.restricted {
+  border-color: rgba(242, 201, 76, 0.5);
+  background: rgba(242, 201, 76, 0.06);
+}
+.dept-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}

@@ -111,7 +111,12 @@ export function updateArrivals(state: SimState): void {
     state.rng,
     arrivalRate(state.tick, demand.walkIns) * treatableShare(state, "walk_in"),
   );
-  if (ambulance) ambulanceComes(state);
+  const ae = state.departments.ae;
+  if (ae === "closed") return; // Closed: patients go elsewhere.
+  if (ambulance) {
+    if (ae === "divert") state.today.stats.diverted++;
+    else ambulanceComes(state);
+  }
   if (walkIn) walkInArrives(state);
 }
 

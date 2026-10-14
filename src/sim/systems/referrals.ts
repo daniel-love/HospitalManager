@@ -61,6 +61,7 @@ export function serviceOf(specialty: SpecialtyId): OutpatientService | undefined
  * with sessions of that kind.
  */
 function holdsClinics(state: SimState, specialty: SpecialtyId, isPrivate: boolean): boolean {
+  if (state.departments.outpatients === "closed") return false;
   if (!serviceOf(specialty) || outpatientDesks(state).length === 0) return false;
   const hybrid = state.funding === "hybrid";
   const room = state.rooms.some(
@@ -176,8 +177,12 @@ export function updateReferrals(state: SimState): void {
     if (offersClinic(state, sp.id)) {
       const perMinute = (nhsReferralsPerDay(state, sp.id) * 7) / minutes;
       if (chance(state.rng, perMinute)) {
-        refer(state, sp.id, chance(state.rng, sp.outpatients.urgentShare));
-        added = true;
+        const urgent = chance(state.rng, sp.outpatients.urgentShare);
+        // Taking urgent referrals only: GPs send routine ones elsewhere.
+        if (urgent || state.departments.outpatients === "open") {
+          refer(state, sp.id, urgent);
+          added = true;
+        }
       }
     }
     if (!offersPrivateClinic(state, sp.id)) continue;
@@ -185,8 +190,11 @@ export function updateReferrals(state: SimState): void {
     const r = (nextFloat(state.rng) * minutes) / 7;
     const payer = r < p.insured ? "insured" : r < p.insured + p.selfPay ? "self_pay" : null;
     if (payer) {
-      refer(state, sp.id, chance(state.rng, sp.outpatients.urgentShare), payer);
-      added = true;
+      const urgent = chance(state.rng, sp.outpatients.urgentShare);
+      if (urgent || state.departments.outpatients === "open") {
+        refer(state, sp.id, urgent, payer);
+        added = true;
+      }
     }
   }
   if (added) bookAppointments(state);

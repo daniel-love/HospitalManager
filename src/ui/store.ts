@@ -7,6 +7,7 @@
 import { signal } from "@preact/signals";
 import type { AdviceData } from "@game/advice";
 import type { FinanceData } from "@game/describeFinance";
+import type { HospitalData } from "@game/describeHospital";
 import type { Speed } from "@game/loop";
 import type { Tool } from "@game/tools";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
@@ -380,6 +381,11 @@ export const patientsOpen = signal(false);
 /** The Staff screen and its tab: who's working, hiring, and the rota. */
 export type StaffTab = "team" | "hire" | "rota";
 export const staffScreen = signal<StaffTab | null>(null);
+/** The Hospital dialog and its tab, and what it shows. */
+export type HospitalTab = "departments" | "escalation" | "policies";
+export const hospitalTab = signal<HospitalTab | null>(null);
+export const hospitalData = signal<HospitalData | null>(null);
+
 /** The Finance dialog and its tab, and what it shows. */
 export type FinanceTab = "loans" | "grants";
 export const financeTab = signal<FinanceTab | null>(null);

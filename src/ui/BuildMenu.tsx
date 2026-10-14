@@ -14,6 +14,7 @@ import {
   buildTab,
   coverageOverlay,
   financeTab,
+  hospitalTab,
   paletteHelp,
   patientsOpen,
   planning,
@@ -34,16 +35,29 @@ const TABS: { id: BuildTab; label: string }[] = [
  * Management buttons: the Staff screen and Patients dialog (centred), or a
  * side panel on the left.
  */
-type PanelButton =
-  { kind: "staff" } | { kind: "patients" } | { kind: "finance" } | { kind: "side"; id: SidePanel };
+type Centred = "staff" | "patients" | "hospital" | "finance";
+type PanelButton = { kind: Centred } | { kind: "side"; id: SidePanel };
 const PANELS: PanelButton[] = [
   { kind: "staff" },
   { kind: "patients" },
+  { kind: "hospital" },
   { kind: "finance" },
   { kind: "side", id: "reports" },
   { kind: "side", id: "help" },
 ];
 const SIDE_LABELS: Record<SidePanel, string> = { reports: "Reports", help: "Help" };
+const CENTRED_LABELS: Record<Centred, string> = {
+  staff: "Staff",
+  patients: "Patients",
+  hospital: "Hospital",
+  finance: "Finance",
+};
+const CENTRED_HINTS: Record<Centred, string> = {
+  staff: "Staff: who's working, hiring and the rota",
+  patients: "Every patient's status",
+  hospital: "Hospital: department status, escalation and policies",
+  finance: "Finance: loans, your rating, and grants",
+};
 const SIDE_HINTS: Record<SidePanel, string> = {
   reports: "Today's money and A&E performance",
   help: "Help (H): what to build and who to hire next, and how everything works",
@@ -67,6 +81,7 @@ export function BuildBar({
   onStaff,
   onPatients,
   onFinance,
+  onHospital,
 }: {
   onTogglePlan: () => void;
   onToggleCoverage: () => void;
@@ -75,6 +90,7 @@ export function BuildBar({
   /** Opens the Staff screen (at its Team tab). */
   onStaff: () => void;
   onFinance: () => void;
+  onHospital: () => void;
   onPatients: () => void;
 }) {
   const open = buildTab.value;
@@ -117,25 +133,16 @@ export function BuildBar({
       <span class="buildbar-divider" aria-hidden="true" />
       {PANELS.map((p) => {
         const active =
-          p.kind === "staff"
-            ? staffScreen.value !== null
-            : p.kind === "patients"
-              ? patientsOpen.value
-              : p.kind === "finance"
-                ? financeTab.value !== null
-                : sidePanel.value === p.id;
-        const label =
           p.kind === "side"
-            ? SIDE_LABELS[p.id]
-            : { staff: "Staff", patients: "Patients", finance: "Finance" }[p.kind];
-        const hint =
-          p.kind === "side"
-            ? SIDE_HINTS[p.id]
+            ? sidePanel.value === p.id
             : {
-                staff: "Staff: who's working, hiring and the rota",
-                patients: "Every patient's status",
-                finance: "Finance: loans, your rating, and grants",
+                staff: staffScreen.value !== null,
+                patients: patientsOpen.value,
+                hospital: hospitalTab.value !== null,
+                finance: financeTab.value !== null,
               }[p.kind];
+        const label = p.kind === "side" ? SIDE_LABELS[p.id] : CENTRED_LABELS[p.kind];
+        const hint = p.kind === "side" ? SIDE_HINTS[p.id] : CENTRED_HINTS[p.kind];
         return (
           <button
             key={p.kind === "side" ? p.id : p.kind}
@@ -152,7 +159,10 @@ export function BuildBar({
               } else if (p.kind === "finance") {
                 if (active) financeTab.value = null;
                 else onFinance();
-              } else {
+              } else if (p.kind === "hospital") {
+                if (active) hospitalTab.value = null;
+                else onHospital();
+              } else if (p.kind === "side") {
                 sidePanel.value = active ? null : p.id;
                 buildTab.value = null;
                 tool.value = null;

@@ -96,7 +96,7 @@ export interface Session {
  */
 export function sessionsOn(state: SimState, day: number, half: SessionHalf): Session[] {
   const weekday = (day - 1) % 7;
-  if (weekday > 4) return [];
+  if (weekday > 4 || state.departments.outpatients === "closed") return [];
   // Cached until the layout or anyone's job plan changes.
   let plans = "";
   for (const s of Object.values(state.staff)) {

@@ -68,10 +68,12 @@ function wardBeds(state: SimState): number {
  * beds can take them at the average length of stay.
  */
 export function emergencyValuePerDay(state: SimState): number {
+  // A closed A&E provides none; on divert, none for ambulances.
+  if (state.departments.ae === "closed") return 0;
   const demand = dailyDemand(state);
   const treatable = treatableConditions(state);
   const ward = state.rooms.some((r) => r.valid && r.typeId === "ward");
-  const ambulances = parkingSpaces(state).length > 0;
+  const ambulances = parkingSpaces(state).length > 0 && state.departments.ae !== "divert";
   // Patients a day with each condition.
   const perDay = new Map<ConditionDef, number>();
   for (const ch of ["walk_in", "ambulance"] as const) {

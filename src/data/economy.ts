@@ -101,6 +101,17 @@ export const REPUTATION = {
   smoothingDays: 30,
   /** Private demand is this reputation's worth at ×1, in proportion. */
   neutral: 60,
+  /**
+   * Points off each day's score while a department isn't fully open: GPs,
+   * ambulance services and patients notice, and so does the press. A&E's
+   * are steep: diverting does relieve a swamped department, and the 4-hour
+   * figures with it, but it shouldn't pay.
+   */
+  status: {
+    ae: { divert: 25, closed: 40 },
+    outpatients: { urgent: 5, closed: 15 },
+    theatres: { emergency: 5, closed: 15 },
+  },
   /** Penalties on a day's score. */
   unexpectedDeath: 8,
   incident: 3,

@@ -36,7 +36,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 31;
+export const SIM_STATE_VERSION = 32;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -146,6 +146,8 @@ export interface SimState {
   emergencyTheatres: Record<string, true>;
   /** Hybrid trusts: rooms in the Private Patient Unit, pinned to a tile like roomSpecialties. */
   privateRooms: Record<string, true>;
+  /** Each department's status (GAME_DESIGN §8.3): open, or less than fully open. */
+  departments: Departments;
   /** How the hospital is funded (GAME_DESIGN §2.2), chosen when the game starts. */
   funding: Funding;
   /** 0–100: what patients and GPs think of the hospital (systems/reputation.ts). */
@@ -222,6 +224,19 @@ export interface Policies {
   priceLevel: number;
   /** Private Hospitals: specialties taking NHS-funded referrals (patient choice), at tariff. */
   nhsReferrals: Partial<Record<SpecialtyId, true>>;
+}
+
+/**
+ * Department statuses (GAME_DESIGN §8.3), a crisis lever. A&E on divert
+ * takes no ambulances (walk-ins still come); closed, it takes nobody.
+ * Outpatients taking urgent referrals only turns routine GP referrals away;
+ * closed, its clinics don't run. Theatres for emergencies only stand their
+ * planned lists down; closed, they don't operate at all.
+ */
+export interface Departments {
+  ae: "open" | "divert" | "closed";
+  outpatients: "open" | "urgent" | "closed";
+  theatres: "open" | "emergency" | "closed";
 }
 
 /**
@@ -313,6 +328,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     roomSpecialties: {},
     emergencyTheatres: {},
     privateRooms: {},
+    departments: { ae: "open", outpatients: "open", theatres: "open" },
     funding: opts.funding ?? "nhs",
     reputation: REPUTATION.start,
     cover: {},

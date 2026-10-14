@@ -202,7 +202,8 @@ function weekLists(state: SimState, weekStart: number): TheatreList[] {
 /** The theatre lists on a day's morning or afternoon (none at weekends). */
 export function listsOn(state: SimState, day: number, half: SessionHalf): TheatreList[] {
   const weekday = (day - 1) % 7;
-  if (weekday > 4) return [];
+  // For emergencies only, or closed: planned lists stand down.
+  if (weekday > 4 || state.departments.theatres !== "open") return [];
   return weekLists(state, day - weekday).filter((l) => l.day === day && l.half === half);
 }
 
@@ -729,6 +730,7 @@ export function emergencyOpOf(p: Patient) {
  * anaesthetist, two theatre practitioners and Recovery.
  */
 export function cantOperate(state: SimState, specialty: SpecialtyId): string | null {
+  if (state.departments.theatres === "closed") return "Theatres are closed";
   const has = (type: string) => state.rooms.some((r) => r.valid && r.typeId === type);
   const doctor = (sp: SpecialtyId) =>
     Object.values(state.staff).some(

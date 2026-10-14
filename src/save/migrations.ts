@@ -712,6 +712,29 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v32: department statuses; diverted ambulances.
+  31: (save) => {
+    type Day = { stats: object };
+    const state = save.state as {
+      today: Day;
+      history: Day[];
+      month: Day;
+      months: Day[];
+      departments?: object;
+    };
+    const stats = <T extends Day>(d: T) => ({ ...d, stats: { diverted: 0, ...d.stats } });
+    return {
+      ...save,
+      state: {
+        ...state,
+        today: stats(state.today),
+        history: state.history.map(stats),
+        month: stats(state.month),
+        months: state.months.map(stats),
+        departments: state.departments ?? { ae: "open", outpatients: "open", theatres: "open" },
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

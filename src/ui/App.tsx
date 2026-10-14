@@ -12,6 +12,7 @@ import { SaveDialog } from "./SaveDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { AdministrationDialog } from "./AdministrationDialog";
 import { FinanceDialog } from "./FinanceDialog";
+import { HospitalDialog } from "./HospitalDialog";
 import { NewGameDialog } from "./NewGameDialog";
 import { PatientsDialog } from "./PatientsDialog";
 import { StaffScreen } from "./StaffScreen";
@@ -54,11 +55,13 @@ export function App({ game }: { game: Game }) {
         onStaff={() => game.openStaff("team")}
         onPatients={() => game.togglePatients()}
         onFinance={() => game.openFinance("loans")}
+        onHospital={() => game.openHospital("departments")}
       />
       <Notifications game={game} />
       <PatientsDialog game={game} />
       <StaffScreen game={game} />
       <FinanceDialog game={game} />
+      <HospitalDialog game={game} />
       <CoverageLegend />
       <Toasts />
       <DebugOverlay />

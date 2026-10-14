@@ -53,10 +53,27 @@ export function dayScore(state: SimState, s: FlowStats): number | null {
   return Math.max(0, score - penalty);
 }
 
-/** At midnight: the day's score moves reputation along its running average. */
+/** Points off the day's score for departments that aren't fully open. */
+export function statusPenalty(state: SimState): number {
+  const d = state.departments;
+  const p = REPUTATION.status;
+  return (
+    (d.ae === "open" ? 0 : p.ae[d.ae]) +
+    (d.outpatients === "open" ? 0 : p.outpatients[d.outpatients]) +
+    (d.theatres === "open" ? 0 : p.theatres[d.theatres])
+  );
+}
+
+/**
+ * At midnight: the day's score moves reputation along its running average.
+ * Departments not fully open count against it even on a day with nothing
+ * else to judge.
+ */
 export function updateReputation(state: SimState, s: FlowStats): void {
-  const score = dayScore(state, s);
-  if (score === null) return;
+  const penalty = statusPenalty(state);
+  const day = dayScore(state, s);
+  if (day === null && penalty === 0) return;
+  const score = Math.max(0, (day ?? state.reputation) - penalty);
   state.reputation += (score - state.reputation) / REPUTATION.smoothingDays;
   state.reputation = Math.max(0, Math.min(100, state.reputation));
 }

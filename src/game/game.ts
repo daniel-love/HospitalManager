@@ -27,6 +27,8 @@ import { acceptGrant, declineGrant } from "@sim/systems/grants";
 import { borrow, cantBorrow, repayEarly } from "@sim/systems/loans";
 import { setCover } from "@sim/systems/rota";
 import { describeFinance } from "./describeFinance";
+import { describeHospital } from "./describeHospital";
+import { setDepartment, type Department } from "@sim/systems/departments";
 import { applyStaffCommand, type StaffCommand } from "@sim/systems/staffing";
 import {
   clockFromTick,
@@ -61,6 +63,8 @@ import {
   patientTable,
   administrationDismissed,
   financeData,
+  hospitalData,
+  hospitalTab,
   financeTab,
   patientsOpen,
   planning,
@@ -74,6 +78,7 @@ import {
   staffScreen,
   staffTable,
   type FinanceTab,
+  type HospitalTab,
   type StaffTab,
   tool,
   type InspectorData,
@@ -639,29 +644,46 @@ export class Game {
    * sits in the same place), optionally picking out one member of staff.
    */
   openStaff(tab: StaffTab, highlight: number | null = null): void {
+    this.closeCentred();
     staffScreen.value = tab;
     staffHighlight.value = highlight;
-    patientsOpen.value = false;
-    financeTab.value = null;
     this.refreshPanels();
   }
 
   /** Opens or closes the Patients dialog (closing the Staff screen). */
   togglePatients(): void {
-    patientsOpen.value = !patientsOpen.value;
-    if (patientsOpen.value) {
-      staffScreen.value = null;
-      financeTab.value = null;
-    }
+    const open = !patientsOpen.value;
+    this.closeCentred();
+    patientsOpen.value = open;
     this.refreshPanels();
   }
 
   /** Opens the Finance dialog at a tab (closing the others in the same place). */
   openFinance(tab: FinanceTab): void {
+    this.closeCentred();
     financeTab.value = tab;
+    this.refreshPanels();
+  }
+
+  /** Opens the Hospital dialog at a tab (closing the others in the same place). */
+  openHospital(tab: HospitalTab): void {
+    this.closeCentred();
+    hospitalTab.value = tab;
+    this.refreshPanels();
+  }
+
+  /** Closes the dialogs that sit in the middle of the screen. */
+  private closeCentred(): void {
     staffScreen.value = null;
     patientsOpen.value = false;
-    this.refreshPanels();
+    financeTab.value = null;
+    hospitalTab.value = null;
+  }
+
+  /** Sets a department's status (Hospital → Departments). */
+  setDepartment(dept: Department, status: string): void {
+    setDepartment(this.state, dept, status as never);
+    this.afterMoney();
   }
 
   /** Takes out a loan (Finance → Loans). */
@@ -712,6 +734,7 @@ export class Game {
     advice.value = panel === "help" ? describeAdvice(this.state) : null;
     patientTable.value = patientsOpen.value ? describePatientTable(this.state) : null;
     financeData.value = financeTab.value ? describeFinance(this.state) : null;
+    hospitalData.value = hospitalTab.value ? describeHospital(this.state) : null;
   }
 
   /** The patient or member of staff nearest the mouse pointer, if close enough. */
@@ -941,7 +964,8 @@ export class Game {
       this.build.rotate();
     } else if (e.code === "Escape") {
       if (this.build.cancel()) return;
-      if (financeTab.value) financeTab.value = null;
+      if (hospitalTab.value) hospitalTab.value = null;
+      else if (financeTab.value) financeTab.value = null;
       else if (staffScreen.value) staffScreen.value = null;
       else if (patientsOpen.value) patientsOpen.value = false;
       else if (inspector.value) this.select(null);
