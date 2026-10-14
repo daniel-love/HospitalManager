@@ -32,6 +32,7 @@ import {
 } from "./world/objects";
 import { clipRect, contains, outlineTiles, rectTiles, unionRect, type Rect } from "./world/rect";
 import { detectRooms } from "./world/rooms";
+import { capitalCapError } from "./systems/loans";
 
 export type Command =
   /** Lay foundations: grass or paving → floor. */
@@ -92,6 +93,7 @@ export function applyCommand(state: SimState, cmd: Command): CommandResult {
   if (!plan.ok) return plan;
   run(state, cmd, true);
   state.money -= plan.cost;
+  state.month.flows.building += plan.cost;
   state.layoutVersion++;
   detectRooms(state);
   return plan;
@@ -109,6 +111,8 @@ function finish(state: SimState, o: Outcome): CommandResult {
   if (o.error) return { ...base, ok: false, error: o.error };
   if (o.count === 0) return { ...base, ok: false, error: NOTHING_TO_CHANGE };
   if (o.cost > state.money) return { ...base, ok: false, error: "Not enough money" };
+  const capped = capitalCapError(state, o.cost);
+  if (capped) return { ...base, ok: false, error: capped };
   return { ...base, ok: true };
 }
 

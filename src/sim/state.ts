@@ -5,6 +5,7 @@
  * after loading.
  */
 import { REPUTATION, STARTING_CASH } from "@data/economy";
+import { GRANT_OFFERS, OVERSIGHT, START_CREDIT } from "@data/finance";
 import type { SpecialtyId } from "@data/schema";
 import { DEFAULT_CATCHMENT } from "@data/patients";
 import {
@@ -13,13 +14,16 @@ import {
   type Operation,
   type Outpatient,
   type Referral,
+  emptyFlows,
   emptyLedger,
   emptyStats,
   type DayReport,
   type FlowStats,
   type Incident,
   type Job,
+  type Grant,
   type Ledger,
+  type Loan,
   type MonthReport,
   type Patient,
   type SimEvent,
@@ -27,11 +31,12 @@ import {
 } from "./agents";
 import type { PlanEntry } from "./plan";
 import { createRng, type RngState } from "./rng";
+import { TICKS_PER_DAY } from "./time";
 import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 30;
+export const SIM_STATE_VERSION = 31;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -163,6 +168,20 @@ export interface SimState {
    */
   month: MonthReport;
   months: MonthReport[];
+  /** Loans outstanding (systems/loans.ts). */
+  loans: Loan[];
+  nextLoanId: number;
+  /** How lenders and regulators see the hospital's finances (systems/loans.ts). */
+  rating: Rating;
+  /** A grant on offer, those taken on, and those finished (systems/grants.ts). */
+  grants: {
+    offer: Grant | null;
+    active: Grant[];
+    /** When the next offer comes. */
+    nextOffer: number;
+    /** Finished grants, newest last: met (kept) or missed (clawed back). */
+    done: { defId: string; tick: number; met: boolean }[];
+  };
   settings: SimSettings;
   /** Tick each kind of warning was last raised, so they aren't repeated constantly. */
   alerts: Record<string, number>;
@@ -206,6 +225,20 @@ export interface Policies {
 }
 
 /**
+ * An NHS trust's oversight segment (1 best to 4, financial special measures),
+ * and a Private Hospital's credit rating (an index into CREDIT_RATINGS, 0
+ * best) and administration. Each is reviewed monthly.
+ */
+export interface Rating {
+  segment: number;
+  credit: number;
+  /** A Private Hospital in administration: when it went in. Null otherwise. */
+  administration: number | null;
+  /** A Private Hospital with cash below zero: since when. Null otherwise. */
+  overdrawnSince: number | null;
+}
+
+/**
  * NHS Trust: NHS funding only. Private Hospital: private patients (and NHS
  * referrals it chooses to take), consultants with practising privileges, no
  * emergency department. Hybrid: an NHS trust with a Private Patient Unit.
@@ -241,6 +274,7 @@ export function emptyMonth(monthIndex: number, cash: number): MonthReport {
     stats: emptyStats(),
     openingCash: cash,
     closingCash: cash,
+    flows: emptyFlows(),
   };
 }
 
@@ -287,6 +321,20 @@ export function createSimState(opts: NewGameOptions): SimState {
     history: [],
     month: emptyMonth(0, opts.money ?? STARTING_CASH),
     months: [],
+    loans: [],
+    nextLoanId: 1,
+    rating: {
+      segment: OVERSIGHT.start,
+      credit: START_CREDIT,
+      administration: null,
+      overdrawnSince: null,
+    },
+    grants: {
+      offer: null,
+      active: [],
+      nextOffer: GRANT_OFFERS.everyDays[0] * TICKS_PER_DAY,
+      done: [],
+    },
     settings: { catchment: DEFAULT_CATCHMENT, patientVolume: 1, rotas: opts.rotas ?? false },
     alerts: {},
     incidents: [],

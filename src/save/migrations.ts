@@ -675,6 +675,43 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v31: loans, ratings, grants; interest and cash flows in the books.
+  30: (save) => {
+    type Ledgered = { ledger: object };
+    type Month = Ledgered & { flows?: object };
+    const state = save.state as {
+      today: Ledgered;
+      history: Ledgered[];
+      month: Month;
+      months: Month[];
+      loans?: object[];
+      nextLoanId?: number;
+      rating?: object;
+      grants?: object;
+    };
+    const ledger = <T extends Ledgered>(d: T) => ({ ...d, ledger: { interest: 0, ...d.ledger } });
+    const flows = { building: 0, borrowed: 0, repaid: 0, grants: 0, clawedBack: 0 };
+    const month = (m: Month) => ({ ...ledger(m), flows: m.flows ?? flows });
+    return {
+      ...save,
+      state: {
+        ...state,
+        today: ledger(state.today),
+        history: state.history.map(ledger),
+        month: month(state.month),
+        months: state.months.map(month),
+        loans: state.loans ?? [],
+        nextLoanId: state.nextLoanId ?? 1,
+        rating: state.rating ?? {
+          segment: 2,
+          credit: 3,
+          administration: null,
+          overdrawnSince: null,
+        },
+        grants: state.grants ?? { offer: null, active: [], nextOffer: 0, done: [] },
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

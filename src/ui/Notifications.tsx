@@ -20,10 +20,19 @@ export function Notifications({ game }: { game: Game }) {
         {shown.map((n) => (
           <li key={n.id} class={n.severity}>
             <button
-              disabled={!n.at && !n.staff}
-              title={n.staff ? "Open the Staff screen" : n.at ? "Show on the map" : undefined}
+              disabled={!n.at && !n.staff && !n.finance}
+              title={
+                n.staff
+                  ? "Open the Staff screen"
+                  : n.finance
+                    ? "Open Finance"
+                    : n.at
+                      ? "Show on the map"
+                      : undefined
+              }
               onClick={() => {
                 if (n.staff) game.openStaff(n.staff.tab, n.staff.id ?? null);
+                else if (n.finance) game.openFinance(n.finance);
                 else if (n.at) game.focus(n.at);
               }}
             >

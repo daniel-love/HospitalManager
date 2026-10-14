@@ -4,7 +4,15 @@
  * last fortnight, outpatient waiting lists, incidents and the daily reports.
  */
 import { formatMoney } from "@game/tools";
-import { costs, income, net, type DayReport, type FlowStats, type Ledger } from "@sim/agents";
+import {
+  costs,
+  income,
+  net,
+  type CashFlows,
+  type DayReport,
+  type FlowStats,
+  type Ledger,
+} from "@sim/agents";
 import { formatDate } from "@sim/time";
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
@@ -364,6 +372,7 @@ const COST_LINES: { key: keyof Ledger; kind: string; label: string }[] = [
   { key: "upkeep", kind: "upkeep", label: "Equipment upkeep" },
   { key: "supplies", kind: "supplies", label: "Drugs and supplies" },
   { key: "estates", kind: "estates", label: "Estates and utilities" },
+  { key: "interest", kind: "estates", label: "Loan interest" },
   { key: "transfers", kind: "transport", label: "Transfer ambulances" },
 ];
 
@@ -428,6 +437,31 @@ function MoneySection({
     </div>
   );
 }
+
+/** Cash beyond income and running costs, in the statement: building, loans, grants. */
+const FLOW_LINES: { key: keyof CashFlows; label: string; title: string; sign: 1 | -1 }[] = [
+  {
+    key: "building",
+    label: "Building and equipment",
+    title:
+      "Building work and equipment bought, less anything sold: paid from cash, not a running cost",
+    sign: -1,
+  },
+  { key: "borrowed", label: "Borrowed", title: "Loans taken out (Finance)", sign: 1 },
+  {
+    key: "repaid",
+    label: "Loans repaid",
+    title: "Loan principal paid back (the interest is a running cost)",
+    sign: -1,
+  },
+  { key: "grants", label: "Grants", title: "Grants and investment received (Finance)", sign: 1 },
+  {
+    key: "clawedBack",
+    label: "Grants clawed back",
+    title: "Grants returned when their conditions weren't met",
+    sign: -1,
+  },
+];
 
 /**
  * The monthly financial statement: this month so far beside last month, line
@@ -506,18 +540,21 @@ function Statement({ data }: { data: ReportData }) {
             );
           })}
         </tr>
-        <tr>
-          <td title="Building work and equipment bought, less anything sold: paid from cash, not a running cost">
-            Building and equipment
-          </td>
-          {cols.map((c) => (
-            <td key={c.title} class="num">
-              {Math.abs(c.m.capital) < 1
-                ? "—"
-                : `${c.m.capital > 0 ? "−" : ""}${formatMoney(Math.abs(c.m.capital))}`}
-            </td>
-          ))}
-        </tr>
+        {FLOW_LINES.filter(
+          (line) => line.key === "building" || cols.some((c) => Math.abs(c.m.flows[line.key]) >= 1),
+        ).map((line) => (
+          <tr key={line.key}>
+            <td title={line.title}>{line.label}</td>
+            {cols.map((c) => {
+              const v = c.m.flows[line.key] * line.sign;
+              return (
+                <td key={c.title} class="num">
+                  {Math.abs(v) < 1 ? "—" : `${v < 0 ? "−" : ""}${formatMoney(Math.abs(v))}`}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
         <tr>
           <td>Cash at the end</td>
           {cols.map((c) => (

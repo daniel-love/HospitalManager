@@ -23,7 +23,10 @@ import { tick } from "@sim/sim";
 import { createSimState, type Funding, type GapFill, type SimState } from "@sim/state";
 import { siteView } from "@sim/world/site";
 import { coverageView, stationsSeeing, bedCover } from "@sim/systems/monitoring";
+import { acceptGrant, declineGrant } from "@sim/systems/grants";
+import { borrow, cantBorrow, repayEarly } from "@sim/systems/loans";
 import { setCover } from "@sim/systems/rota";
+import { describeFinance } from "./describeFinance";
 import { applyStaffCommand, type StaffCommand } from "@sim/systems/staffing";
 import {
   clockFromTick,
@@ -56,6 +59,9 @@ import {
   mapHelp,
   notifications,
   patientTable,
+  administrationDismissed,
+  financeData,
+  financeTab,
   patientsOpen,
   planning,
   planSummary,
@@ -67,6 +73,7 @@ import {
   staffHighlight,
   staffScreen,
   staffTable,
+  type FinanceTab,
   type StaffTab,
   tool,
   type InspectorData,
@@ -409,6 +416,7 @@ export class Game {
    * their bearings. `name` is what the save was called, if it came from one.
    */
   loadState(state: SimState, name = "My hospital"): void {
+    administrationDismissed.value = false;
     this.state = state;
     this.saveName = name;
     this.savedTick = state.tick;
@@ -612,6 +620,7 @@ export class Game {
       severity: e.severity,
       ...(e.at ? { at: e.at } : {}),
       ...(e.staff ? { staff: e.staff } : {}),
+      ...(e.finance ? { finance: e.finance } : {}),
     }));
     this.state.events = [];
     notifications.value = [...added.reverse(), ...notifications.value].slice(0, MAX_NOTIFICATIONS);
@@ -633,14 +642,64 @@ export class Game {
     staffScreen.value = tab;
     staffHighlight.value = highlight;
     patientsOpen.value = false;
+    financeTab.value = null;
     this.refreshPanels();
   }
 
   /** Opens or closes the Patients dialog (closing the Staff screen). */
   togglePatients(): void {
     patientsOpen.value = !patientsOpen.value;
-    if (patientsOpen.value) staffScreen.value = null;
+    if (patientsOpen.value) {
+      staffScreen.value = null;
+      financeTab.value = null;
+    }
     this.refreshPanels();
+  }
+
+  /** Opens the Finance dialog at a tab (closing the others in the same place). */
+  openFinance(tab: FinanceTab): void {
+    financeTab.value = tab;
+    staffScreen.value = null;
+    patientsOpen.value = false;
+    this.refreshPanels();
+  }
+
+  /** Takes out a loan (Finance → Loans). */
+  borrow(kind: "capital" | "bank", amount: number, years: number): void {
+    const why = cantBorrow(this.state, kind, amount, years);
+    if (why) {
+      showToast(why, "error");
+      return;
+    }
+    borrow(this.state, kind, amount, years);
+    showToast(`Borrowed ${formatMoney(amount)}`);
+    this.afterMoney();
+  }
+
+  /** Pays a loan off early. */
+  repayLoan(id: number): void {
+    const why = repayEarly(this.state, id);
+    if (why) showToast(why, "error");
+    this.afterMoney();
+  }
+
+  /** Takes on the grant on offer. */
+  acceptGrant(): void {
+    const why = acceptGrant(this.state);
+    if (why) showToast(why, "error");
+    this.afterMoney();
+  }
+
+  /** Turns down the grant on offer. */
+  declineGrant(): void {
+    declineGrant(this.state);
+    this.afterMoney();
+  }
+
+  private afterMoney(): void {
+    this.drainEvents();
+    this.refreshPanels();
+    this.publishHud();
   }
 
   /** Refreshes whichever management panel is open. */
@@ -652,6 +711,7 @@ export class Game {
     report.value = panel === "reports" ? describeReport(this.state) : null;
     advice.value = panel === "help" ? describeAdvice(this.state) : null;
     patientTable.value = patientsOpen.value ? describePatientTable(this.state) : null;
+    financeData.value = financeTab.value ? describeFinance(this.state) : null;
   }
 
   /** The patient or member of staff nearest the mouse pointer, if close enough. */
@@ -708,6 +768,7 @@ export class Game {
       money: this.state.money,
       patients: patientsInDept(this.state),
       fourHour: fourHourShare(this.state.today.stats),
+      administration: this.state.rating.administration !== null,
     };
     if (!debugVisible.value) return;
     const { camera } = this.renderer;
@@ -880,7 +941,8 @@ export class Game {
       this.build.rotate();
     } else if (e.code === "Escape") {
       if (this.build.cancel()) return;
-      if (staffScreen.value) staffScreen.value = null;
+      if (financeTab.value) financeTab.value = null;
+      else if (staffScreen.value) staffScreen.value = null;
       else if (patientsOpen.value) patientsOpen.value = false;
       else if (inspector.value) this.select(null);
       else sidePanel.value = null;

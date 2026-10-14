@@ -10,6 +10,8 @@ import { PlanBar } from "./PlanBar";
 import { ReportsPanel } from "./ReportsPanel";
 import { SaveDialog } from "./SaveDialog";
 import { SettingsDialog } from "./SettingsDialog";
+import { AdministrationDialog } from "./AdministrationDialog";
+import { FinanceDialog } from "./FinanceDialog";
 import { NewGameDialog } from "./NewGameDialog";
 import { PatientsDialog } from "./PatientsDialog";
 import { StaffScreen } from "./StaffScreen";
@@ -51,10 +53,12 @@ export function App({ game }: { game: Game }) {
         onPanel={() => game.refreshPanels()}
         onStaff={() => game.openStaff("team")}
         onPatients={() => game.togglePatients()}
+        onFinance={() => game.openFinance("loans")}
       />
       <Notifications game={game} />
       <PatientsDialog game={game} />
       <StaffScreen game={game} />
+      <FinanceDialog game={game} />
       <CoverageLegend />
       <Toasts />
       <DebugOverlay />
@@ -63,6 +67,7 @@ export function App({ game }: { game: Game }) {
       <PaletteHelp />
       <SaveDialog game={game} />
       <NewGameDialog game={game} />
+      <AdministrationDialog game={game} />
       <SettingsDialog game={game} />
     </>
   );

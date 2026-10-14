@@ -13,6 +13,7 @@ import { ListSection } from "./ListSection";
 import {
   buildTab,
   coverageOverlay,
+  financeTab,
   paletteHelp,
   patientsOpen,
   planning,
@@ -33,10 +34,12 @@ const TABS: { id: BuildTab; label: string }[] = [
  * Management buttons: the Staff screen and Patients dialog (centred), or a
  * side panel on the left.
  */
-type PanelButton = { kind: "staff" } | { kind: "patients" } | { kind: "side"; id: SidePanel };
+type PanelButton =
+  { kind: "staff" } | { kind: "patients" } | { kind: "finance" } | { kind: "side"; id: SidePanel };
 const PANELS: PanelButton[] = [
   { kind: "staff" },
   { kind: "patients" },
+  { kind: "finance" },
   { kind: "side", id: "reports" },
   { kind: "side", id: "help" },
 ];
@@ -63,6 +66,7 @@ export function BuildBar({
   onPanel,
   onStaff,
   onPatients,
+  onFinance,
 }: {
   onTogglePlan: () => void;
   onToggleCoverage: () => void;
@@ -70,6 +74,7 @@ export function BuildBar({
   onPanel: () => void;
   /** Opens the Staff screen (at its Team tab). */
   onStaff: () => void;
+  onFinance: () => void;
   onPatients: () => void;
 }) {
   const open = buildTab.value;
@@ -116,15 +121,21 @@ export function BuildBar({
             ? staffScreen.value !== null
             : p.kind === "patients"
               ? patientsOpen.value
-              : sidePanel.value === p.id;
+              : p.kind === "finance"
+                ? financeTab.value !== null
+                : sidePanel.value === p.id;
         const label =
-          p.kind === "staff" ? "Staff" : p.kind === "patients" ? "Patients" : SIDE_LABELS[p.id];
+          p.kind === "side"
+            ? SIDE_LABELS[p.id]
+            : { staff: "Staff", patients: "Patients", finance: "Finance" }[p.kind];
         const hint =
-          p.kind === "staff"
-            ? "Staff: who's working, hiring and the rota"
-            : p.kind === "patients"
-              ? "Every patient's status"
-              : SIDE_HINTS[p.id];
+          p.kind === "side"
+            ? SIDE_HINTS[p.id]
+            : {
+                staff: "Staff: who's working, hiring and the rota",
+                patients: "Every patient's status",
+                finance: "Finance: loans, your rating, and grants",
+              }[p.kind];
         return (
           <button
             key={p.kind === "side" ? p.id : p.kind}
@@ -138,6 +149,9 @@ export function BuildBar({
                 else onStaff();
               } else if (p.kind === "patients") {
                 onPatients();
+              } else if (p.kind === "finance") {
+                if (active) financeTab.value = null;
+                else onFinance();
               } else {
                 sidePanel.value = active ? null : p.id;
                 buildTab.value = null;

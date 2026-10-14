@@ -20,7 +20,6 @@ import {
   type Outpatient,
   type Patient,
   type PatientStage,
-  net,
   type MonthReport,
   type Point,
   type Staff,
@@ -1076,7 +1075,7 @@ export function describeReport(state: SimState): ReportData {
     name: monthName(dateOf(firstDayOf(m.monthIndex))),
     days: m.days,
     ledger: m.ledger,
-    capital: m.openingCash + net(m.ledger) - m.closingCash,
+    flows: m.flows,
     openingCash: m.openingCash,
     closingCash: m.closingCash,
   });

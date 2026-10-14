@@ -358,6 +358,7 @@ const ledgerSchema = z.object({
   upkeep: num,
   supplies: num,
   estates: num,
+  interest: num,
   transfers: num,
 });
 const monthSchemaFields = {
@@ -365,7 +366,20 @@ const monthSchemaFields = {
   days: int.min(0),
   openingCash: num,
   closingCash: num,
+  flows: z.object({
+    building: num,
+    borrowed: num,
+    repaid: num,
+    grants: num,
+    clawedBack: num,
+  }),
 };
+const grantSchema = z.object({
+  defId: z.string(),
+  offered: int,
+  until: int,
+  target: nullableInt,
+});
 const statsSchema = z.object({
   arrivals: int.min(0),
   discharged: int.min(0),
@@ -538,6 +552,32 @@ const saveSchema = z.object({
     ),
     month: monthSchema,
     months: z.array(monthSchema),
+    loans: z.array(
+      z.object({
+        id: int.positive(),
+        kind: z.enum(["capital", "revenue_support", "bank"]),
+        principal: num.min(0),
+        balance: num.min(0),
+        rate: num.min(0),
+        months: int.positive(),
+        payment: num.min(0),
+        taken: int,
+        missed: int.min(0),
+      }),
+    ),
+    nextLoanId: int.positive(),
+    rating: z.object({
+      segment: int.min(1).max(4),
+      credit: int.min(0).max(6),
+      administration: nullableInt,
+      overdrawnSince: nullableInt,
+    }),
+    grants: z.object({
+      offer: grantSchema.nullable(),
+      active: z.array(grantSchema),
+      nextOffer: int,
+      done: z.array(z.object({ defId: z.string(), tick: int, met: z.boolean() })),
+    }),
     settings: z.object({
       catchment: int.min(1_000).max(10_000_000),
       patientVolume: num.min(0).max(10),
@@ -619,6 +659,10 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       history: state.history,
       month: state.month,
       months: state.months,
+      loans: state.loans,
+      nextLoanId: state.nextLoanId,
+      rating: state.rating,
+      grants: state.grants,
       settings: state.settings,
       alerts: state.alerts,
       incidents: state.incidents,
@@ -690,6 +734,15 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     history: s.history,
     month: s.month,
     months: s.months,
+    loans: s.loans,
+    nextLoanId: s.nextLoanId,
+    rating: { ...s.rating },
+    grants: {
+      offer: s.grants.offer,
+      active: s.grants.active,
+      nextOffer: s.grants.nextOffer,
+      done: s.grants.done,
+    },
     settings: { ...s.settings },
     alerts: { ...s.alerts },
     incidents: s.incidents,

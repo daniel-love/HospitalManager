@@ -507,6 +507,8 @@ export interface Ledger {
   supplies: number;
   /** Estates and utilities for the floor area built. */
   estates: number;
+  /** Interest on loans. */
+  interest: number;
   /** Ambulances taking patients to other hospitals. */
   transfers: number;
 }
@@ -718,6 +720,55 @@ export interface MonthReport {
   /** Cash at the start of the month, and at the end (or now, if still running). */
   openingCash: number;
   closingCash: number;
+  /** Cash that isn't income or running costs: building, loans and grants. */
+  flows: CashFlows;
+}
+
+/** Cash in and out beyond income and running costs, over a month. */
+export interface CashFlows {
+  /** Spent on building and equipment, less anything sold. */
+  building: number;
+  borrowed: number;
+  /** Loan principal paid back (interest is a running cost). */
+  repaid: number;
+  grants: number;
+  /** Grants clawed back when their conditions weren't met. */
+  clawedBack: number;
+}
+
+export function emptyFlows(): CashFlows {
+  return { building: 0, borrowed: 0, repaid: 0, grants: 0, clawedBack: 0 };
+}
+
+/**
+ * A loan (systems/loans.ts): a DHSC capital or revenue support loan for an
+ * NHS or Hybrid trust, or a bank loan for a Private Hospital, repaid in
+ * equal monthly instalments (an annuity) at the start of each month.
+ */
+export interface Loan {
+  id: number;
+  kind: "capital" | "revenue_support" | "bank";
+  principal: number;
+  /** Principal still owed. */
+  balance: number;
+  /** Annual interest rate. */
+  rate: number;
+  months: number;
+  /** The monthly instalment, interest and principal together. */
+  payment: number;
+  taken: number;
+  /** Instalments due but not paid (a Private Hospital without the cash). */
+  missed: number;
+}
+
+/** A grant on offer, or taken on (systems/grants.ts). */
+export interface Grant {
+  defId: string;
+  /** When it was offered, and (taken on) its deadline, or (on offer) when the offer lapses. */
+  offered: number;
+  until: number;
+  /** For rooms and beds: how many the hospital needs to have, counted when offered. */
+  target: number | null;
 }
 
 /** Adds one set of numeric fields into another (ledgers, flow stats). */
@@ -740,6 +791,7 @@ export function emptyLedger(): Ledger {
     upkeep: 0,
     supplies: 0,
     estates: 0,
+    interest: 0,
     transfers: 0,
   };
 }
@@ -810,7 +862,9 @@ export function income(l: Ledger): number {
 }
 
 export function costs(l: Ledger): number {
-  return l.salaries + l.bank + l.agency + l.upkeep + l.supplies + l.estates + l.transfers;
+  return (
+    l.salaries + l.bank + l.agency + l.upkeep + l.supplies + l.estates + l.interest + l.transfers
+  );
 }
 
 /**
@@ -840,6 +894,8 @@ export interface SimEvent {
   at?: Point;
   /** A staffing matter: the Staff screen tab to open when clicked, and who it's about. */
   staff?: { tab: "team" | "rota"; id?: number };
+  /** A money matter: the Finance dialog tab to open when clicked. */
+  finance?: "loans" | "grants";
 }
 
 /** In the hospital: not off duty at home, nor on call at home or on the way in. */

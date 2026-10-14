@@ -6,10 +6,11 @@
  */
 import { signal } from "@preact/signals";
 import type { AdviceData } from "@game/advice";
+import type { FinanceData } from "@game/describeFinance";
 import type { Speed } from "@game/loop";
 import type { Tool } from "@game/tools";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
-import type { DayReport, FlowStats, Ledger } from "@sim/agents";
+import type { CashFlows, DayReport, FlowStats, Ledger } from "@sim/agents";
 import type { Funding, GapFill, Rotation, RoomCheck } from "@sim/state";
 import type { NurseBand } from "@data/staff";
 import type { HelpContent } from "./help";
@@ -22,6 +23,8 @@ export interface HudState {
   patients: number;
   /** Today's 4-hour performance (share leaving A&E within 4 hours), or null before anyone has. */
   fourHour: number | null;
+  /** A Private Hospital in administration. */
+  administration: boolean;
 }
 
 export interface DebugStats {
@@ -186,7 +189,10 @@ export const hud = signal<HudState>({
   money: 0,
   patients: 0,
   fourHour: null,
+  administration: false,
 });
+/** The player has seen the administration notice for this game and chosen to play on. */
+export const administrationDismissed = signal(false);
 export const debugStats = signal<DebugStats | null>(null);
 export const debugVisible = signal<boolean>(false);
 
@@ -218,6 +224,8 @@ export interface Notification {
   at?: { x: number; y: number };
   /** A staffing matter: opens the Staff screen at this tab (and person). */
   staff?: { tab: "team" | "rota"; id?: number };
+  /** A money matter: opens the Finance dialog at this tab. */
+  finance?: FinanceTab;
 }
 export const notifications = signal<Notification[]>([]);
 
@@ -283,8 +291,8 @@ export interface StatementMonth {
   name: string;
   days: number;
   ledger: Ledger;
-  /** Spent on building and equipment (less sales): cash that isn't a running cost. */
-  capital: number;
+  /** Cash in and out that isn't income or running costs: building, loans and grants. */
+  flows: CashFlows;
   openingCash: number;
   closingCash: number;
 }
@@ -372,6 +380,11 @@ export const patientsOpen = signal(false);
 /** The Staff screen and its tab: who's working, hiring, and the rota. */
 export type StaffTab = "team" | "hire" | "rota";
 export const staffScreen = signal<StaffTab | null>(null);
+/** The Finance dialog and its tab, and what it shows. */
+export type FinanceTab = "loans" | "grants";
+export const financeTab = signal<FinanceTab | null>(null);
+export const financeData = signal<FinanceData | null>(null);
+
 /** A member of staff to pick out in the Team tab (from a notification). */
 export const staffHighlight = signal<number | null>(null);
 

@@ -178,6 +178,7 @@ button {
 .menu-button,
 .inspector-action,
 .modal button,
+.finance-dialog .report-group button,
 .slot button {
   white-space: nowrap;
   font-size: 13px;
@@ -189,13 +190,16 @@ button {
   cursor: pointer;
 }
 .menu-button:hover,
+.finance-dialog .report-group button:hover:not(:disabled),
 .modal button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.14);
 }
+.finance-dialog .report-group button:disabled,
 .modal button:disabled {
   opacity: 0.5;
   cursor: default;
 }
+.finance-dialog button.primary,
 .modal button.primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -2245,4 +2249,62 @@ body.planning #game::after {
 .nhs-referrals {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+
+/* ---------- Finance ---------- */
+.finance-dialog {
+  height: calc(100% - 140px);
+  width: min(760px, calc(100% - 32px));
+}
+.borrow-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 460px;
+}
+.borrow-form label {
+  display: grid;
+  grid-template-columns: 60px 1fr 110px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.borrow-form label strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.borrow-form button.primary {
+  align-self: flex-start;
+}
+.grant-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.grant-card.offer {
+  border-color: var(--accent);
+  background: rgba(59, 130, 196, 0.1);
+}
+.grant-card p {
+  margin: 2px 0;
+}
+.grant-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.grant-amount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.grant-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

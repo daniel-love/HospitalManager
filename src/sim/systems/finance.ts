@@ -23,6 +23,8 @@ import {
 import { emit } from "../events";
 import { emptyMonth, type SimState } from "../state";
 import { dailyBlock } from "./funding";
+import { updateGrants } from "./grants";
+import { checkCash, repayLoans, reviewRating } from "./loans";
 import { overPrivateCap } from "./referrals";
 import { updateReputation } from "./reputation";
 import {
@@ -246,6 +248,8 @@ function closeDay(state: SimState): void {
   month.closingCash = state.money;
   const next = dateOf(report.day + 1);
   if (next.monthIndex !== month.monthIndex) closeMonth(state, next.monthIndex);
+  checkCash(state);
+  updateGrants(state);
 
   const n = net(report.ledger);
   const money = new Intl.NumberFormat("en-GB", {
@@ -293,6 +297,8 @@ function closeMonth(state: SimState, nextIndex: number): void {
       `Cash ${money.format(m.closingCash)}. See Reports.`,
     n >= 0 ? "info" : "warn",
   );
+  reviewRating(state, m);
+  repayLoans(state);
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
