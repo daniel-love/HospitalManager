@@ -6,6 +6,7 @@
  */
 import { signal } from "@preact/signals";
 import type { AdviceData } from "@game/advice";
+import type { EventChip } from "@game/describeEvents";
 import type { FinanceData } from "@game/describeFinance";
 import type { HospitalData } from "@game/describeHospital";
 import type { Speed } from "@game/loop";
@@ -26,6 +27,8 @@ export interface HudState {
   fourHour: number | null;
   /** A Private Hospital in administration. */
   administration: boolean;
+  /** Pressure events forecast or under way. */
+  events: EventChip[];
 }
 
 export interface DebugStats {
@@ -191,6 +194,7 @@ export const hud = signal<HudState>({
   patients: 0,
   fourHour: null,
   administration: false,
+  events: [],
 });
 /** The player has seen the administration notice for this game and chosen to play on. */
 export const administrationDismissed = signal(false);
@@ -227,6 +231,8 @@ export interface Notification {
   staff?: { tab: "team" | "rota"; id?: number };
   /** A money matter: opens the Finance dialog at this tab. */
   finance?: FinanceTab;
+  /** A matter for the Hospital dialog: opens it at this tab. */
+  hospital?: HospitalTab;
 }
 export const notifications = signal<Notification[]>([]);
 
@@ -382,7 +388,7 @@ export const patientsOpen = signal(false);
 export type StaffTab = "team" | "hire" | "rota";
 export const staffScreen = signal<StaffTab | null>(null);
 /** The Hospital dialog and its tab, and what it shows. */
-export type HospitalTab = "departments" | "escalation" | "policies" | "performance";
+export type HospitalTab = "departments" | "escalation" | "policies" | "events" | "performance";
 export const hospitalTab = signal<HospitalTab | null>(null);
 export const hospitalData = signal<HospitalData | null>(null);
 

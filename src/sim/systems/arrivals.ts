@@ -32,6 +32,7 @@ import {
   stretcherSpot,
 } from "./ambulances";
 import { rollDeterioration } from "./deterioration";
+import { arrivalFactor, conditionFactor } from "./pressure";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
 const total = (profile: readonly number[]) => profile.reduce((a, b) => a + b, 0);
@@ -103,13 +104,18 @@ export function updateArrivals(state: SimState): void {
   if (state.funding === "private") return;
   const demand = dailyDemand(state);
   // Always draw both, so the random sequence doesn't depend on the layout.
+  // Pressure events (winter, heat) bring more.
   const ambulance = chance(
     state.rng,
-    ambulanceRate(state.tick, demand.ambulances) * treatableShare(state, "ambulance"),
+    ambulanceRate(state.tick, demand.ambulances) *
+      treatableShare(state, "ambulance") *
+      arrivalFactor(state, "ambulance"),
   );
   const walkIn = chance(
     state.rng,
-    arrivalRate(state.tick, demand.walkIns) * treatableShare(state, "walk_in"),
+    arrivalRate(state.tick, demand.walkIns) *
+      treatableShare(state, "walk_in") *
+      arrivalFactor(state, "walk_in"),
   );
   const ae = state.departments.ae;
   if (ae === "closed") return; // Closed: patients go elsewhere.
@@ -205,7 +211,10 @@ export function spawnPatient(
   const rng = state.rng;
   const treatable = new Set(treatableConditions(state));
   let options = content.conditions.filter((c) => arrivalWeight(c, channel, treatable.has(c)) > 0);
-  let weights = options.map((c) => arrivalWeight(c, channel, treatable.has(c)));
+  // Pressure events shift the mix (more breathing problems in a flu season).
+  let weights = options.map(
+    (c) => arrivalWeight(c, channel, treatable.has(c)) * conditionFactor(state, c.id),
+  );
   if (options.length === 0) {
     options = content.conditions.filter((c) => c.channels[channel] > 0);
     weights = options.map((c) => c.channels[channel]);

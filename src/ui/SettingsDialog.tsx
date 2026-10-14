@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from "preact/hooks";
 import { AMBULANCES_PER_100K, CATCHMENTS, WALK_INS_PER_100K } from "@data/patients";
+import type { EventFrequency } from "@data/pressure";
 import type { Game } from "@game/game";
 import { dailyDemand, treatableShare } from "@sim/systems/arrivals";
 import { ANTIALIAS_OPTIONS, AUTOSAVE_OPTIONS, settings, settingsOpen } from "./settings";
@@ -77,6 +78,8 @@ function SettingsBody({ game }: { game: Game }) {
               : `With what you've built, about ${walkIns} walk-ins and ${ambulances} ambulances a day come here.`}
           </p>
         </fieldset>
+
+        <EventsSetting game={game} />
 
         {!game.state.settings.rotas && <RotasSetting game={game} />}
 
@@ -155,6 +158,46 @@ function RotasSetting({ game }: { game: Game }) {
       >
         Start shifts and rotas
       </button>
+    </fieldset>
+  );
+}
+
+const EVENT_OPTIONS: { id: EventFrequency; label: string; hint: string }[] = [
+  { id: "off", label: "Off", hint: "No pressure events" },
+  { id: "rare", label: "Rare", hint: "About half the real-world rate" },
+  {
+    id: "realistic",
+    label: "Realistic",
+    hint: "Flu seasons in winter, heatwaves in summer, at about real-world rates",
+  },
+  { id: "frequent", label: "Frequent", hint: "About twice the real-world rate" },
+];
+
+/** How often pressure events come (saved with the game). */
+function EventsSetting({ game }: { game: Game }) {
+  const [frequency, setFrequency] = useState(game.state.settings.eventFrequency);
+  return (
+    <fieldset class="setting">
+      <legend>Events</legend>
+      <p class="dim">
+        Winter pressures, heatwaves and other events that test the hospital. Each is forecast a few
+        days ahead; Hospital → Events says what you can do. Saved with this game.
+      </p>
+      {EVENT_OPTIONS.map((o) => (
+        <label class="setting-choice" key={o.id}>
+          <input
+            type="radio"
+            name="events"
+            checked={frequency === o.id}
+            onChange={() => {
+              game.setEventFrequency(o.id);
+              setFrequency(o.id);
+            }}
+          />
+          <span>{o.label}</span>
+          <span class="dim">{o.hint}</span>
+        </label>
+      ))}
     </fieldset>
   );
 }

@@ -30,6 +30,7 @@ import { inClinic } from "./outpatients";
 import { coverFor, groupName, groupOf, slotName, type ShiftTime } from "./rota";
 import { createStaff, removeStaff, staffTitle } from "./staffing";
 import { inTheatre } from "./theatres";
+import { heatFatigue, sicknessFactor } from "./pressure";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
 
@@ -96,7 +97,8 @@ export function updateWorkforce(state: SimState): void {
     const working = here && busy(state, s);
     if (state.settings.rotas) {
       const delta = here
-        ? (FATIGUE.perHourOnShift + (working ? FATIGUE.perHourBusy : 0)) / 60
+        ? (FATIGUE.perHourOnShift + (working ? FATIGUE.perHourBusy : 0)) / 60 +
+          heatFatigue(state, s)
         : -FATIGUE.recoveryPerHour / 60;
       s.fatigue = clamp(s.fatigue + delta);
     }
@@ -161,6 +163,8 @@ export function callsInSick(state: SimState, s: Staff): boolean {
       1 + ((SICKNESS.lowMoraleFactor - 1) * (SICKNESS.fromMorale - s.morale)) / SICKNESS.fromMorale;
   }
   if (s.fatigue > SICKNESS.tiredFrom) p *= SICKNESS.tiredFactor;
+  // Flu season: staff catch it too, unless vaccinated.
+  p *= sicknessFactor(state);
   return chance(state.rng, p);
 }
 

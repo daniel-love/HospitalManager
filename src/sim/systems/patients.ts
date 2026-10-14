@@ -82,6 +82,7 @@ import { withAmbulanceCrew } from "./ambulances";
 import { hasTeam } from "./staffing";
 import { onEscalationBed } from "./escalation";
 import { hasVisitor, visitedLately } from "./visitors";
+import { heatMoodDecay, heatWardMood } from "./pressure";
 
 const TICKS_PER_HOUR = TICKS_PER_MINUTE * 60;
 
@@ -456,7 +457,9 @@ function updateNeeds(state: SimState, p: Patient, beingSeen: boolean): void {
     // Settled in a bed and looked after (ward needs such as meals, toilets
     // and washing are left to the ward team for now). Visitors keep spirits
     // up: without one lately, mood settles lower; with someone there, it lifts.
-    const settles = visitedLately(state, p) ? WARD_MOOD.visited : WARD_MOOD.unvisited;
+    // A hot ward without cooling is uncomfortable.
+    const settles =
+      (visitedLately(state, p) ? WARD_MOOD.visited : WARD_MOOD.unvisited) - heatWardMood(state, p);
     if (hasVisitor(state, p.id)) lift(p, WARD_MOOD.withVisitor / TICKS_PER_HOUR);
     if (p.mood < settles) lift(p, MOOD_RECOVERY_ON_WARD / TICKS_PER_HOUR);
     else p.mood = Math.max(settles, p.mood - WARD_MOOD.drift / TICKS_PER_HOUR);
@@ -478,6 +481,8 @@ function updateNeeds(state: SimState, p: Patient, beingSeen: boolean): void {
     decay = MOOD_DECAY_IN_CUBICLE;
   }
   if (p.bladder >= 90 && !p.toilet) decay += MOOD_DECAY_TOILET;
+  // Waiting in the heat, without cooling (water helps).
+  if (decay > 0) decay += heatMoodDecay(state, p);
   // A clinician with them (triage, treatment, review) reassures them.
   if (beingSeen) decay -= MOOD_RECOVERY_BEING_SEEN;
   p.mood = Math.min(100, Math.max(0, p.mood - decay / TICKS_PER_HOUR));

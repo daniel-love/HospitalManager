@@ -15,6 +15,7 @@ export function emit(
   at?: Point,
   staff?: SimEvent["staff"],
   finance?: SimEvent["finance"],
+  hospital?: SimEvent["hospital"],
 ): void {
   state.events.push({
     tick: state.tick,
@@ -23,6 +24,7 @@ export function emit(
     ...(at ? { at: { ...at } } : {}),
     ...(staff ? { staff } : {}),
     ...(finance ? { finance } : {}),
+    ...(hospital ? { hospital } : {}),
   });
   if (state.events.length > MAX_PENDING) state.events.splice(0, state.events.length - MAX_PENDING);
 }

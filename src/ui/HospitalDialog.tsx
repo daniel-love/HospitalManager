@@ -15,6 +15,7 @@ const TABS: { id: HospitalTab; label: string }[] = [
   { id: "departments", label: "Departments" },
   { id: "escalation", label: "Escalation" },
   { id: "policies", label: "Policies" },
+  { id: "events", label: "Events" },
   { id: "performance", label: "Performance" },
 ];
 
@@ -39,6 +40,9 @@ export function HospitalDialog({ game }: { game: Game }) {
               {t.id === "departments" && data.departments.some((d) => d.status !== "open") && (
                 <span class="tab-badge">!</span>
               )}
+              {t.id === "events" && data.events.active.length > 0 && (
+                <span class="tab-badge">{data.events.active.length}</span>
+              )}
             </button>
           ))}
         </div>
@@ -50,6 +54,7 @@ export function HospitalDialog({ game }: { game: Game }) {
         {tab === "departments" && <Departments game={game} data={data} />}
         {tab === "escalation" && <Escalation game={game} data={data} />}
         {tab === "policies" && <Policies game={game} data={data} />}
+        {tab === "events" && <Events data={data.events} />}
         {tab === "performance" && <Performance data={data.performance} />}
       </div>
     </section>
@@ -187,6 +192,12 @@ function Policies({ game, data }: { game: Game; data: HospitalData }) {
         <span class="dim small-note">
           {p.visitingOptions.find((o) => o.id === p.visiting)!.label}
         </span>
+      </PolicyCard>
+      <PolicyCard
+        title="Staff flu vaccination"
+        note={`Each autumn (from October), offer every member of staff the flu vaccine, at about £${p.fluVaccinationCost} a head. It halves the extra sickness a flu season brings among staff.`}
+      >
+        <Toggle on={p.fluVaccination} onChange={(on) => game.setFluVaccination(on)} />
       </PolicyCard>
       <PolicyCard
         title="Discharge before noon"
@@ -351,6 +362,76 @@ function Performance({ data }: { data: HospitalData["performance"] }) {
           </tbody>
         ))}
       </table>
+    </>
+  );
+}
+
+const FREQUENCY_WORDS = {
+  off: "Events are off (Settings).",
+  rare: "Events come about half as often as in real life (Settings).",
+  realistic:
+    "Events follow the calendar at about real-world rates: flu seasons in winter, heatwaves in summer (Settings).",
+  frequent: "Events come about twice as often as in real life (Settings).",
+};
+
+/** Pressure events forecast or under way, what they do and the levers; and past ones. */
+function Events({ data }: { data: HospitalData["events"] }) {
+  return (
+    <>
+      <p class="dim small-note">{FREQUENCY_WORDS[data.frequency]}</p>
+      {data.active.length === 0 && <p class="dim">Nothing forecast. All quiet, for now.</p>}
+      {data.active.map((e) => (
+        <div key={e.id} class={`dept-card event-card${e.coming ? " coming" : " restricted"}`}>
+          <div class="dept-head">
+            <strong>{e.name}</strong>
+            <span class="dim">{e.coming ? "Forecast" : "Under way"}</span>
+          </div>
+          <span class="dim small-note">{e.when}</span>
+          {!e.coming && e.shape === "wave" && (
+            <div class="meter" title="How strong it is now: it builds, peaks and fades">
+              <div class="meter-fill warn" style={{ width: `${Math.round(e.intensity * 100)}%` }} />
+            </div>
+          )}
+          <span class="hire-desc">{e.description}</span>
+          <strong class="event-levers-title">What you can do</strong>
+          <ul class="event-levers">
+            {e.levers.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      {data.uncooled && (
+        <div class="report-group">
+          <h4>Rooms without enough cooling</h4>
+          {data.uncooled.length === 0 ? (
+            <p class="dim small-note">Every room patients wait or stay in is cooled.</p>
+          ) : (
+            <ul class="event-levers">
+              {data.uncooled.map((r) => (
+                <li key={r.name}>
+                  {r.count} × {r.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {data.past.length > 0 && (
+        <div class="report-group">
+          <h4>Past events</h4>
+          <table class="report-table">
+            <tbody>
+              {data.past.map((p, i) => (
+                <tr key={i}>
+                  <td>{p.name}</td>
+                  <td class="num dim">{p.dates}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   );
 }

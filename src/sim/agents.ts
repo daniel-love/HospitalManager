@@ -973,6 +973,8 @@ export interface SimEvent {
   staff?: { tab: "team" | "rota"; id?: number };
   /** A money matter: the Finance dialog tab to open when clicked. */
   finance?: "statement" | "departments" | "loans" | "grants";
+  /** A matter for the Hospital dialog: the tab to open when clicked. */
+  hospital?: "departments" | "escalation" | "policies" | "performance" | "events";
 }
 
 /** In the hospital: not off duty at home, nor on call at home or on the way in. */

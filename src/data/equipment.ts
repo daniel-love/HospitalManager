@@ -628,6 +628,22 @@ export const equipment: EquipmentInput[] = [
     glyph: "Wa",
     description: "Drinking water for waiting patients.",
   },
+  {
+    id: "portable_air_conditioner",
+    name: "Portable air conditioner",
+    category: "facilities",
+    tier: 1,
+    cost: 650,
+    upkeep: 12,
+    footprint: [1, 1],
+    reliability: 0.995,
+    power: true,
+    capabilities: ["cooling"],
+    glyph: "AC",
+    access: [],
+    description:
+      "Keeps a room cool in a heatwave: one for every 30 floor tiles. Patients and staff in rooms without cooling suffer in the heat.",
+  },
 
   // Décor
   {

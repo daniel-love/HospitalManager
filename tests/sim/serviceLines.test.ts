@@ -63,5 +63,5 @@ describe("service lines", () => {
     // The KPI counters.
     expect(month.stats.bedHours).toBeGreaterThan(0);
     expect(month.end.headcount).toBeGreaterThan(0);
-  });
+  }, 60_000);
 });

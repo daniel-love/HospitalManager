@@ -819,6 +819,19 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v35: pressure events (realistic in old games), and the staff flu vaccination policy.
+  34: (save) => {
+    const state = save.state as { settings: object; policies: object; pressure?: object };
+    return {
+      ...save,
+      state: {
+        ...state,
+        settings: { eventFrequency: "realistic", ...state.settings },
+        policies: { fluVaccination: false, ...state.policies },
+        pressure: state.pressure ?? { active: [], past: [], nextId: 1, vaccinated: null },
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

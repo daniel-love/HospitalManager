@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { conditionById, objectDef } from "@data/catalogue";
 import { PRIVATE } from "@data/economy";
+import { PRESSURE_EVENTS, type PressureEventId } from "@data/pressure";
 import { specialtyIds, staffRoleIds } from "@data/schema";
 import { SERVICE_LINES, type ServiceLine } from "@sim/agents";
 import { SIM_STATE_VERSION, type PlacedObject, type SimState } from "@sim/state";
@@ -348,6 +349,9 @@ const collectionSchema = z.object({
   leaveAt: nullableInt,
 });
 
+const pressureEventId = z.enum(
+  PRESSURE_EVENTS.map((e) => e.id) as [PressureEventId, ...PressureEventId[]],
+);
 const ledgerSchema = z.object({
   block: num,
   tariff: num,
@@ -572,6 +576,7 @@ const saveSchema = z.object({
       escalation: z.boolean(),
       dischargeBeforeNoon: z.boolean(),
       visiting: z.enum(["open", "set", "restricted", "none"]),
+      fluVaccination: z.boolean(),
     }),
     privateRooms: z.record(z.string().regex(/^\d+:\d+$/), z.literal(true)),
     funding: z.enum(["nhs", "private", "hybrid"]),
@@ -618,10 +623,25 @@ const saveSchema = z.object({
       nextOffer: int,
       done: z.array(z.object({ defId: z.string(), tick: int, met: z.boolean() })),
     }),
+    pressure: z.object({
+      active: z.array(
+        z.object({
+          id: int.positive(),
+          defId: pressureEventId,
+          announced: int,
+          start: int,
+          end: int,
+        }),
+      ),
+      past: z.array(z.object({ defId: pressureEventId, start: int, end: int })),
+      nextId: int.positive(),
+      vaccinated: nullableInt,
+    }),
     settings: z.object({
       catchment: int.min(1_000).max(10_000_000),
       patientVolume: num.min(0).max(10),
       rotas: z.boolean(),
+      eventFrequency: z.enum(["off", "rare", "realistic", "frequent"]),
     }),
     alerts: z.record(z.string(), int),
     incidents: z.array(
@@ -705,6 +725,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       nextLoanId: state.nextLoanId,
       rating: state.rating,
       grants: state.grants,
+      pressure: state.pressure,
       settings: state.settings,
       alerts: state.alerts,
       incidents: state.incidents,
@@ -786,6 +807,12 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
       active: s.grants.active,
       nextOffer: s.grants.nextOffer,
       done: s.grants.done,
+    },
+    pressure: {
+      active: s.pressure.active,
+      past: s.pressure.past,
+      nextId: s.pressure.nextId,
+      vaccinated: s.pressure.vaccinated,
     },
     settings: { ...s.settings },
     alerts: { ...s.alerts },

@@ -6,6 +6,7 @@
  */
 import { REPUTATION, STARTING_CASH } from "@data/economy";
 import { GRANT_OFFERS, OVERSIGHT, START_CREDIT } from "@data/finance";
+import type { EventFrequency, PressureEventId } from "@data/pressure";
 import type { SpecialtyId } from "@data/schema";
 import { DEFAULT_CATCHMENT } from "@data/patients";
 import {
@@ -39,7 +40,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 34;
+export const SIM_STATE_VERSION = 35;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -189,6 +190,14 @@ export interface SimState {
     /** Finished grants, newest last: met (kept) or missed (clawed back). */
     done: { defId: string; tick: number; met: boolean }[];
   };
+  /** Pressure events: forecast or under way, and past ones, newest last (systems/pressure.ts). */
+  pressure: {
+    active: PressureEvent[];
+    past: { defId: PressureEventId; start: number; end: number }[];
+    nextId: number;
+    /** The financial year (0 = Year 1) staff were last vaccinated against flu, or null. */
+    vaccinated: number | null;
+  };
   settings: SimSettings;
   /** Tick each kind of warning was last raised, so they aren't repeated constantly. */
   alerts: Record<string, number>;
@@ -215,6 +224,18 @@ export interface SimSettings {
    * around the clock: saves from before rotas, and test fixtures.
    */
   rotas: boolean;
+  /** How often pressure events come (data/pressure.ts EVENT_FREQUENCY). Off for test fixtures. */
+  eventFrequency: EventFrequency;
+}
+
+/** A pressure event forecast or under way (systems/pressure.ts). */
+export interface PressureEvent {
+  id: number;
+  defId: PressureEventId;
+  /** When it was forecast, when it starts and when it ends. */
+  announced: number;
+  start: number;
+  end: number;
 }
 
 /**
@@ -235,6 +256,8 @@ export interface Policies {
   dischargeBeforeNoon: boolean;
   /** When relatives may visit ward patients (systems/visitors.ts). */
   visiting: Visiting;
+  /** Vaccinate staff against flu each autumn (data/pressure.ts FLU_VACCINATION). */
+  fluVaccination: boolean;
 }
 
 /**
@@ -293,6 +316,8 @@ export interface NewGameOptions {
   /** Staff work shifts. Off for test maps, where everyone works around the clock. */
   rotas?: boolean;
   funding?: Funding;
+  /** Pressure events. Off for test maps. */
+  eventFrequency?: EventFrequency;
 }
 
 export const DEFAULT_MAP_SIZE = 200;
@@ -359,6 +384,7 @@ export function createSimState(opts: NewGameOptions): SimState {
       escalation: false,
       dischargeBeforeNoon: false,
       visiting: "set",
+      fluVaccination: false,
     },
     today: { ledger: emptyLedger(), stats: emptyStats(), services: emptyServices() },
     history: [],
@@ -378,7 +404,13 @@ export function createSimState(opts: NewGameOptions): SimState {
       nextOffer: GRANT_OFFERS.everyDays[0] * TICKS_PER_DAY,
       done: [],
     },
-    settings: { catchment: DEFAULT_CATCHMENT, patientVolume: 1, rotas: opts.rotas ?? false },
+    pressure: { active: [], past: [], nextId: 1, vaccinated: null },
+    settings: {
+      catchment: DEFAULT_CATCHMENT,
+      patientVolume: 1,
+      rotas: opts.rotas ?? false,
+      eventFrequency: opts.eventFrequency ?? "off",
+    },
     alerts: {},
     incidents: [],
     nextIncidentId: 1,

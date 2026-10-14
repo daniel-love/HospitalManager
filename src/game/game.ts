@@ -6,6 +6,7 @@
  * In plan mode, commands go into the build plan instead (see sim/plan.ts), and
  * the map, tools and inspector all show the plan preview ("viewState").
  */
+import type { EventFrequency } from "@data/pressure";
 import { content, equipmentById, objectDef, roomById } from "@data/catalogue";
 import type { SpecialtyId } from "@data/schema";
 import {
@@ -32,6 +33,7 @@ import { coverageView, stationsSeeing, bedCover } from "@sim/systems/monitoring"
 import { acceptGrant, declineGrant } from "@sim/systems/grants";
 import { borrow, cantBorrow, repayEarly } from "@sim/systems/loans";
 import { setCover } from "@sim/systems/rota";
+import { eventChips } from "./describeEvents";
 import { describeFinance } from "./describeFinance";
 import { describeHospital } from "./describeHospital";
 import { setDepartment, type Department } from "@sim/systems/departments";
@@ -450,7 +452,13 @@ export class Game {
 
   newGame(funding: Funding = "nhs"): void {
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
-    const state = createSimState({ seed, site: true, rotas: true, funding });
+    const state = createSimState({
+      seed,
+      site: true,
+      rotas: true,
+      funding,
+      eventFrequency: "realistic",
+    });
     this.loadState(state);
     if (state.site) this.focus(siteView(state.site));
     // Until it's saved, a reload starts afresh rather than resuming the old hospital.
@@ -632,6 +640,7 @@ export class Game {
       ...(e.at ? { at: e.at } : {}),
       ...(e.staff ? { staff: e.staff } : {}),
       ...(e.finance ? { finance: e.finance } : {}),
+      ...(e.hospital ? { hospital: e.hospital } : {}),
     }));
     this.state.events = [];
     notifications.value = [...added.reverse(), ...notifications.value].slice(0, MAX_NOTIFICATIONS);
@@ -690,6 +699,17 @@ export class Game {
   setEscalation(on: boolean): void {
     this.state.policies.escalation = on;
     this.afterMoney();
+  }
+
+  /** The staff flu vaccination policy (Hospital → Policies). */
+  setFluVaccination(on: boolean): void {
+    this.state.policies.fluVaccination = on;
+    this.afterMoney();
+  }
+
+  /** How often pressure events come (Settings). */
+  setEventFrequency(frequency: EventFrequency): void {
+    this.state.settings.eventFrequency = frequency;
   }
 
   setDischargeBeforeNoon(on: boolean): void {
@@ -814,6 +834,7 @@ export class Game {
       patients: patientsInDept(this.state),
       fourHour: fourHourShare(this.state.today.stats),
       administration: this.state.rating.administration !== null,
+      events: eventChips(this.state),
     };
     if (!debugVisible.value) return;
     const { camera } = this.renderer;

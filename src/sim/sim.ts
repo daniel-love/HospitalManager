@@ -22,9 +22,11 @@ import { updateOutpatients } from "./systems/outpatients";
 import { updateTheatres } from "./systems/theatres";
 import { updateWorkforce } from "./systems/workforce";
 import { updateVisitors } from "./systems/visitors";
+import { updatePressure } from "./systems/pressure";
 
 export function tick(state: SimState): void {
   state.tick++;
+  updatePressure(state);
   updateArrivals(state);
   updateReferrals(state);
   updateAmbulances(state);

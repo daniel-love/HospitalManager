@@ -76,6 +76,7 @@ src/
       finance.ts          # tariff (emergency at the marginal rate, planned in full), pay, supplies, estates, daily reports, monthly statements
       funding.ts          # the NHS block contract: sized to rooms and beds, capped by delivered activity
       serviceLines.ts     # service-line reporting: books each ledger entry to a department too
+      pressure.ts         # pressure events: the calendar, forecasts, intensity and effects (winter, heat)
       reputation.ts       # 0–100 reputation: a running average of each day's patient experience
       loans.ts            # DHSC and bank loans, repayments, oversight segments and credit ratings
       grants.ts           # grant offers, conditions, deadlines and clawback
@@ -85,7 +86,6 @@ src/
       alerts.ts           # bottleneck warnings; tidies after layout changes
       monitoring.ts       # nurse stations, coverage (cached per layout), obs rounds
       deterioration.ts    # NEWS2, noticing and escalation, cardiac arrest, incidents
-      events.ts           # scenario/event scheduler (M6)
       reputation.ts       # (M6)
   data/                   # content definitions (balance by editing these)
     rooms.ts

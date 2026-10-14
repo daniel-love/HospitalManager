@@ -4,6 +4,7 @@
  */
 import { content } from "@data/catalogue";
 import { PRIVATE, REPUTATION } from "@data/economy";
+import { FLU_VACCINATION } from "@data/pressure";
 import type { SpecialtyId } from "@data/schema";
 import type { GapFill, SimState, Visiting } from "@sim/state";
 import { STATUS_TEXT, type Department } from "@sim/systems/departments";
@@ -12,6 +13,7 @@ import { holder } from "@sim/places";
 import { statusPenalty } from "@sim/systems/reputation";
 import { VISITING } from "@sim/systems/visitors";
 import { dateOf, firstDayOf, monthName } from "@sim/time";
+import { describeEvents, type EventsData } from "./describeEvents";
 import { KPIS, type KpiSection, type Rag } from "./kpis";
 
 /** Months of KPIs shown: this month so far and the ones before. */
@@ -46,7 +48,10 @@ export interface HospitalData {
     priceLevels: readonly [number, number];
     priceElasticity: number;
     nhsReferrals: { id: SpecialtyId; name: string; on: boolean }[];
+    fluVaccination: boolean;
+    fluVaccinationCost: number;
   };
+  events: EventsData;
   performance: {
     /** This month so far first, then earlier months. */
     months: { name: string; days: number }[];
@@ -106,7 +111,10 @@ export function describeHospital(state: SimState): HospitalData {
       nhsReferrals: content.specialties
         .filter((sp) => sp.outpatients)
         .map((sp) => ({ id: sp.id, name: sp.name, on: !!state.policies.nhsReferrals[sp.id] })),
+      fluVaccination: state.policies.fluVaccination,
+      fluVaccinationCost: FLU_VACCINATION.costPerHead,
     },
+    events: describeEvents(state),
     performance: performance(state),
   };
 }

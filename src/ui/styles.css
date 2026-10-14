@@ -2476,3 +2476,44 @@ body.planning #game::after {
   max-width: 360px;
   padding: 1px 0;
 }
+
+/* ---------- Pressure events ---------- */
+
+.topbar .event-chip {
+  padding: 2px 8px;
+  border: 1px solid rgba(242, 201, 76, 0.6);
+  border-radius: 10px;
+  background: rgba(242, 201, 76, 0.18);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.topbar .event-chip.coming {
+  border-style: dashed;
+  background: transparent;
+}
+.topbar .event-chip .dim {
+  color: var(--text-dim);
+}
+.topbar .event-chip {
+  white-space: nowrap;
+}
+@media (max-width: 1000px) {
+  .topbar .event-chip .dim {
+    display: none;
+  }
+}
+.event-card .meter {
+  max-width: 240px;
+}
+.event-levers-title {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.event-levers {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+}

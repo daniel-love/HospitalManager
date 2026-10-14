@@ -433,6 +433,8 @@ Each event has a **trigger** (scheduled, seasonal, random, or conditional), an *
 | **Heatwave**                  | Elderly and dehydration presentations, staff fatigue                  | Cooling, ambience                                                                             |
 | **VIP / media visit**         | Reputation multiplier on the day                                      | Make sure the visited department is presentable                                               |
 
+**As built (M6 step 1):** events are forecast before they start (a heat-health alert two days ahead, flu surveillance a week ahead), shown as chips in the top bar and in Hospital → Events with what the player can do. Winter pressures are modelled as a flu season (more ambulances and admissions, breathing problems and staff sickness, rather than a flood of walk-ins: winter's real strain is acuity and beds). Heatwaves bring falls and heat illness and make rooms without portable air conditioning uncomfortable for patients and tiring for staff. Staff flu vaccination is a policy.
+
 **Scenario framework:** a scenario = starting map (blank or pre-built), funding model, budget, an event script and objectives (e.g. "Achieve 90% 4-hour for 4 consecutive weeks" or "Reach a Good rating within 2 years").
 
 ---

@@ -25,7 +25,7 @@ const HINTS: Record<Speed, string> = {
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
 export function TopBar({ game }: { game: Game }) {
-  const { clock, speed, money, patients, fourHour } = hud.value;
+  const { clock, speed, money, patients, fourHour, events } = hud.value;
   return (
     <div class="topbar">
       <span class="clock">{clock}</span>
@@ -48,6 +48,17 @@ export function TopBar({ game }: { game: Game }) {
       >
         4-hr {fourHour === null ? "—" : `${Math.round(fourHour * 100)}%`}
       </span>
+      {events.map((e) => (
+        <button
+          key={e.id}
+          class={`event-chip${e.coming ? " coming" : ""}`}
+          title={`${e.label} ${e.coming ? "forecast" : "under way"}: click for what to do`}
+          onMouseDown={noFocus}
+          onClick={() => game.openHospital("events")}
+        >
+          {e.label} <span class="dim">{e.when}</span>
+        </button>
+      ))}
       <div class="speeds" role="group" aria-label="Game speed">
         {SPEEDS.map((s) => (
           <button
