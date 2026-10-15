@@ -63,26 +63,29 @@ export function TopBar({ game }: { game: Game }) {
       >
         <span class="stat">
           <span class="dim">A&amp;E</span> {census.ae}
+          {(census.waiting > 0 || census.awaitingBed > 0) && (
+            <span class="sub">
+              {" ("}
+              {census.waiting > 0 && `${census.waiting} waiting`}
+              {census.waiting > 0 && census.awaitingBed > 0 && ", "}
+              {census.awaitingBed > 0 && (
+                <span class="warn">{census.awaitingBed} need a bed</span>
+              )}
+              {")"}
+            </span>
+          )}
         </span>
-        <span class={`stat${census.waiting > 0 ? "" : " zero"}`}>
-          <span class="dim">waiting</span> {census.waiting}
-        </span>
-        {census.awaitingBed > 0 && (
-          <span class="stat warn">
-            <span class="dim">for a bed</span> {census.awaitingBed}
-          </span>
-        )}
         <span class="stat">
-          <span class="dim">wards</span> {census.wards}
+          <span class="dim">Wards</span> {census.wards}
         </span>
         {census.surgery > 0 && (
           <span class="stat">
-            <span class="dim">surgery</span> {census.surgery}
+            <span class="dim">Surgery</span> {census.surgery}
           </span>
         )}
         {census.clinics > 0 && (
           <span class="stat">
-            <span class="dim">clinics</span> {census.clinics}
+            <span class="dim">Clinics</span> {census.clinics}
           </span>
         )}
       </button>
