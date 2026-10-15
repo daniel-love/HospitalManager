@@ -27,7 +27,9 @@ import {
 import { onSite } from "@sim/agents";
 import { applyCommand, type Command, type CommandResult } from "@sim/commands";
 import { addToPlan, buildPreview, commitPlan, planDiff, type PlanPreview } from "@sim/plan";
-import { roomsPatientsCantReach } from "@sim/places";
+import { roomsPatientsCantReach, seatsIn } from "@sim/places";
+import { waitingCrowd } from "@sim/systems/patients";
+import { WAITING_CROWD } from "@data/patients";
 import { tick } from "@sim/sim";
 import {
   createSimState,
@@ -35,6 +37,7 @@ import {
   type GapFill,
   type SimState,
   type Visiting,
+  type WaitingFor,
 } from "@sim/state";
 import { siteView } from "@sim/world/site";
 import { coverageView, stationsSeeing, bedCover } from "@sim/systems/monitoring";
@@ -60,6 +63,7 @@ import {
   setEmergencyTheatre,
   setPrivateRoom,
   setRoomSpecialty,
+  setWaitingFor,
 } from "@sim/world/rooms";
 import { PRIVATE } from "@data/economy";
 import { CameraControls, isPanModifier } from "@render/cameraControls";
@@ -309,6 +313,19 @@ export class Game {
     const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
     if (!room || !roomById.get(room.typeId)?.specialty) return;
     setRoomSpecialty(this.state, room, specialty);
+    if (this.preview) this.rebuildPreview();
+    this.publishInspector();
+  }
+
+  /**
+   * Keeps the selected Waiting Area for A&E patients or outpatients (null:
+   * anyone). A setting for the real hospital, even in plan mode.
+   */
+  setWaitingFor(who: WaitingFor | null): void {
+    const tile = this.selectedTile;
+    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    if (!room || room.typeId !== "waiting_area") return;
+    setWaitingFor(this.state, room, who);
     if (this.preview) this.rebuildPreview();
     this.publishInspector();
   }
@@ -1096,6 +1113,16 @@ export class Game {
             }
           : {}),
         ...(room.typeId === "theatre" ? { emergency: room.emergency } : {}),
+        ...(room.typeId === "waiting_area"
+          ? {
+              waiting: {
+                value: room.waitingFor,
+                seats: seatsIn(this.viewState, room),
+                crowd: waitingCrowd(this.viewState).get(room.id) ?? 0,
+                comfortable: WAITING_CROWD.comfortable,
+              },
+            }
+          : {}),
         ...(room.objectIds.some((id) => equipmentById.get(this.viewState.objects[id]!.defId)?.power)
           ? { essential: room.essential }
           : {}),

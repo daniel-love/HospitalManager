@@ -33,6 +33,7 @@ import {
   TRIAGE_CATEGORIES,
   TRIAGE_MINS,
   TRIAGE_TARGET_MINS,
+  WAITING_CROWD,
 } from "@data/patients";
 import type { Outcome, Patient, PatientStage, Point } from "../agents";
 import { emit, warn } from "../events";
@@ -53,6 +54,7 @@ import {
   seatTile,
   siteEntrance,
   staffedDesks,
+  mayWaitIn,
   standingSpot,
 } from "../places";
 import { chance, nextInt } from "../rng";
@@ -62,7 +64,7 @@ import { crewAccess, privateRoomsCrossed } from "../world/access";
 import { tileIndex } from "../world/grid";
 import { isStandable } from "../world/objects";
 import { findPath } from "../world/pathfinding";
-import { roomOfObject } from "../world/rooms";
+import { roomAt, roomOfObject } from "../world/rooms";
 import { earnEmergency, earnPlanned } from "./finance";
 import {
   dirtyCouch,
@@ -222,9 +224,14 @@ function waitInArea(state: SimState, p: Patient, beingSeen: boolean): void {
       return;
     }
   }
-  if (p.seat && !inValidRoom(state, p.seat.objectId, "waiting_area")) releaseSeat(state, p);
+  if (p.seat) {
+    const room = inValidRoom(state, p.seat.objectId, "waiting_area")
+      ? roomOfObject(state, p.seat.objectId)
+      : undefined;
+    if (!room || !mayWaitIn(room, "ae")) releaseSeat(state, p);
+  }
   if (!p.seat && (myTurn || p.standing === null)) {
-    const seat = freeSeat(state, p);
+    const seat = freeSeat(state, p, "waiting_area", "ae");
     if (seat) {
       reserve(state, seat.objectId, seat.slot, p.id);
       p.seat = seat;
@@ -236,13 +243,21 @@ function waitInArea(state: SimState, p: Patient, beingSeen: boolean): void {
     headTo(state, p, seatTile(obj, p.seat.slot), seatApproach(obj, p.seat.slot));
     return;
   }
+  // No free seat: stand in a Waiting Area they may use (or, failing that, reception).
   const grid = state.floors[0]!;
-  if (!p.standing || !isStandable(grid, p.standing.x, p.standing.y)) {
+  let spot = p.standing;
+  const spotRoom = spot && roomAt(state, 0, spot.x, spot.y);
+  if (
+    !spot ||
+    !isStandable(grid, spot.x, spot.y) ||
+    (spotRoom?.typeId === "waiting_area" && !mayWaitIn(spotRoom, "ae"))
+  ) {
     const pickN = (n: number) => nextInt(state.rng, 0, n - 1);
-    p.standing = standingSpot(state, "waiting_area", pickN) ??
+    spot = standingSpot(state, "waiting_area", pickN, "ae") ??
       standingSpot(state, "ae_reception", pickN) ?? { x: Math.round(p.x), y: Math.round(p.y) };
+    p.standing = spot;
   }
-  headTo(state, p, p.standing);
+  headTo(state, p, spot);
 }
 
 function toiletTrip(state: SimState, p: Patient): void {
@@ -437,6 +452,44 @@ export function afterTriage(state: SimState, p: Patient): void {
 
 // ---------- Needs and mood ----------
 
+/** Rooms people wait in, so crowding there can be counted. */
+const WAITING_ROOMS = new Set(["waiting_area", "ae_reception"]);
+
+const crowdCache = new WeakMap<SimState, { tick: number; byRoom: Map<number, number> }>();
+
+/**
+ * How many people are waiting in each Waiting Area (and A&E Reception) right
+ * now, by room id: A&E patients waiting to be called and outpatients
+ * waiting for their clinic. Counted once a tick.
+ */
+export function waitingCrowd(state: SimState): Map<number, number> {
+  const c = crowdCache.get(state);
+  if (c && c.tick === state.tick) return c.byRoom;
+  const byRoom = new Map<number, number>();
+  const count = (a: Point) => {
+    const room = roomAt(state, 0, Math.round(a.x), Math.round(a.y));
+    if (room && WAITING_ROOMS.has(room.typeId)) byRoom.set(room.id, (byRoom.get(room.id) ?? 0) + 1);
+  };
+  for (const p of Object.values(state.patients)) {
+    if ((p.stage === "waiting_triage" || p.stage === "waiting_treatment") && !p.toilet) count(p);
+  }
+  for (const o of Object.values(state.outpatients)) if (o.stage === "waiting") count(o);
+  crowdCache.set(state, { tick: state.tick, byRoom });
+  return byRoom;
+}
+
+/** People waiting in the room this patient is in, if it's somewhere people wait. */
+export function crowdAround(state: SimState, p: Patient): number {
+  const room = roomAt(state, 0, Math.round(p.x), Math.round(p.y));
+  return room ? (waitingCrowd(state).get(room.id) ?? 0) : 0;
+}
+
+/** Extra mood lost an hour by an A&E patient waiting in a crowd of `n`. */
+export function crowdMoodDecay(n: number, standing: boolean): number {
+  const extra = Math.max(0, n - WAITING_CROWD.comfortable) * WAITING_CROWD.perPerson;
+  return Math.min(WAITING_CROWD.max, extra) * (standing ? WAITING_CROWD.standingFactor : 1);
+}
+
 /** Care has moved on (triaged, seen, a step done, a decision): mood picks up. */
 export function lift(p: Patient, amount: number): void {
   p.mood = Math.min(100, p.mood + amount);
@@ -478,6 +531,8 @@ function updateNeeds(state: SimState, p: Patient, beingSeen: boolean): void {
   ) {
     const seated = p.seat !== null && p.path.length === 0 && !p.toilet;
     decay = seated || p.toilet ? MOOD_DECAY_SEATED : MOOD_DECAY_STANDING;
+    // A packed waiting room is worse, and worse again on your feet.
+    if (!p.toilet && WAITING.has(p.stage)) decay += crowdMoodDecay(crowdAround(state, p), !seated);
   } else if ((p.stage === "in_cubicle" || p.stage === "awaiting_bed") && !beingSeen) {
     decay = MOOD_DECAY_IN_CUBICLE;
   }

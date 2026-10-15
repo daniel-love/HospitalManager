@@ -49,7 +49,7 @@ import { inCare } from "@sim/systems/curtains";
 import { wardBedUse } from "@sim/systems/escalation";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { annualCost } from "@sim/systems/finance";
-import { formatWait, inAE } from "@sim/systems/patients";
+import { crowdAround, crowdMoodDecay, formatWait, inAE } from "@sim/systems/patients";
 import {
   canDo,
   MAX_WEEK_SESSIONS,
@@ -450,6 +450,8 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
   const needs: string[] = [];
   if (p.stage.startsWith("waiting") && !p.toilet) {
     needs.push(p.seat ? "Has a seat" : "Standing: no free seat");
+    const crowd = crowdAround(state, p);
+    if (crowdMoodDecay(crowd, false) > 0) needs.push(`Crowded: ${crowd} waiting around them`);
   }
   // Ward toilet needs aren't modelled yet (left to the ward team), so a
   // bladder carried up from A&E isn't shown once they're on the ward.

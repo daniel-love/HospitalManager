@@ -17,7 +17,7 @@ import { SCENARIOS, type ScenarioId } from "@data/scenarios";
 import { PRESSURE_EVENTS, type PressureEventId } from "@data/pressure";
 import { specialtyIds, staffRoleIds } from "@data/schema";
 import { SERVICE_LINES, type ServiceLine } from "@sim/agents";
-import { SIM_STATE_VERSION, type PlacedObject, type SimState } from "@sim/state";
+import { SIM_STATE_VERSION, WAITING_FOR, type PlacedObject, type SimState } from "@sim/state";
 import { clockFromTick, formatClock } from "@sim/time";
 import { createFloorGrid, tileIndex, type FloorGrid } from "@sim/world/grid";
 import { layerOf, objectRect } from "@sim/world/objects";
@@ -675,6 +675,7 @@ const saveSchema = z.object({
     }),
     privateRooms: z.record(z.string().regex(/^\d+:\d+$/), z.literal(true)),
     essentialRooms: z.record(z.string().regex(/^\d+:\d+$/), z.boolean()),
+    waitingAreas: z.record(z.string().regex(/^\d+:\d+$/), z.enum(WAITING_FOR)),
     maintenance: z.record(z.string(), z.object({ wear: num.min(0).max(100), broken: nullableInt })),
     closedRooms: z.record(
       z.string().regex(/^\d+:\d+$/),
@@ -852,6 +853,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       privateRooms: state.privateRooms,
       closedRooms: state.closedRooms,
       essentialRooms: state.essentialRooms,
+      waitingAreas: state.waitingAreas,
       maintenance: state.maintenance,
       name: state.name,
       funding: state.funding,
@@ -939,6 +941,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     privateRooms: { ...s.privateRooms },
     closedRooms: { ...s.closedRooms },
     essentialRooms: { ...s.essentialRooms },
+    waitingAreas: { ...s.waitingAreas },
     maintenance: Object.fromEntries(
       Object.entries(s.maintenance).map(([k, v]) => [Number(k), { ...v }]),
     ),

@@ -20,7 +20,7 @@ import {
   roomById,
 } from "@data/catalogue";
 import type { RoomDef, SpecialtyId } from "@data/schema";
-import type { Room, RoomCheck, SimState } from "../state";
+import type { Room, RoomCheck, SimState, WaitingFor } from "../state";
 import { isSolidWall, isWallOrDoor, tileIndex, WallType, type FloorGrid } from "./grid";
 import { isStandable, objectRect, sideTiles } from "./objects";
 import { shareKit } from "./sharedKit";
@@ -51,6 +51,7 @@ export function detectRooms(state: SimState): void {
         private: false,
         closed: false,
         essential: POWER.essential.includes(def.id),
+        waitingFor: null,
         forConditions: [],
       });
     }
@@ -121,8 +122,25 @@ export function detectRooms(state: SimState): void {
     const room = id === 0 ? undefined : rooms[id - 1];
     if (room && (room.typeId === "ward" || room.typeId === "side_room")) room.closed = true;
   }
+  for (const [key, who] of Object.entries(state.waitingAreas)) {
+    const [floor, tile] = key.split(":").map(Number);
+    const id = state.floors[floor!]?.roomId[tile!] ?? 0;
+    const room = id === 0 ? undefined : rooms[id - 1];
+    if (room?.typeId === "waiting_area") room.waitingFor = who;
+  }
   state.rooms = rooms;
   state.objectRoom = objectRoom;
+}
+
+/** Keeps a Waiting Area for A&E patients or outpatients, or opens it to anyone (null). */
+export function setWaitingFor(state: SimState, room: Room, who: WaitingFor | null): void {
+  const grid = state.floors[room.floor]!;
+  for (const key of Object.keys(state.waitingAreas)) {
+    const [floor, tile] = key.split(":").map(Number);
+    if (floor === room.floor && grid.roomId[tile!] === room.id) delete state.waitingAreas[key];
+  }
+  if (who !== null) state.waitingAreas[`${room.floor}:${room.tiles[0]!}`] = who;
+  room.waitingFor = who;
 }
 
 /**

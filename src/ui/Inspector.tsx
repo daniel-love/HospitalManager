@@ -1,4 +1,5 @@
 import type { SpecialtyId } from "@data/schema";
+import type { WaitingFor } from "@sim/state";
 import { formatMoney } from "@game/tools";
 import { inspector, type AgentInfo } from "./store";
 
@@ -11,6 +12,7 @@ export function Inspector({
   onTheatreSessions,
   onPrivateSessions,
   onEmergencyTheatre,
+  onWaitingFor,
   onPrivateRoom,
   onRoomClosed,
   onEssentialRoom,
@@ -23,6 +25,7 @@ export function Inspector({
   onTheatreSessions: (staffId: number, sessions: number) => void;
   onPrivateSessions: PrivateSessionsHandler;
   onEmergencyTheatre: (on: boolean) => void;
+  onWaitingFor: (who: WaitingFor | null) => void;
   onPrivateRoom: (on: boolean) => void;
   onRoomClosed: (closed: boolean) => void;
   onEssentialRoom: (on: boolean) => void;
@@ -101,6 +104,32 @@ export function Inspector({
                 ))}
               </select>
               <span class="dim">{room.specialty.note}</span>
+            </label>
+          )}
+          {room.waiting && (
+            <label class="room-specialty">
+              For{" "}
+              <select
+                value={room.waiting.value ?? ""}
+                onChange={(e) => {
+                  const v = (e.currentTarget as HTMLSelectElement).value;
+                  onWaitingFor(v === "" ? null : (v as WaitingFor));
+                }}
+              >
+                <option value="">Anyone</option>
+                <option value="ae">A&amp;E patients</option>
+                <option value="outpatients">Outpatients</option>
+              </select>
+              <span class="dim">
+                Patients wait in an area kept for them first, then one open to anyone. With no seat
+                free they stand, and get fed up faster.
+              </span>
+              <span class={room.waiting.crowd > room.waiting.comfortable ? "warn-text" : "dim"}>
+                {room.waiting.crowd} waiting · {room.waiting.seats.taken}/{room.waiting.seats.total}{" "}
+                seats taken
+                {room.waiting.crowd > room.waiting.comfortable &&
+                  ": crowded, so A&E patients here are getting fed up faster"}
+              </span>
             </label>
           )}
           {room.emergency !== undefined && (

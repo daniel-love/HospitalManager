@@ -12,7 +12,7 @@ import { inService } from "./world/service";
 import { content, equipmentById, equipmentNamesFor, roomById } from "@data/catalogue";
 import { TOILET_FIXTURES, TOILET_USES_BEFORE_CLEAN } from "@data/patients";
 import type { Point } from "./agents";
-import type { PlacedObject, Room, SimState } from "./state";
+import type { PlacedObject, Room, SimState, WaitingFor } from "./state";
 import { OPEN, patientAccess } from "./world/access";
 import { tileIndex } from "./world/grid";
 import { isWalkable } from "./world/pathfinding";
@@ -78,10 +78,15 @@ export function missingRoom(
   return `No ${name} with ${items.join(" and ")}`;
 }
 
-function objectsIn(state: SimState, roomType: string, test: (defId: string) => boolean) {
+function objectsIn(
+  state: SimState,
+  roomType: string,
+  test: (defId: string) => boolean,
+  roomTest: (room: Room) => boolean = () => true,
+) {
   const out: PlacedObject[] = [];
   for (const room of state.rooms) {
-    if (!room.valid || room.typeId !== roomType) continue;
+    if (!room.valid || room.typeId !== roomType || !roomTest(room)) continue;
     for (const id of room.objectIds) {
       const obj = state.objects[id]!;
       if (test(obj.defId)) out.push(obj);
@@ -152,54 +157,93 @@ export function seatApproach(obj: PlacedObject, slot: number): Point {
   return { x: t.x + dx, y: t.y + dy };
 }
 
-/** The nearest free seat in a valid room of a type (a waiting area unless said). */
+/**
+ * Whether someone may wait in this room: a Waiting Area kept for one group
+ * (Room.waitingFor) only takes them; `who` undefined takes any room.
+ */
+export function mayWaitIn(room: Room, who?: WaitingFor): boolean {
+  return who === undefined || room.waitingFor === null || room.waitingFor === who;
+}
+
+const hasSeats = (d: string) => (equipmentById.get(d)?.seats ?? 0) > 0;
+
+/**
+ * The nearest free seat in a valid room of a type (a waiting area unless
+ * said). With `who`, only Waiting Areas they may use, and one kept for them
+ * before one open to anyone.
+ */
 export function freeSeat(
   state: SimState,
   from: Point,
   roomType = "waiting_area",
+  who?: WaitingFor,
 ): { objectId: number; slot: number } | null {
-  let best: { objectId: number; slot: number } | null = null;
-  let bestD = Infinity;
-  const seating = objectsIn(state, roomType, (d) => (equipmentById.get(d)?.seats ?? 0) > 0);
-  for (const obj of seating) {
-    const seats = equipmentById.get(obj.defId)!.seats!;
-    for (let slot = 0; slot < seats; slot++) {
-      if (holder(state, obj.id, slot) !== undefined) continue;
-      const d = manhattan(seatTile(obj, slot), from);
-      if (d < bestD) {
-        best = { objectId: obj.id, slot };
-        bestD = d;
+  const passes: ((room: Room) => boolean)[] =
+    who === undefined ? [() => true] : [(r) => r.waitingFor === who, (r) => r.waitingFor === null];
+  for (const roomTest of passes) {
+    let best: { objectId: number; slot: number } | null = null;
+    let bestD = Infinity;
+    for (const obj of objectsIn(state, roomType, hasSeats, roomTest)) {
+      const seats = equipmentById.get(obj.defId)!.seats!;
+      for (let slot = 0; slot < seats; slot++) {
+        if (holder(state, obj.id, slot) !== undefined) continue;
+        const d = manhattan(seatTile(obj, slot), from);
+        if (d < bestD) {
+          best = { objectId: obj.id, slot };
+          bestD = d;
+        }
       }
     }
+    if (best) return best;
   }
-  return best;
+  return null;
 }
 
-/** A random standable tile in a valid room of the type, if there is one. */
+/**
+ * A random standable tile in a valid room of the type, if there is one.
+ * With `who`, only Waiting Areas they may use, one kept for them first.
+ */
 export function standingSpot(
   state: SimState,
   roomType: string,
   pick: (n: number) => number,
+  who?: WaitingFor,
 ): Point | null {
   const grid = state.floors[0]!;
-  const tiles: Point[] = [];
-  for (const room of state.rooms) {
-    if (!room.valid || room.typeId !== roomType) continue;
-    for (const i of room.tiles) {
-      const x = i % grid.width;
-      const y = (i - x) / grid.width;
-      if (isStandable(grid, x, y)) tiles.push({ x, y });
+  const passes: ((room: Room) => boolean)[] =
+    who === undefined ? [() => true] : [(r) => r.waitingFor === who, (r) => r.waitingFor === null];
+  for (const roomTest of passes) {
+    const tiles: Point[] = [];
+    for (const room of state.rooms) {
+      if (!room.valid || room.typeId !== roomType || !roomTest(room)) continue;
+      for (const i of room.tiles) {
+        const x = i % grid.width;
+        const y = (i - x) / grid.width;
+        if (isStandable(grid, x, y)) tiles.push({ x, y });
+      }
     }
+    if (tiles.length > 0) return tiles[pick(tiles.length)]!;
   }
-  return tiles.length === 0 ? null : tiles[pick(tiles.length)]!;
+  return null;
 }
 
-/** Seats in valid waiting areas, and how many are taken. */
-export function seatCount(state: SimState): { total: number; taken: number } {
+/** Seats in one room, and how many are taken. */
+export function seatsIn(state: SimState, room: Room): { total: number; taken: number } {
   let total = 0;
   let taken = 0;
-  const seating = objectsIn(state, "waiting_area", (d) => (equipmentById.get(d)?.seats ?? 0) > 0);
-  for (const obj of seating) {
+  for (const id of room.objectIds) {
+    const seats = equipmentById.get(state.objects[id]!.defId)?.seats ?? 0;
+    total += seats;
+    for (let slot = 0; slot < seats; slot++) if (holder(state, id, slot) !== undefined) taken++;
+  }
+  return { total, taken };
+}
+
+/** Seats in valid waiting areas (with `who`, those they may use), and how many are taken. */
+export function seatCount(state: SimState, who?: WaitingFor): { total: number; taken: number } {
+  let total = 0;
+  let taken = 0;
+  for (const obj of objectsIn(state, "waiting_area", hasSeats, (r) => mayWaitIn(r, who))) {
     const seats = equipmentById.get(obj.defId)!.seats!;
     total += seats;
     for (let slot = 0; slot < seats; slot++) if (holder(state, obj.id, slot) !== undefined) taken++;

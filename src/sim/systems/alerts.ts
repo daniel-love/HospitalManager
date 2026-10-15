@@ -385,11 +385,11 @@ export function updateAlerts(state: SimState): void {
   );
   const standing = waiting.filter((p) => p.seat === null && !p.toilet).length;
   if (standing > 0) {
-    const { total } = seatCount(state);
+    const { total } = seatCount(state, "ae");
     const text =
       total === 0
-        ? `${plural(standing, "patient is", "patients are")} standing: there's no working Waiting Area with seats.`
-        : `The waiting area is full: ${plural(standing, "patient is", "patients are")} standing.`;
+        ? `${plural(standing, "patient is", "patients are")} standing: there's no working Waiting Area with seats for A&E.`
+        : `The A&E waiting area is full: ${plural(standing, "patient is", "patients are")} standing, and getting fed up faster.`;
     warn(state, "standing", COOLDOWN, text);
   }
 

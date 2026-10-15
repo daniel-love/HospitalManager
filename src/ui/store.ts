@@ -14,7 +14,7 @@ import type { Speed } from "@game/loop";
 import type { Tool } from "@game/tools";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import type { CashFlows, DayReport, FlowStats, Ledger } from "@sim/agents";
-import type { Funding, GapFill, Rotation, RoomCheck } from "@sim/state";
+import type { Funding, GapFill, Rotation, RoomCheck, WaitingFor } from "@sim/state";
 import type { NurseBand } from "@data/staff";
 import type { HelpContent } from "./help";
 
@@ -166,6 +166,14 @@ export interface InspectorData {
     };
     /** Operating theatres: kept for emergencies. */
     emergency?: boolean;
+    /** Waiting Areas: who it's for (null: anyone), seats, and how many are waiting here now. */
+    waiting?: {
+      value: WaitingFor | null;
+      seats: { total: number; taken: number };
+      crowd: number;
+      /** Past this many waiting, A&E patients here get fed up faster. */
+      comfortable: number;
+    };
     /** Hybrid trusts: in the Private Patient Unit (rooms that can be). */
     private?: boolean;
     /** On the essential supply: the standby generators cover it first in a power cut. */

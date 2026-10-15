@@ -29,11 +29,13 @@ import {
   freeSeat,
   frontOf,
   holder,
+  mayWaitIn,
   release,
   reserve,
   seatApproach,
   seatTile,
   siteEntrance,
+  standingSpot,
 } from "../places";
 import { chance, nextFloat, nextInt } from "../rng";
 import type { PlacedObject, SimState } from "../state";
@@ -41,6 +43,7 @@ import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE, tickAt } from "../time"
 import { sessionsOn, type Session } from "./clinics";
 import { ticksFor, unassignJob } from "./jobBoard";
 import { headTo } from "./movement";
+import { roomOfObject } from "../world/rooms";
 import { bookAppointments, serviceOf } from "./referrals";
 import { earnOutpatient, earnPrivate } from "./finance";
 
@@ -297,19 +300,31 @@ function bookIn(state: SimState, o: Outpatient): void {
   o.stage = "waiting";
 }
 
-/** Sit in the nearest Waiting Area until called. */
+/**
+ * Sit in the nearest Waiting Area they may use until called; with no seat
+ * free, stand in one (each outpatient keeps to their own spot).
+ */
 function waitToBeCalled(state: SimState, o: Outpatient): void {
-  if (!o.seat) {
-    const seat = freeSeat(state, o);
-    if (!seat) return; // Stand where they are.
-    reserve(state, seat.objectId, seat.slot, o.id);
-    o.seat = seat;
+  if (o.seat) {
+    const room = roomOfObject(state, o.seat.objectId);
+    if (!room?.valid || room.typeId !== "waiting_area" || !mayWaitIn(room, "outpatients")) {
+      release(state, o.seat.objectId, o.seat.slot, o.id);
+      o.seat = null;
+    }
   }
-  const obj = state.objects[o.seat.objectId];
-  if (!obj) {
-    o.seat = null;
+  if (!o.seat && (state.tick + o.id) % 10 === 0) {
+    const seat = freeSeat(state, o, "waiting_area", "outpatients");
+    if (seat) {
+      reserve(state, seat.objectId, seat.slot, o.id);
+      o.seat = seat;
+    }
+  }
+  if (!o.seat) {
+    const spot = standingSpot(state, "waiting_area", (n) => o.id % n, "outpatients");
+    if (spot) headTo(state, o, spot);
     return;
   }
+  const obj = state.objects[o.seat.objectId]!;
   headTo(state, o, seatTile(obj, o.seat.slot), seatApproach(obj, o.seat.slot));
 }
 

@@ -143,6 +143,12 @@ export const START_MOOD: [number, number] = [60, 90];
 /** Mood lost per hour while waiting to be seen. */
 export const MOOD_DECAY_SEATED = 6;
 export const MOOD_DECAY_STANDING = 12;
+/**
+ * A crowded waiting room wears on everyone in it: past `comfortable` people
+ * waiting in the same room, each extra one costs those waiting for A&E
+ * `perPerson` mood an hour (up to `max`), and more if they're standing.
+ */
+export const WAITING_CROWD = { comfortable: 6, perPerson: 0.5, max: 12, standingFactor: 1.5 };
 /** Extra mood loss per hour when they badly need the toilet and can't go. */
 export const MOOD_DECAY_TOILET = 12;
 /** Mood lost per hour waiting in a cubicle between steps (they're being seen). */

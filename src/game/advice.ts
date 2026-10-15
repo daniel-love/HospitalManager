@@ -115,7 +115,7 @@ export function describeAdvice(state: SimState): AdviceData {
       item(
         hasRoom("waiting_area"),
         "A Waiting Area with seats",
-        "Patients wait here for triage and treatment. Standing makes them unhappy sooner.",
+        "Patients wait here for triage and treatment. Standing, or a crowded room, makes them unhappy sooner.",
       ),
       item(
         hasRoom("triage_room"),

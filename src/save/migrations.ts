@@ -988,6 +988,8 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v45: Waiting Areas can be kept for A&E or outpatients (all open to anyone so far).
+  44: (save) => ({ ...save, state: { ...(save.state as object), waitingAreas: {} } }),
 };
 
 /** Base64 of n zero bytes, without building them. */

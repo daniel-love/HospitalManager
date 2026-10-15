@@ -43,7 +43,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 44;
+export const SIM_STATE_VERSION = 45;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -67,6 +67,10 @@ export interface RoomCheck {
 }
 
 /** A detected room: a connected area of one zone type, bounded by walls and doors. */
+/** Who a Waiting Area is for: A&E patients, or outpatients booked into a clinic. */
+export type WaitingFor = "ae" | "outpatients";
+export const WAITING_FOR: readonly WaitingFor[] = ["ae", "outpatients"];
+
 export interface Room {
   /** Matches FloorGrid.roomId. Reassigned whenever rooms are re-detected. */
   id: number;
@@ -90,6 +94,8 @@ export interface Room {
   closed: boolean;
   /** On the essential supply: the standby generators cover it first (see SimState.essentialRooms). */
   essential: boolean;
+  /** Waiting areas: who may wait here (see SimState.waitingAreas), or null for anyone. */
+  waitingFor: WaitingFor | null;
   /**
    * Advisory: equipment some conditions need here, beyond being valid
    * (e.g. an ECG for chest pain). Doesn't affect `valid`.
@@ -172,6 +178,8 @@ export interface SimState {
    * default (data/maintenance.ts POWER), keyed like privateRooms.
    */
   essentialRooms: Record<string, boolean>;
+  /** Waiting Areas kept for one group of patients, pinned to a tile like roomSpecialties. */
+  waitingAreas: Record<string, WaitingFor>;
   /**
    * Equipment that can break down: how worn (0–100) and, if it's broken,
    * since when, by object id (systems/maintenance.ts). Items not listed are
@@ -521,6 +529,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     privateRooms: {},
     closedRooms: {},
     essentialRooms: {},
+    waitingAreas: {},
     maintenance: {},
     departments: { ae: "open", outpatients: "open", theatres: "open" },
     name: opts.name ?? "My hospital",

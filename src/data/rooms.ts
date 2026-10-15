@@ -49,7 +49,8 @@ export const rooms: RoomInput[] = [
     publicRoute: true,
     required: [],
     minSeats: 6,
-    description: "Patients and companions wait here. Toilets nearby are recommended.",
+    description:
+      "Patients and companions wait here, standing if the seats run out. Can be kept for A&E or outpatients. Toilets nearby are recommended.",
   },
   {
     id: "triage_room",

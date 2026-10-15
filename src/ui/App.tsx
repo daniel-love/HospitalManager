@@ -42,6 +42,7 @@ export function App({ game }: { game: Game }) {
           game.applyStaff({ type: "set_private_sessions", id, kind, sessions })
         }
         onEmergencyTheatre={(on) => game.setEmergencyTheatre(on)}
+        onWaitingFor={(who) => game.setWaitingFor(who)}
         onPrivateRoom={(on) => game.setPrivateRoom(on)}
         onRoomClosed={(closed) => game.setRoomClosed(closed)}
         onEssentialRoom={(on) => game.setEssentialRoom(on)}
