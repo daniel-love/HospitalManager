@@ -290,9 +290,41 @@ function evaluateRoom(state: SimState, room: Room, rooms: Room[]): void {
     }
   }
 
+  if (room.typeId === "mortuary") checks.push(mortuaryDoorCheck(grid, room, rooms));
+
   room.checks = checks;
-  room.valid = checks.every((c) => c.ok);
+  room.valid = checks.every((c) => c.ok || c.advisory);
   room.capabilities = capabilitiesOf(defIds);
+}
+
+/**
+ * Rooms where patients, visitors and families are: a mortuary opening onto
+ * one means every transfer, and every funeral director, passes them.
+ */
+const PUBLIC_ROOMS = [
+  "ae_reception",
+  "waiting_area",
+  "outpatients_reception",
+  "ward",
+  "relatives_room",
+  "discharge_lounge",
+];
+
+/**
+ * A mortuary should open onto a corridor, away from where the public are. It
+ * still works if it doesn't (only an advisory), but transfers will be seen.
+ */
+function mortuaryDoorCheck(grid: FloorGrid, room: Room, rooms: Room[]): RoomCheck {
+  const neighbours = connectedRoomTypes(grid, room, rooms);
+  const seen = PUBLIC_ROOMS.filter((t) => neighbours.has(t)).map((t) => roomById.get(t)?.name ?? t);
+  return {
+    label: "Opens away from public areas",
+    ok: seen.length === 0,
+    advisory: true,
+    ...(seen.length > 0
+      ? { detail: `opens onto the ${seen.join(" and ")}: transfers will be seen` }
+      : {}),
+  };
 }
 
 /**

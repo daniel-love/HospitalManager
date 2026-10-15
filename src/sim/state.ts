@@ -43,7 +43,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 46;
+export const SIM_STATE_VERSION = 47;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -64,6 +64,8 @@ export interface RoomCheck {
   ok: boolean;
   /** Extra detail, e.g. "4 of 6". */
   detail?: string;
+  /** Advice only: the room still works if it isn't met. */
+  advisory?: boolean;
 }
 
 /** A detected room: a connected area of one zone type, bounded by walls and doors. */

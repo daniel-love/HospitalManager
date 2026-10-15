@@ -198,8 +198,8 @@ export function Inspector({
           {room.checks.length > 0 && (
             <ul class="checklist">
               {room.checks.map((c) => (
-                <li key={c.label} class={c.ok ? "ok" : "bad"}>
-                  <span aria-hidden="true">{c.ok ? "✓" : "✗"}</span> {c.label}
+                <li key={c.label} class={c.ok ? "ok" : c.advisory ? "advisory" : "bad"}>
+                  <span aria-hidden="true">{c.ok ? "✓" : c.advisory ? "!" : "✗"}</span> {c.label}
                   {c.detail && <span class="dim"> ({c.detail})</span>}
                 </li>
               ))}

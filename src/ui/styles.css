@@ -363,6 +363,9 @@ button {
 .checklist .ok > span:first-child {
   color: var(--ok);
 }
+.checklist .advisory > span:first-child {
+  color: #f2c94c;
+}
 .checklist .pending {
   color: var(--text-dim);
 }

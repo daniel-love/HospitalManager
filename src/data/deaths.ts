@@ -51,6 +51,15 @@ export const LOADING_MINS: [number, number] = [5, 10];
  */
 export const CONTINGENCY_HOURS = 6;
 
+/**
+ * A covered trolley on its way to the mortuary is unmistakable. Patients and
+ * visitors in the same room or corridor, within `radius` tiles, notice it:
+ * a patient's mood drops by `mood` (0–100), and once `complaintAt` people
+ * have seen one transfer, families complain. Staff draw the curtains in the
+ * room it leaves from, so nobody there counts.
+ */
+export const TRANSFER_SEEN = { radius: 4, mood: 10, complaintAt: 3 };
+
 /** Deceased patients each mortuary fridge unit holds. */
 export const BODIES_PER_FRIDGE = 3;
 /** After the review, the funeral director collects within this many hours. */

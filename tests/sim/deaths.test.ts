@@ -15,6 +15,7 @@ import { clockFromTick, TICKS_PER_MINUTE } from "@sim/time";
 import { roomOfObject } from "@sim/world/rooms";
 import { describePatient } from "@game/describe";
 import { staffedDeathsWard } from "../fixtures/deathsWard";
+import { applyAll } from "../fixtures/smallAE";
 import { invariantProblems } from "./simHelpers";
 
 const MIN = TICKS_PER_MINUTE;
@@ -90,6 +91,10 @@ describe("an expected death in a side room", () => {
       (j) => j.kind === "clean_cubicle" && j.objectId === bed.id,
     );
     expect(clean?.durationTicks ?? Infinity).toBeGreaterThanOrEqual(30 * MIN);
+    // Timed, and down an empty corridor: nobody saw.
+    const stats = state.today.stats;
+    expect(stats).toMatchObject({ mortuaryTransfers: 1, transfersSeen: 0, complaints: 0 });
+    expect(stats.mortuaryTransferMins).toBeGreaterThan(0);
   });
 
   it("is reviewed by the Medical Examiner, then released to the funeral director", () => {
@@ -112,6 +117,69 @@ describe("an expected death in an open bay", () => {
     runUntil(state, () => p.stage === "deceased");
     expect(state.today.stats.complaints).toBe(1);
     expect(state.events.map((e) => e.text).join("\n")).toMatch(/open bay rather than a side room/);
+  });
+});
+
+describe("a transfer to the mortuary past people in the corridor", () => {
+  it("upsets the patients who see it, and families complain", () => {
+    const state = settled(staffedDeathsWard());
+    const p = inpatient(state, bedIn(state, "side_room"));
+    p.endOfLife = true;
+    p.stayUntil = state.tick + MIN;
+    // Three ward patients stretching their legs in the corridor between the
+    // side room and the mortuary.
+    const wardBeds = Object.values(state.objects).filter(
+      (o) => o.defId === "hospital_bed" && roomOfObject(state, o.id)?.typeId === "ward",
+    );
+    const walkers = wardBeds.slice(0, 3).map((b) => inpatient(state, b));
+    const pin = () =>
+      walkers.forEach((w, i) => {
+        w.x = w.prevX = 8 + i;
+        w.y = w.prevY = 10;
+        w.path = [];
+      });
+    for (let i = 0; i < 8 * HOUR && p.stage !== "to_mortuary"; i++) {
+      pin();
+      tick(state);
+    }
+    for (const w of walkers) w.mood = 80;
+    for (let i = 0; i < HOUR && p.stage !== "in_mortuary"; i++) {
+      pin();
+      tick(state);
+    }
+    expect(p.stage).toBe("in_mortuary");
+    expect(p.death!.transfer!.seenBy).toEqual(expect.arrayContaining(walkers.map((w) => w.id)));
+    for (const w of walkers) expect(w.mood).toBeLessThan(72);
+    expect(state.today.stats).toMatchObject({
+      mortuaryTransfers: 1,
+      transfersSeen: 1,
+      complaints: 1,
+    });
+    expect(state.events.map((e) => e.text).join("\n")).toMatch(
+      /taken to the mortuary past patients and visitors/,
+    );
+  });
+});
+
+describe("the mortuary's door", () => {
+  const check = (state: SimState) =>
+    state.rooms.find((r) => r.typeId === "mortuary")!.checks.find((c) => c.advisory)!;
+
+  it("is fine onto a corridor", () => {
+    const state = staffedDeathsWard();
+    expect(check(state).ok).toBe(true);
+  });
+
+  it("onto a waiting area is advised against, but the mortuary still works", () => {
+    const state = staffedDeathsWard();
+    applyAll(state, [
+      { type: "zone", floor: 0, rect: { x: 2, y: 9, w: 26, h: 3 }, roomType: "waiting_area" },
+    ]);
+    expect(check(state)).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/Waiting Area: transfers will be seen/),
+    });
+    expect(state.rooms.find((r) => r.typeId === "mortuary")!.valid).toBe(true);
   });
 });
 

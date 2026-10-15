@@ -217,7 +217,7 @@ export const rooms: RoomInput[] = [
     enclosed: true,
     required: [{ label: "Mortuary fridge unit", anyOf: ["mortuary_fridge"] }],
     description:
-      "Where deceased patients stay until the Medical Examiner (and sometimes the coroner) is done and they're released. Needs a bed-width route from the wards and A&E; best kept away from public areas.",
+      "Where deceased patients stay until the Medical Examiner (and sometimes the coroner) is done and they're released. Needs a bed-width route from the wards and A&E. Patients and visitors who see a covered trolley go by are upset, and families complain, so keep its door and route away from public areas; but the further it is, the longer each porter is tied up.",
   },
   {
     id: "xray_room",

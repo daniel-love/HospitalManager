@@ -997,6 +997,34 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
     const inheritedLists = [...new Set(Object.values(state.referrals).map((r) => r.specialty))];
     return { ...save, state: { ...state, inheritedLists } };
   },
+  // v47: mortuary transfers are timed and noticed by whoever sees them go by.
+  46: (save) => {
+    type Day = { stats: object };
+    const state = save.state as {
+      patients: { death: object | null }[];
+      today: Day;
+      history: Day[];
+      month: Day;
+      months: Day[];
+    };
+    const stats = <T extends Day>(d: T) => ({
+      ...d,
+      stats: { mortuaryTransfers: 0, mortuaryTransferMins: 0, transfersSeen: 0, ...d.stats },
+    });
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients.map((p) =>
+          p.death ? { ...p, death: { ...p.death, transfer: null } } : p,
+        ),
+        today: stats(state.today),
+        history: state.history.map(stats),
+        month: stats(state.month),
+        months: state.months.map(stats),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

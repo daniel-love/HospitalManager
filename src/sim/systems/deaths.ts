@@ -33,6 +33,7 @@ import {
   MORALE_HIT_TEAM,
   MORALE_HIT_UNEXPECTED,
   RELEASE_HOURS,
+  TRANSFER_SEEN,
   VERIFY_MINS,
 } from "@data/deaths";
 import { onSite, type Incident, type Job, type Patient, type Point, type Staff } from "../agents";
@@ -116,6 +117,7 @@ export function die(state: SimState, p: Patient, expected: boolean, verified: bo
     verified: verified ? state.tick : null,
     familyTold: expected ? state.tick : null,
     lastOffices: null,
+    transfer: null,
     inMortuary: null,
     fridge: null,
     meReviewed: null,
@@ -472,14 +474,8 @@ function runToMortuary(state: SimState, job: Job, porter: Staff, p: Patient): vo
       if (state.objects[p.bed]) dirtyCouch(state, p.bed, DEEP_CLEAN_MINS);
       p.bed = null;
     }
+    p.death!.transfer = { started: state.tick, from: tileOf(p), seenBy: [] };
     headTo(state, p, dest, dest, true);
-    if (passesPublicArea(state, p.path)) {
-      complain(
-        state,
-        `${p.name} was taken to the mortuary through a public waiting area. Families have complained.`,
-        tileOf(p),
-      );
-    }
   }
   let arrival = headTo(state, p, dest, dest, true);
   if (arrival === "no_route") arrival = headTo(state, p, dest);
@@ -489,13 +485,62 @@ function runToMortuary(state: SimState, job: Job, porter: Staff, p: Patient): vo
   porter.y = p.y;
   porter.path = [];
   porter.dest = null;
+  noticeTransfer(state, p);
   if (arrival !== "arrived") return;
   removeJob(state, job);
+  const transfer = p.death!.transfer;
+  if (transfer) {
+    const stats = state.today.stats;
+    stats.mortuaryTransfers++;
+    stats.mortuaryTransferMins += (state.tick - transfer.started) / TICKS_PER_MINUTE;
+    if (transfer.seenBy.length > 0) stats.transfersSeen++;
+  }
   p.stage = "in_mortuary";
   p.x = p.prevX = fridge.x;
   p.y = p.prevY = fridge.y;
   p.death!.inMortuary = state.tick;
   p.death!.fridge = { objectId: fridge.id, slot: job.step };
+}
+
+/**
+ * Patients and visitors near the covered trolley, in the same room or
+ * corridor, see it go by: once each. Patients are upset by it, and enough
+ * people seeing one transfer brings a complaint. Not in the room it left,
+ * where the curtains are drawn.
+ */
+function noticeTransfer(state: SimState, p: Patient): void {
+  const t = p.death?.transfer;
+  if (!t) return;
+  const at = tileOf(p);
+  const room = roomAt(state, 0, at.x, at.y);
+  if (!room || room === roomAt(state, 0, t.from.x, t.from.y)) return;
+  const r2 = TRANSFER_SEEN.radius * TRANSFER_SEEN.radius;
+  const sees = (a: Point): boolean => {
+    const dx = a.x - p.x;
+    const dy = a.y - p.y;
+    return dx * dx + dy * dy <= r2 && roomAt(state, 0, Math.round(a.x), Math.round(a.y)) === room;
+  };
+  const before = t.seenBy.length;
+  for (const w of Object.values(state.patients)) {
+    if (w.death || w.id === p.id || t.seenBy.includes(w.id) || !sees(w)) continue;
+    t.seenBy.push(w.id);
+    w.mood = Math.max(0, w.mood - TRANSFER_SEEN.mood);
+  }
+  for (const w of [
+    ...Object.values(state.outpatients),
+    ...Object.values(state.visitors),
+    ...Object.values(state.tours),
+  ]) {
+    if (!t.seenBy.includes(w.id) && sees(w)) t.seenBy.push(w.id);
+  }
+  if (before < TRANSFER_SEEN.complaintAt && t.seenBy.length >= TRANSFER_SEEN.complaintAt) {
+    const where = roomById.get(room.typeId)?.name ?? "corridor";
+    complain(
+      state,
+      `${p.name} was taken to the mortuary past patients and visitors in the ${where}. Families have complained.`,
+      at,
+    );
+  }
 }
 
 /** Whether a route ([x0, y0, x1, y1, …]) crosses a waiting area or reception. */

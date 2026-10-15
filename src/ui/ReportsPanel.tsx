@@ -641,6 +641,18 @@ function FlowSections({ stats: s, ae }: { stats: FlowStats; ae: boolean }) {
               value={s.deaths}
               extra={s.unexpectedDeaths > 0 ? `${s.unexpectedDeaths} unexpected` : undefined}
             />
+            {s.mortuaryTransfers > 0 && (
+              <Row
+                label="Average transfer to the mortuary"
+                title="From the porter setting off with the covered trolley to arriving at the mortuary. A far-off mortuary ties a porter up for longer; a near one by public areas gets seen."
+                value={mins(avg(s.mortuaryTransferMins, s.mortuaryTransfers))}
+                extra={
+                  s.transfersSeen > 0
+                    ? `${s.transfersSeen} of ${s.mortuaryTransfers} seen by patients or visitors`
+                    : undefined
+                }
+              />
+            )}
             {s.complaints > 0 && (
               <Row
                 label="Complaints"

@@ -120,6 +120,8 @@ export interface Death {
   /** The family told (for expected deaths they were there: set at once). */
   familyTold: number | null;
   lastOffices: number | null;
+  /** On the way to the mortuary: when the porter set off, from where, and who saw. */
+  transfer: MortuaryTransfer | null;
   inMortuary: number | null;
   /** Their space in the mortuary: fridge unit and slot. */
   fridge: { objectId: number; slot: number } | null;
@@ -128,6 +130,17 @@ export interface Death {
   coroner: boolean;
   /** When the funeral director collects them. */
   releaseAt: number | null;
+}
+
+/**
+ * Taking the deceased to the mortuary: when the porter set off and from
+ * where (curtains are drawn there, so nobody in that room counts), and the
+ * patients and visitors who saw the covered trolley go by (agent ids).
+ */
+export interface MortuaryTransfer {
+  started: number;
+  from: Point;
+  seenBy: number[];
 }
 
 /**
@@ -607,6 +620,11 @@ export interface FlowStats {
   unexpectedDeaths: number;
   /** Complaints about how a death was handled (no side room, no relatives' room, public route). */
   complaints: number;
+  /** Deceased taken to the mortuary, and the sum of their journey times (porter setting off to arrival). */
+  mortuaryTransfers: number;
+  mortuaryTransferMins: number;
+  /** Of those transfers, the ones patients or visitors saw. */
+  transfersSeen: number;
   /** Departures (discharge or LWBS) within 4 hours of arrival. */
   within4h: number;
   departures: number;
@@ -957,6 +975,9 @@ export function emptyStats(): FlowStats {
     deaths: 0,
     unexpectedDeaths: 0,
     complaints: 0,
+    mortuaryTransfers: 0,
+    mortuaryTransferMins: 0,
+    transfersSeen: 0,
     within4h: 0,
     departures: 0,
     triaged: 0,

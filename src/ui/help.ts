@@ -136,7 +136,7 @@ export function tileHelp(state: SimState, floor: number, x: number, y: number): 
       });
     }
     if (room && roomDef) {
-      const missing = room.checks.filter((c) => !c.ok).length;
+      const missing = room.checks.filter((c) => !c.ok && !c.advisory).length;
       help.footer = `In ${roomDef.name}${room.valid ? " ✓" : ` (${missing} to fix)`}`;
     } else {
       help.footer = "Not inside a room, so it doesn't count towards one";
@@ -150,7 +150,8 @@ export function tileHelp(state: SimState, floor: number, x: number, y: number): 
   }
 
   if (!room || !roomDef) return null;
-  const failing = room.checks.filter((c) => !c.ok);
+  const failing = room.checks.filter((c) => !c.ok && !c.advisory);
+  const advice = room.checks.filter((c) => !c.ok && c.advisory);
   const lacking = room.forConditions.filter((c) => !c.ok);
   return {
     title: roomDef.name,
@@ -169,6 +170,16 @@ export function tileHelp(state: SimState, floor: number, x: number, y: number): 
                   })),
                 }
               : { heading: "Requirements", items: [{ text: "All met", ok: true }] },
+            ...(advice.length > 0
+              ? [
+                  {
+                    heading: "Worth fixing",
+                    items: advice.map((c) => ({
+                      text: c.detail ? `${c.label} (${c.detail})` : c.label,
+                    })),
+                  },
+                ]
+              : []),
             ...(roomsPatientsCantReach(state).includes(room)
               ? [
                   {

@@ -249,6 +249,13 @@ const patientSchema = z.object({
       verified: nullableInt,
       familyTold: nullableInt,
       lastOffices: nullableInt,
+      transfer: z
+        .object({
+          started: int,
+          from: z.object({ x: int, y: int }),
+          seenBy: z.array(int.positive()),
+        })
+        .nullable(),
       inMortuary: nullableInt,
       fridge: z.object({ objectId: int.positive(), slot: int.min(0) }).nullable(),
       meReviewed: nullableInt,
@@ -472,6 +479,9 @@ const statsSchema = z.object({
   deaths: int.min(0),
   unexpectedDeaths: int.min(0),
   complaints: int.min(0),
+  mortuaryTransfers: int.min(0),
+  mortuaryTransferMins: num,
+  transfersSeen: int.min(0),
   within4h: int.min(0),
   departures: int.min(0),
   triaged: int.min(0),

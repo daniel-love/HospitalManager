@@ -18,7 +18,7 @@ export class RoomLabelLayer {
     for (const room of rooms) {
       const def = roomById.get(room.typeId);
       if (!def) continue;
-      const missing = room.checks.filter((c) => !c.ok).length;
+      const missing = room.checks.filter((c) => !c.ok && !c.advisory).length;
       const status = room.valid ? "✓" : `✗ ${missing} to fix`;
       const label = new Text({
         // Rooms with no requirements (corridors) just show their name.
