@@ -36,6 +36,7 @@ import { nextShift, startOnRota, updateShifts } from "./rota";
 import { leave, startingSkill } from "./workforce";
 import { forgetStaff } from "./serviceLines";
 import { canActDown, residentDoctorsOnStrike } from "./strikes";
+import { bestApplicant, daysToNext, postKey, takeApplicant } from "./recruitment";
 
 export type StaffCommand =
   | {
@@ -88,12 +89,30 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
     }
     const refused = cantHire(state, cmd);
     if (refused) return { ok: false, error: refused };
+    // Recruiting: the most skilled applicant for the post, if there is one.
+    const key = postKey(
+      cmd.role,
+      cmd.role === "nurse" ? (cmd.band ?? 5) : null,
+      cmd.specialty ?? null,
+    );
+    const applicant = state.settings.recruitment ? bestApplicant(state, key) : undefined;
+    if (state.settings.recruitment && !applicant) {
+      const days = daysToNext(state, key);
+      return {
+        ok: false,
+        error: `No applicants for this post just now${days ? `: about one every ${days} days` : ""}`,
+      };
+    }
     const staff = createStaff(state, {
       role: cmd.role,
       specialty: role.specialist ? cmd.specialty! : null,
       band: cmd.role === "nurse" ? (cmd.band ?? 5) : null,
       contract: cmd.privileges ? "privileges" : cmd.onCall ? "on_call" : "resident",
     });
+    if (applicant) {
+      staff.skill = applicant.skill;
+      takeApplicant(state, applicant);
+    }
     const at = { x: staff.x, y: staff.y };
     startOnRota(state, staff);
     const first = onSite(staff) || staff.onCall ? null : nextShift(state, staff);

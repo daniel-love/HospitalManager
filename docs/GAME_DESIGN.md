@@ -453,7 +453,7 @@ Each event has a **trigger** (scheduled, seasonal, random, or conditional), an *
 
 - **Reputation** (0–100) drives private demand, recruitment pool size and grant eligibility.
 - **Inspection rating:** Outstanding / Good / Requires Improvement / Inadequate. _Inadequate_ puts the hospital into **special measures** (NHS): more inspections and restrictions.
-- **As built (M6 step 5, part 1):** inspections are unannounced and paced by rating (compressed from CQC's years); a team tours the site and combines what it sees with three months' data, rating each key question and aggregating by CQC's rules. Inadequate puts an NHS trust in special measures (oversight segment 4). VIP and media visits move reputation by what they see.
+- **As built (M6 step 5, part 1):** inspections are unannounced and paced by rating (compressed from CQC's years); a team tours the site and combines what it sees with three months' data, rating each key question and aggregating by CQC's rules. Inadequate puts an NHS trust in special measures (oversight segment 4). VIP and media visits move reputation by what they see. (Part 2:) hiring is from an applicant pool, larger and more skilled with a better reputation and rating; grant offers follow the rating.
 - **Unlocks:** new room types and equipment tiers unlock via reputation, rating or research (e.g. MRI, cath lab, helipad, major trauma centre status).
 - **Fail states (campaign):** bankruptcy (unable to service debt), sustained Inadequate rating, too many serious incidents. Sandbox has no fail state, or it's optional.
 

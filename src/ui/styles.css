@@ -2565,3 +2565,7 @@ body.planning #game::after {
   background: none;
   cursor: pointer;
 }
+.small-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

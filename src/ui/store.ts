@@ -258,6 +258,9 @@ export interface RosterData {
   funding: Funding;
   /** How rota gaps are filled (a hospital policy). */
   gapFill: GapFill;
+  /** Hiring from applicants (a setting): who's applying for each post (systems/recruitment.ts postKey). */
+  recruitment: boolean;
+  applicants: Record<string, { count: number; best: number | null; nextDays: number | null }>;
   /** Bank and agency staff at work now. */
   temps: { bank: number; agency: number };
   /** Each rota group's cover and how the rota meets it. */

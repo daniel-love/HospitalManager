@@ -935,6 +935,23 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v41: recruitment from applicants (off in existing games: hiring stays instant).
+  40: (save) => {
+    const state = save.state as {
+      settings: object;
+      applicants?: object[];
+      nextApplicantId?: number;
+    };
+    return {
+      ...save,
+      state: {
+        ...state,
+        settings: { recruitment: false, ...state.settings },
+        applicants: state.applicants ?? [],
+        nextApplicantId: state.nextApplicantId ?? 1,
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

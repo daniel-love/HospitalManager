@@ -1,4 +1,5 @@
 import { h, render } from "preact";
+import { openingCampaign } from "@sim/systems/recruitment";
 import { Game } from "@game/game";
 import { Renderer } from "@render/renderer";
 import { loadLastSave } from "@save/saveManager";
@@ -22,7 +23,9 @@ async function main(): Promise<void> {
     site: true,
     rotas: true,
     eventFrequency: "realistic",
+    recruitment: true,
   });
+  openingCampaign(state);
   const renderer = await Renderer.create(document.getElementById("game")!, state, {
     antialias: wantAntialias(),
   });

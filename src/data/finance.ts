@@ -246,4 +246,9 @@ export const GRANT_OFFERS = {
   /** Reputation for meeting a grant's condition, and lost for missing it. */
   reputationMet: 2,
   reputationMissed: 3,
+  /**
+   * The wait between offers, times this by CQC rating: funders back
+   * well-rated hospitals. Inadequate (or special measures) gets none.
+   */
+  ratingPace: { outstanding: 0.7, good: 1, requires_improvement: 1.4, inadequate: 1 },
 };

@@ -81,6 +81,8 @@ function SettingsBody({ game }: { game: Game }) {
 
         <EventsSetting game={game} />
 
+        <RecruitmentSetting game={game} />
+
         {!game.state.settings.rotas && <RotasSetting game={game} />}
 
         <fieldset class="setting">
@@ -198,6 +200,35 @@ function EventsSetting({ game }: { game: Game }) {
           <span class="dim">{o.hint}</span>
         </label>
       ))}
+    </fieldset>
+  );
+}
+
+/** Hiring from applicants, or instantly (saved with the game). */
+function RecruitmentSetting({ game }: { game: Game }) {
+  const [on, setOn] = useState(game.state.settings.recruitment);
+  const choose = (value: boolean) => {
+    game.setRecruitment(value);
+    setOn(value);
+  };
+  return (
+    <fieldset class="setting">
+      <legend>Recruitment</legend>
+      <p class="dim">
+        Hiring from applicants, who come in over time: more of them, and more skilled, with a good
+        reputation and CQC rating. Hard-to-fill posts such as consultants come slowly. Saved with
+        this game.
+      </p>
+      <label class="setting-choice">
+        <input type="radio" name="recruitment" checked={on} onChange={() => choose(true)} />
+        <span>From applicants</span>
+        <span class="dim">As for real vacancies</span>
+      </label>
+      <label class="setting-choice">
+        <input type="radio" name="recruitment" checked={!on} onChange={() => choose(false)} />
+        <span>Hire instantly</span>
+        <span class="dim">Anyone, any time</span>
+      </label>
     </fieldset>
   );
 }

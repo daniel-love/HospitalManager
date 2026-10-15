@@ -614,6 +614,10 @@ const saveSchema = z.object({
     outpatients: z.array(outpatientSchema),
     visitors: z.array(visitorSchema),
     tours: z.array(tourSchema),
+    applicants: z.array(
+      z.object({ id: int.positive(), key: z.string(), skill: num.min(0).max(100), until: int }),
+    ),
+    nextApplicantId: int.positive(),
     cqc: z.object({
       overall: rating.nullable(),
       questions: z
@@ -752,6 +756,7 @@ const saveSchema = z.object({
       patientVolume: num.min(0).max(10),
       rotas: z.boolean(),
       eventFrequency: z.enum(["off", "rare", "realistic", "frequent"]),
+      recruitment: z.boolean(),
     }),
     alerts: z.record(z.string(), int),
     incidents: z.array(
@@ -815,6 +820,8 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       outpatients: Object.values(state.outpatients),
       visitors: Object.values(state.visitors),
       tours: Object.values(state.tours),
+      applicants: state.applicants,
+      nextApplicantId: state.nextApplicantId,
       cqc: state.cqc,
       operations: Object.values(state.operations),
       nextOperationId: state.nextOperationId,
@@ -898,6 +905,8 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     outpatients: byId(s.outpatients, "outpatient"),
     visitors: byId(s.visitors, "visitor"),
     tours: byId(s.tours, "tour"),
+    applicants: s.applicants,
+    nextApplicantId: s.nextApplicantId,
     cqc: s.cqc,
     operations: byId(s.operations, "operation"),
     nextOperationId: s.nextOperationId,

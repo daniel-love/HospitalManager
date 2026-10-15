@@ -3,6 +3,7 @@
  * of staff is doing, the staff roster, and the daily report. Pure functions
  * of SimState, so they're easy to test.
  */
+import { daysToNext, postKeys } from "@sim/systems/recruitment";
 import { delayedDischarge } from "@sim/systems/discharge";
 import { symptomatic } from "@sim/systems/outbreaks";
 import {
@@ -1050,6 +1051,20 @@ export function describeRoster(state: SimState): RosterData {
     rotas: state.settings.rotas,
     funding: state.funding,
     gapFill: state.policies.gapFill,
+    recruitment: state.settings.recruitment,
+    applicants: Object.fromEntries(
+      postKeys().map((key) => {
+        const here = state.applicants.filter((a) => a.key === key);
+        return [
+          key,
+          {
+            count: here.length,
+            best: here.length === 0 ? null : Math.max(...here.map((a) => Math.round(a.skill))),
+            nextDays: daysToNext(state, key),
+          },
+        ];
+      }),
+    ),
     temps: {
       bank: staff.filter((s) => s.contract === "bank").length,
       agency: staff.filter((s) => s.contract === "agency").length,

@@ -359,13 +359,14 @@ function HireTab({ game, data }: { game: Game; data: RosterData }) {
                 r.specialist ? (
                   <SpecialistRow key={r.id} game={game} role={r} data={data} />
                 ) : r.bands ? (
-                  <NurseRow key={r.id} game={game} role={r} rotas={data.rotas} />
+                  <NurseRow key={r.id} game={game} role={r} data={data} />
                 ) : (
                   <RoleRow
                     key={r.id}
                     role={r}
                     rotas={data.rotas}
                     pay={r.annualCost}
+                    applicants={data.recruitment ? (data.applicants[r.id] ?? null) : null}
                     onHire={() => game.applyStaff({ type: "hire_staff", role: r.id })}
                   />
                 ),
@@ -395,10 +396,14 @@ function RoleRow(props: {
   counts?: string;
   onHire: () => void;
   hireLabel?: string;
+  /** Recruiting: applicants for the post (null when hiring is instant). */
+  applicants?: { count: number; best: number | null; nextDays: number | null } | null;
   children?: preact.ComponentChildren;
   extraButton?: preact.ComponentChildren;
 }) {
   const { role } = props;
+  const a = props.applicants;
+  const none = !!a && a.count === 0;
   const [open, setOpen] = useState(false);
   return (
     <div class={`hire-row${open ? " open" : ""}`}>
@@ -419,11 +424,24 @@ function RoleRow(props: {
           {props.rotas && role.count > 0 && !role.specialist && ` · ${perShift(role.count)}`}
           {props.counts && ` · ${props.counts}`}
         </span>
+        {a && (
+          <span class={none ? "warn-text small-note" : "dim small-note"}>
+            {none
+              ? `No applicants${a.nextDays ? `: about one every ${a.nextDays} days` : ""}`
+              : `${a.count} ${a.count === 1 ? "applicant" : "applicants"} · best skill ${a.best}`}
+          </span>
+        )}
         {props.children}
         {open && <span class="hire-desc">{role.description}</span>}
       </div>
       <div class="hire-buttons">
-        <button class="small-button" onMouseDown={noFocus} onClick={props.onHire}>
+        <button
+          class="small-button"
+          disabled={none}
+          title={none ? "Nobody is applying for this post just now" : undefined}
+          onMouseDown={noFocus}
+          onClick={props.onHire}
+        >
           {props.hireLabel ?? "Hire"}
         </button>
         {props.extraButton}
@@ -439,14 +457,15 @@ const BAND_NOTES: Record<NurseBand, string> = {
 };
 
 /** Nurses: hired at a band, each with its own pay. */
-function NurseRow({ game, role, rotas }: { game: Game; role: RosterRole; rotas: boolean }) {
+function NurseRow({ game, role, data }: { game: Game; role: RosterRole; data: RosterData }) {
   const [band, setBand] = useState<NurseBand>(5);
   const chosen = role.bands!.find((b) => b.band === band)!;
   return (
     <RoleRow
       role={role}
-      rotas={rotas}
+      rotas={data.rotas}
       pay={chosen.annualCost}
+      applicants={data.recruitment ? (data.applicants[`nurse:band${band}`] ?? null) : null}
       onHire={() => game.applyStaff({ type: "hire_staff", role: "nurse", band })}
     >
       <div class="chips band-chips" role="radiogroup" aria-label="Band">
@@ -503,6 +522,7 @@ function SpecialistRow({ game, role, data }: { game: Game; role: RosterRole; dat
             : ""
       }
       onHire={() => hire(privateOnly ? "privileges" : "resident")}
+      applicants={data.recruitment ? (data.applicants[`${role.id}:${specialty}`] ?? null) : null}
       hireLabel={privateOnly ? "Grant privileges" : consultant ? "Resident" : "Hire"}
       extraButton={
         consultant &&

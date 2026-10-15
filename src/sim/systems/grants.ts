@@ -178,8 +178,13 @@ export function updateGrants(state: SimState): void {
   }
   if (g.offer || state.tick < g.nextOffer) return;
   const [lo, hi] = GRANT_OFFERS.everyDays;
-  g.nextOffer = state.tick + nextInt(state.rng, lo, hi) * TICKS_PER_DAY;
+  // Funders come sooner to a well-rated hospital, later to a poorly rated one.
+  const rated = state.cqc.overall;
+  const pace = rated ? GRANT_OFFERS.ratingPace[rated] : 1;
+  g.nextOffer = state.tick + Math.round(nextInt(state.rng, lo, hi) * pace) * TICKS_PER_DAY;
   if (g.active.length >= GRANT_OFFERS.maxActive) return;
+  // Nobody funds a hospital rated Inadequate, or in special measures.
+  if (rated === "inadequate" || state.cqc.specialMeasures) return;
   const options = GRANTS.filter((d) => fits(state, d));
   if (options.length === 0) return;
   const def = pick(state.rng, options);

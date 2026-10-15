@@ -42,7 +42,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 40;
+export const SIM_STATE_VERSION = 41;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -217,6 +217,9 @@ export interface SimState {
   cqc: Cqc;
   /** Inspectors and VIPs touring the hospital, keyed by id (agent ids). */
   tours: Record<number, TourAgent>;
+  /** Applicants for posts, with recruitment on (systems/recruitment.ts). */
+  applicants: Applicant[];
+  nextApplicantId: number;
   /** Pressure events: forecast or under way, and past ones, newest last (systems/pressure.ts). */
   pressure: {
     active: PressureEvent[];
@@ -255,6 +258,18 @@ export interface SimSettings {
   rotas: boolean;
   /** How often pressure events come (data/pressure.ts EVENT_FREQUENCY). Off for test fixtures. */
   eventFrequency: EventFrequency;
+  /** Hiring is from applicants (systems/recruitment.ts) rather than instant. Off for test fixtures. */
+  recruitment: boolean;
+}
+
+/** Someone applying for a post (systems/recruitment.ts). */
+export interface Applicant {
+  id: number;
+  /** The post: a role, "nurse:band6", or "consultant:cardiology". */
+  key: string;
+  skill: number;
+  /** They take a job elsewhere at this tick. */
+  until: number;
 }
 
 /** Something an inspector or VIP saw, good or bad, under one of CQC's key questions. */
@@ -414,6 +429,8 @@ export interface NewGameOptions {
   funding?: Funding;
   /** Pressure events. Off for test maps. */
   eventFrequency?: EventFrequency;
+  /** Hiring from applicants. Off for test maps. */
+  recruitment?: boolean;
 }
 
 export const DEFAULT_MAP_SIZE = 200;
@@ -519,11 +536,14 @@ export function createSimState(opts: NewGameOptions): SimState {
       vip: null,
     },
     tours: {},
+    applicants: [],
+    nextApplicantId: 1,
     settings: {
       catchment: DEFAULT_CATCHMENT,
       patientVolume: 1,
       rotas: opts.rotas ?? false,
       eventFrequency: opts.eventFrequency ?? "off",
+      recruitment: opts.recruitment ?? false,
     },
     alerts: {},
     incidents: [],

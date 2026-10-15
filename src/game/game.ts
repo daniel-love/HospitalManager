@@ -6,6 +6,7 @@
  * In plan mode, commands go into the build plan instead (see sim/plan.ts), and
  * the map, tools and inspector all show the plan preview ("viewState").
  */
+import { openingCampaign } from "@sim/systems/recruitment";
 import { RATING_NAMES } from "@data/cqc";
 import { equipmentCondition, setEssentialRoom } from "@sim/systems/maintenance";
 import { roomClosure, setRoomClosed } from "@sim/systems/outbreaks";
@@ -492,7 +493,9 @@ export class Game {
       rotas: true,
       funding,
       eventFrequency: "realistic",
+      recruitment: true,
     });
+    openingCampaign(state);
     this.loadState(state);
     if (state.site) this.focus(siteView(state.site));
     // Until it's saved, a reload starts afresh rather than resuming the old hospital.
@@ -751,6 +754,13 @@ export class Game {
   setFluVaccination(on: boolean): void {
     this.state.policies.fluVaccination = on;
     this.afterMoney();
+  }
+
+  /** Hiring from applicants, or instantly (Settings). Switching on starts a recruitment campaign. */
+  setRecruitment(on: boolean): void {
+    this.state.settings.recruitment = on;
+    if (on && this.state.applicants.length === 0) openingCampaign(this.state);
+    this.refreshPanels();
   }
 
   /** How often pressure events come (Settings). */
