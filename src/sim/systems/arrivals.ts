@@ -306,6 +306,7 @@ export function newPatient(
       referred: null,
       decided: null,
       admitted: null,
+      rounded: null,
       left: null,
     },
     consultants: [],

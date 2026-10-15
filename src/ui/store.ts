@@ -9,6 +9,7 @@ import type { AdviceData } from "@game/advice";
 import type { EventChip } from "@game/describeEvents";
 import type { FinanceData } from "@game/describeFinance";
 import type { HospitalData } from "@game/describeHospital";
+import type { Census } from "@game/describe";
 import type { Speed } from "@game/loop";
 import type { Tool } from "@game/tools";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
@@ -23,8 +24,8 @@ export interface HudState {
   clock: string;
   speed: Speed;
   money: number;
-  /** Patients in the department right now. */
-  patients: number;
+  /** Where patients are right now. */
+  census: Census;
   /** Today's 4-hour performance (share leaving A&E within 4 hours), or null before anyone has. */
   fourHour: number | null;
   /** A Private Hospital in administration. */
@@ -202,7 +203,7 @@ export const hud = signal<HudState>({
   clock: "",
   speed: 1,
   money: 0,
-  patients: 0,
+  census: { ae: 0, waiting: 0, awaitingBed: 0, wards: 0, surgery: 0, clinics: 0 },
   fourHour: null,
   administration: false,
   events: [],
@@ -245,6 +246,8 @@ export interface Notification {
   finance?: FinanceTab;
   /** A matter for the Hospital dialog: opens it at this tab. */
   hospital?: HospitalTab;
+  /** Real time (performance.now() ms) it leaves the feed; it stays in the history. */
+  until: number;
 }
 export const notifications = signal<Notification[]>([]);
 

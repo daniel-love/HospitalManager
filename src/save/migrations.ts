@@ -977,6 +977,17 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
     const name = typeof saved === "string" && saved.trim() ? saved.trim() : "My hospital";
     return { ...save, state: { ...(save.state as object), name } };
   },
+  // v44: specialty ward rounds (nobody has been seen on one yet).
+  43: (save) => {
+    const state = save.state as { patients: { times: object }[] };
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: state.patients.map((p) => ({ ...p, times: { ...p.times, rounded: null } })),
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

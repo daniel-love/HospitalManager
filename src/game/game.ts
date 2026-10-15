@@ -116,7 +116,7 @@ import {
   describeStaff,
   describeStaffTable,
   fourHourShare,
-  patientsInDept,
+  census,
 } from "./describe";
 import { FixedStepLoop, FramePacer, type Speed } from "./loop";
 import { describeAccess, formatMoney } from "./tools";
@@ -128,6 +128,8 @@ const PANEL_INTERVAL_MS = 250;
 const GAP_WINDOW_MS = 5000;
 /** Notifications kept in the feed. */
 const MAX_NOTIFICATIONS = 40;
+/** How long a notification stays in the feed (real seconds), by severity. */
+const NOTIFICATION_SECS = { info: 8, warn: 12, bad: 20 } as const;
 /** How close (in tiles) a click must be to a patient or staff member to select them. */
 const AGENT_PICK_RADIUS = 0.6;
 /** How long the mouse must rest on something before its help card appears. */
@@ -724,6 +726,7 @@ export class Game {
   private drainEvents(): void {
     const events = this.state.events;
     if (events.length === 0) return;
+    const now = performance.now();
     const added = events.map((e) => ({
       id: this.nextNotification++,
       when: formatClock(clockFromTick(e.tick)),
@@ -733,6 +736,7 @@ export class Game {
       ...(e.staff ? { staff: e.staff } : {}),
       ...(e.finance ? { finance: e.finance } : {}),
       ...(e.hospital ? { hospital: e.hospital } : {}),
+      until: now + NOTIFICATION_SECS[e.severity] * 1000,
     }));
     this.state.events = [];
     notifications.value = [...added.reverse(), ...notifications.value].slice(0, MAX_NOTIFICATIONS);
@@ -966,7 +970,7 @@ export class Game {
       clock: formatClock(clockFromTick(this.state.tick)),
       speed: this.loop.speed,
       money: this.state.money,
-      patients: patientsInDept(this.state),
+      census: census(this.state),
       fourHour: fourHourShare(this.state.today.stats),
       administration: this.state.rating.administration !== null,
       events: eventChips(this.state),

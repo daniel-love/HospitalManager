@@ -122,12 +122,14 @@ const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
   registrar: [
     "Works long days and nights on the rota, or weekdays 08:00 to 18:00 with clinics or theatre lists",
     "Reviews referred patients in A&E and decides to admit",
+    "Daily ward round, 08:00 to 17:00: sees each of the specialty's inpatients, and discharges those nearly ready to go",
     "Outpatient clinics (sessions set in their inspector)",
     "Theatre lists and emergency operations (surgical specialties); anaesthetics for them (Anaesthetics)",
   ],
   consultant: [
     "Resident: works weekdays 08:00 to 18:00 and takes turns on call from home out of hours",
     "Reviews referred patients in A&E and decides to admit",
+    "Daily ward round, 08:00 to 17:00: sees each of the specialty's inpatients, and discharges those nearly ready to go",
     "Medical Examiner reviews (with the duty)",
     "Outpatient clinics (sessions set in their inspector): GPs only refer to a specialty while a consultant runs its clinics",
     "Theatre lists and emergency operations (surgical specialties); anaesthetics for them (Anaesthetics)",

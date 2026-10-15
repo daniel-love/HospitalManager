@@ -3,6 +3,7 @@ import type { Game } from "@game/game";
 import { SPEEDS, type Speed } from "@game/loop";
 import { formatMoney } from "@game/tools";
 import { settingsOpen } from "./settings";
+import type { Census } from "@game/describe";
 import { hud, saveDialogOpen, tutorialHighlight } from "./store";
 
 const LABELS: Record<Speed, string> = {
@@ -25,8 +26,21 @@ const HINTS: Record<Speed, string> = {
 // Don't take focus on click, or Space (pause) would re-press the button.
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
+function censusTitle(c: Census): string {
+  const lines = [
+    `In A&E: ${c.ae}`,
+    `  waiting to be booked in, triaged or seen: ${c.waiting}`,
+    `  admitted, on a trolley waiting for a ward bed: ${c.awaitingBed}`,
+    `On the wards: ${c.wards}`,
+    `In for surgery (Day Surgery, theatre, Recovery): ${c.surgery}`,
+    `Outpatients in clinic: ${c.clinics}`,
+    "Click for the list",
+  ];
+  return lines.join("\n");
+}
+
 export function TopBar({ game }: { game: Game }) {
-  const { name, clock, speed, money, patients, fourHour, events, cqc } = hud.value;
+  const { name, clock, speed, money, census, fourHour, events, cqc } = hud.value;
   useEffect(() => {
     document.title = name ? `${name} · Hospital Manager` : "Hospital Manager";
   }, [name]);
@@ -41,13 +55,36 @@ export function TopBar({ game }: { game: Game }) {
       </span>
       <button
         class="census"
-        title="Patients in A&E now: click for the list"
+        title={censusTitle(census)}
         onMouseDown={noFocus}
         onClick={() => {
           game.togglePatients();
         }}
       >
-        {patients} {patients === 1 ? "patient" : "patients"}
+        <span class="stat">
+          <span class="dim">A&amp;E</span> {census.ae}
+        </span>
+        <span class={`stat${census.waiting > 0 ? "" : " zero"}`}>
+          <span class="dim">waiting</span> {census.waiting}
+        </span>
+        {census.awaitingBed > 0 && (
+          <span class="stat warn">
+            <span class="dim">for a bed</span> {census.awaitingBed}
+          </span>
+        )}
+        <span class="stat">
+          <span class="dim">wards</span> {census.wards}
+        </span>
+        {census.surgery > 0 && (
+          <span class="stat">
+            <span class="dim">surgery</span> {census.surgery}
+          </span>
+        )}
+        {census.clinics > 0 && (
+          <span class="stat">
+            <span class="dim">clinics</span> {census.clinics}
+          </span>
+        )}
       </button>
       <span
         class={`four-hour ${fourHour === null ? "" : fourHour >= 0.95 ? "ok" : fourHour >= 0.78 ? "warn" : "bad"}`}

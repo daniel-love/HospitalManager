@@ -19,7 +19,7 @@
  */
 import { MAJOR_INCIDENT } from "@data/pressure";
 import { conditionById, equipmentById } from "@data/catalogue";
-import { MOOD_LIFT_DECISION, REFERRAL_MINS, WARD_DISCHARGE_MINS } from "@data/patients";
+import { MOOD_LIFT_DECISION, REFERRAL_MINS, WARD_DISCHARGE_MINS, WARD_ROUND } from "@data/patients";
 import { onDuty, type Job, type Patient, type Point, type Staff, type AgentBase } from "../agents";
 import { emit, warn } from "../events";
 import { bedside, freeCouches, release, reserve, restPoint } from "../places";
@@ -447,6 +447,7 @@ export function updateWards(state: SimState): void {
     minute < DISCHARGE_ROUND.to;
   const endOfDay = tickAt(c.day, 0) + DISCHARGE_ROUND.lastDischarge * TICKS_PER_MINUTE;
   if (state.policies.dischargeBeforeNoon && minute === DISCHARGE_ROUND.to) rushedRound(state);
+  if (minute >= WARD_ROUND.from && minute < WARD_ROUND.to) postWardRounds(state, tickAt(c.day, 0));
   const incident = majorIncidentDeclared(state);
   for (const p of Object.values(state.patients)) {
     if (p.stage !== "on_ward" || p.stayUntil === null) continue;
@@ -476,6 +477,65 @@ export function updateWards(state: SimState): void {
       durationTicks: ticksFor(state.rng, WARD_DISCHARGE_MINS),
     });
   }
+}
+
+/**
+ * The day's specialty ward round: each inpatient not yet seen today waits
+ * for a resident consultant or registrar of their specialty on duty. It
+ * comes behind A&E referrals, and an on-call consultant isn't called in for
+ * it. Patients whose specialty has nobody in today aren't seen (as on a
+ * weekend with no specialty cover).
+ */
+function postWardRounds(state: SimState, today: number): void {
+  const covered = new Set<string>();
+  for (const s of Object.values(state.staff)) {
+    if (s.specialty !== null && roundsWards(s) && onDuty(s)) covered.add(s.specialty);
+  }
+  if (covered.size === 0) return;
+  for (const p of Object.values(state.patients)) {
+    if (p.stage !== "on_ward" || p.bed === null || p.death !== null) continue;
+    if (p.specialty === null || !covered.has(p.specialty)) continue;
+    if (p.times.rounded !== null && p.times.rounded >= today) continue;
+    if (p.discharge?.fit != null) continue; // Already on their way home.
+    const jobs = jobsForPatient(state, p.id);
+    if (jobs.some((j) => j.kind === "ward_round" || j.kind === "ward_discharge")) continue;
+    postJob(state, {
+      kind: "ward_round",
+      roles: ["consultant", "registrar"],
+      specialty: p.specialty,
+      patientId: p.id,
+      objectId: p.bed,
+      roomType: roomOfObject(state, p.bed)?.typeId ?? "ward",
+      // After the morning's urgent work, before routine ward jobs.
+      dueTick: state.tick + 60 * TICKS_PER_MINUTE,
+      durationTicks: ticksFor(state.rng, WARD_ROUND.mins),
+    });
+  }
+}
+
+/** A resident specialty doctor who does ward rounds (not on call from home, not private practice). */
+export function roundsWards(s: Staff): boolean {
+  return (
+    (s.role === "consultant" || s.role === "registrar") &&
+    s.onCall === null &&
+    s.contract !== "privileges"
+  );
+}
+
+/**
+ * Seen on the ward round. Anyone well enough to go home within a few hours
+ * is discharged there and then (the decision a junior's review would
+ * otherwise make later).
+ */
+export function roundDone(state: SimState, p: Patient, bed: PlacedObject): void {
+  p.times.rounded = state.tick;
+  if (p.stage !== "on_ward" || p.stayUntil === null || p.discharge?.fit != null) return;
+  if (p.endOfLife || (p.emergencyOp && !p.emergencyOp.done)) return;
+  if (p.stayUntil > state.tick + WARD_ROUND.dischargeHours * TICKS_PER_HOUR) return;
+  const review = jobsForPatient(state, p.id).find((j) => j.kind === "ward_discharge");
+  if (review && review.state !== "open") return; // A junior is already on it.
+  if (review) removeJob(state, review);
+  dischargeFromWard(state, p, bed);
 }
 
 /**

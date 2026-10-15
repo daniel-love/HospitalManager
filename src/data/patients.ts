@@ -167,6 +167,20 @@ export const TOILET_URGE = 70;
  * A&E: history, examination, results, and the decision to admit.
  */
 export const REFERRAL_MINS: [number, number] = [20, 40];
+/**
+ * The daily specialty ward round (NHS seven-day services: every inpatient
+ * seen by a senior doctor each day). Between these times (minutes after
+ * midnight) a resident consultant or registrar of the patient's specialty
+ * sees each of their inpatients not seen today, a few minutes at the
+ * bedside. Anyone due to be well enough to go home within `dischargeHours`
+ * is discharged on the round, without waiting for the junior doctor's review.
+ */
+export const WARD_ROUND = {
+  from: 8 * 60,
+  to: 17 * 60,
+  mins: [5, 12] as [number, number],
+  dischargeHours: 4,
+};
 /** The doctor's review before a ward patient goes home. */
 export const WARD_DISCHARGE_MINS: [number, number] = [10, 20];
 /** Making a ward bed up for the next patient (more than wiping a cubicle). */

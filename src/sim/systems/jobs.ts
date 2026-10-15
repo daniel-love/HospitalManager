@@ -27,6 +27,8 @@ import type { PlacedObject, SimState } from "../state";
 import {
   claimWardBed,
   dischargeFromWard,
+  roundDone,
+  roundsWards,
   finishPathway,
   reviewed,
   runTransfer,
@@ -104,6 +106,8 @@ export function assignJobs(state: SimState): void {
     .sort((a, b) => a.dueTick - b.dueTick || a.id - b.id);
   for (const job of open) {
     let candidates = idle.filter((s) => canDo(state, s, job) && s.jobId === null);
+    // The ward round is for the specialty's resident doctors, not someone called in from home.
+    if (job.kind === "ward_round") candidates = candidates.filter(roundsWards);
     if (job.kind === "me_review") {
       const p = job.patientId === null ? undefined : state.patients[job.patientId];
       candidates = candidates.filter((s) => canReviewDeath(state, s, p));
@@ -508,6 +512,9 @@ function complete(state: SimState, job: Job, obj: PlacedObject): void {
       break;
     case "ward_discharge":
       dischargeFromWard(state, patient!, obj);
+      break;
+    case "ward_round":
+      roundDone(state, patient!, obj);
       break;
     case "transfer":
     case "isolate":

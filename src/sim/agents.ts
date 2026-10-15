@@ -218,6 +218,8 @@ export interface Patient extends AgentBase {
     decided: number | null;
     /** Arrived on the ward (left A&E). */
     admitted: number | null;
+    /** Inpatients: last seen on a specialty ward round. */
+    rounded: number | null;
     left: number | null;
   };
   /**
@@ -369,6 +371,8 @@ export type JobKind =
   | "referral"
   | "transfer"
   | "ward_discharge"
+  /** A specialty consultant or registrar sees one of their inpatients on the daily ward round. */
+  | "ward_round"
   | "handover"
   | "triage"
   | "treat"

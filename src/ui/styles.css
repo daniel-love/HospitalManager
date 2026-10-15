@@ -42,6 +42,9 @@ body {
   top: 8px;
   left: 50%;
   transform: translateX(-50%);
+  /* Centred with left: 50%, it would otherwise wrap at half the screen's width. */
+  width: max-content;
+  max-width: calc(100vw - 16px);
   display: flex;
   align-items: center;
   gap: 16px;
@@ -731,6 +734,24 @@ body.planning #game::after {
   padding: 3px 8px;
   cursor: pointer;
 }
+.census {
+  white-space: nowrap;
+}
+.census .stat + .stat {
+  margin-left: 9px;
+}
+.census .stat {
+  color: var(--text);
+}
+.census .stat .dim {
+  color: var(--text-dim);
+}
+.census .stat.zero {
+  color: var(--text-dim);
+}
+.census .stat.warn {
+  color: #f2c94c;
+}
 .census:hover {
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
@@ -1316,6 +1337,10 @@ body.planning #game::after {
 }
 .notifications li.bad button {
   border-left-color: var(--bad);
+}
+.notifications.idle {
+  width: auto;
+  padding: 2px 4px;
 }
 .notifications-footer {
   display: flex;

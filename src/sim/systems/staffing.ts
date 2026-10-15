@@ -394,7 +394,9 @@ function updateOnCall(state: SimState): void {
   const strike = residentDoctorsOnStrike(state);
   const open = Object.values(state.jobs).filter(
     (j) =>
-      j.state === "open" && (j.specialty !== null || (strike && j.roles.includes("junior_doctor"))),
+      j.state === "open" &&
+      j.kind !== "ward_round" &&
+      (j.specialty !== null || (strike && j.roles.includes("junior_doctor"))),
   );
 
   for (const job of open) {

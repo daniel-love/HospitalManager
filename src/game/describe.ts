@@ -757,6 +757,9 @@ export function staffState(state: SimState, s: Staff): StaffState {
     case "ward_discharge":
       what = `Discharge review on the ward: ${who}`;
       break;
+    case "ward_round":
+      what = `Ward round: seeing ${who}`;
+      break;
     case "discharge_planning":
       what = `Arranging social care for ${who} to go home`;
       break;
@@ -1174,13 +1177,52 @@ export function fourHourShare(stats: { within4h: number; departures: number }): 
   return stats.departures === 0 ? null : stats.within4h / stats.departures;
 }
 
-/** Patients still in A&E (not on their way out, or admitted to a ward). */
-export function patientsInDept(state: SimState): number {
-  let n = 0;
+/** Where patients are right now, for the top bar. */
+export interface Census {
+  /** Still in A&E (not on their way out, or admitted to a ward). */
+  ae: number;
+  /** Of those, waiting to be booked in, triaged or seen. */
+  waiting: number;
+  /** Of those, admitted and waiting on an A&E trolley for a ward bed. */
+  awaitingBed: number;
+  /** Inpatients in a ward bed. */
+  wards: number;
+  /** In for surgery: in the Day Surgery Unit, theatre or Recovery. */
+  surgery: number;
+  /** Outpatients in for an appointment. */
+  clinics: number;
+}
+
+const WAITING_STAGES = new Set<PatientStage>([
+  "awaiting_handover",
+  "queueing",
+  "booking",
+  "waiting_triage",
+  "waiting_treatment",
+]);
+const SURGERY_STAGES = new Set<PatientStage>([
+  "pre_op",
+  "to_theatre",
+  "in_theatre",
+  "in_recovery",
+  "post_op",
+]);
+
+export function census(state: SimState): Census {
+  const c: Census = { ae: 0, waiting: 0, awaitingBed: 0, wards: 0, surgery: 0, clinics: 0 };
   for (const p of Object.values(state.patients)) {
-    if (inAE(p)) n++;
+    if (p.death !== null) continue;
+    if (inAE(p)) {
+      c.ae++;
+      if (WAITING_STAGES.has(p.stage)) c.waiting++;
+      else if (p.stage === "awaiting_bed") c.awaitingBed++;
+    } else if (p.stage === "on_ward") c.wards++;
+    else if (SURGERY_STAGES.has(p.stage)) c.surgery++;
   }
-  return n;
+  for (const o of Object.values(state.outpatients)) {
+    if (o.stage !== "leaving") c.clinics++;
+  }
+  return c;
 }
 
 // ---------- Patients dialog and Staff screen ----------
