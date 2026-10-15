@@ -32,6 +32,12 @@ export type ObjectiveDef =
   | { id: string; kind: "no_unexpected_deaths"; from: number; to: number }
   | {
       id: string;
+      /** No major incident casualty (major trauma or serious injury) dies, up to this day. */
+      kind: "no_casualty_deaths";
+      to: number;
+    }
+  | {
+      id: string;
       kind: "trauma_transfers";
       /** Every major incident casualty with major trauma on their way to the trauma centre within this many hours. */
       withinHours: number;
@@ -145,6 +151,52 @@ export const SCENARIOS: ScenarioDef[] = [
       },
     ],
     endDay: D.mar1,
+  },
+  {
+    id: "major_incident",
+    name: "Survive a major incident",
+    summary:
+      "A district hospital already stretched by a doctors' strike, and the ambulance service is about to call.",
+    briefing: [
+      "You run a small district general hospital: A&E with Resus, diagnostics, a medical ward, outpatients and a surgical block. Resident doctors have given notice of a strike from next Monday, and consultants will have to cover.",
+      "Intelligence suggests trouble: be ready for a major incident during the strike. When it comes, decide whether to declare one (Hospital → Events).",
+      "To win: no critically or seriously injured casualty dies, every critically injured one is on their way to the major trauma centre within 4 hours of arriving, and A&E gets back to 60% within 4 hours over the following week. Resus space, CT and porters will matter: you have a week to prepare.",
+    ],
+    funding: "nhs",
+    money: 1_500_000,
+    catchment: 40_000,
+    startDay: 1,
+    start: "district_hospital",
+    eventFrequency: "off",
+    script: [
+      { event: "strike_resident_doctors", announceDay: 1, startDay: 8, startHour: 7 },
+      { event: "major_incident", announceDay: 9, startDay: 9, startHour: 14 },
+    ],
+    objectives: [
+      {
+        id: "no_deaths",
+        kind: "no_casualty_deaths",
+        to: 12,
+        text: "No critically or seriously injured casualty dies",
+      },
+      {
+        id: "trauma",
+        kind: "trauma_transfers",
+        withinHours: 4,
+        to: 12,
+        text: "Every critically injured casualty on the way to the major trauma centre within 4 hours",
+      },
+      {
+        id: "recover",
+        kind: "four_hour",
+        atLeast: 0.6,
+        from: 13,
+        to: 19,
+        text: "The week after, 60% leaving A&E within 4 hours",
+      },
+    ],
+    locks: [],
+    endDay: 20,
   },
   {
     id: "private_that_pays",

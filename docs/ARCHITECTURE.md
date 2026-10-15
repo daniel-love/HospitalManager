@@ -44,6 +44,7 @@ src/
     game.ts               # wires sim + loop + renderer + UI; hotkeys
     describe*.ts          # sim state → what each panel and dialog shows
     kpis.ts               # the KPIs: standards, how each is measured from a month, RAG ratings
+    maps/                 # pre-built hospitals: building blocks (shared with tests) and the scenarios' district hospital
   sim/
     state.ts              # SimState types (the save schema)
     agents.ts             # Patient, Staff, Job, ledger and event types

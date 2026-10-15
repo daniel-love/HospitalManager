@@ -36,6 +36,12 @@ export function startScenario(state: SimState, def: ScenarioDef): void {
     segment4Since: null,
     inadequateRun: 0,
   };
+  // Anything due to be announced by the first day (whose midnight has passed) is announced now.
+  const today = clockFromTick(state.tick).day;
+  for (const s of def.script) {
+    if (s.announceDay > today) continue;
+    announce(state, pressureEventById.get(s.event)!, undefined, tickAt(s.startDay, s.startHour));
+  }
 }
 
 /** Whether a room type or piece of equipment is locked in this scenario, and why. */
@@ -151,8 +157,22 @@ function check(state: SimState, o: ObjectiveDef, midnight: boolean): void {
       else if (day > o.by) p.status = "failed";
       return;
     }
+    case "no_casualty_deaths": {
+      // Counted as they die (casualtyDied).
+      if (p.n > 0) p.status = "failed";
+      else if (day > o.to) p.status = "met";
+      return;
+    }
     case "trauma_transfers": {
-      // Counted as major trauma casualties are decided for transfer (systems/scenarios checkTrauma).
+      // Late: counted as they leave (traumaTransferred), or still here past the limit.
+      const late = Object.values(state.patients).some(
+        (q) =>
+          q.conditionId === "major_trauma" &&
+          q.stage !== "leaving" &&
+          !q.death &&
+          state.tick - q.times.arrived > o.withinHours * TICKS_PER_HOUR,
+      );
+      if (late) p.n++;
       if (p.n > 0) p.status = "failed";
       else if (day > o.to) p.status = "met";
       return;
@@ -212,6 +232,15 @@ function end(state: SimState, won: boolean, text: string): void {
     `${won ? "Scenario complete" : scenarioOf(state) ? "Scenario failed" : "Game over"}: ${text}`,
     won ? "info" : "bad",
   );
+}
+
+/** A major incident casualty has died (for the no_casualty_deaths objective). */
+export function casualtyDied(state: SimState): void {
+  const def = scenarioOf(state);
+  if (!def) return;
+  for (const o of def.objectives) {
+    if (o.kind === "no_casualty_deaths") state.goals.objectives[o.id]!.n++;
+  }
 }
 
 /** A major trauma casualty decided for transfer too late (for the trauma_transfers objective). */

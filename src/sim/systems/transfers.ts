@@ -30,6 +30,7 @@ import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobB
 import { analysers, leaveScanner } from "./diagnostics";
 import { leave } from "./patients";
 import { book } from "./serviceLines";
+import { traumaTransferred } from "./scenarios";
 
 /** Doctors who can assess a patient and arrange their transfer, most preferred first. */
 const ARRANGERS = ["junior_doctor", "registrar", "consultant"] as const;
@@ -130,6 +131,8 @@ function depart(state: SimState, p: Patient): void {
   stats.transferWaitMins += (state.tick - t.decided) / TICKS_PER_MINUTE;
   state.money -= TRANSFER_COST;
   book(state, "transfers", TRANSFER_COST, p.times.admitted !== null ? "wards" : "ae");
+  // A major incident scenario counts trauma transfers that were too slow.
+  if (p.conditionId === "major_trauma") traumaTransferred(state, p.times.arrived);
   leave(state, p, "transferred_out");
   if (bed !== null && state.objects[bed]) dirtyCouch(state, bed);
 }

@@ -58,6 +58,7 @@ import {
   startCollection,
 } from "./collections";
 import { earnEmergency, earnPlanned } from "./finance";
+import { casualtyDied } from "./scenarios";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo, stop } from "./movement";
 import { recordDeparture, releaseSeat } from "./patients";
@@ -84,6 +85,8 @@ export function roomNameAt(state: SimState, at: Point): string {
  */
 export function die(state: SimState, p: Patient, expected: boolean, verified: boolean): void {
   const where = roomNameAt(state, tileOf(p));
+  // A major incident scenario counts casualties who die.
+  if (p.conditionId === "major_trauma" || p.conditionId === "serious_injury") casualtyDied(state);
   for (const job of jobsForPatient(state, p.id)) removeJob(state, job);
   releaseSeat(state, p);
   if (p.toilet) release(state, p.toilet.objectId, 0, p.id);

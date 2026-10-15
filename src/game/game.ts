@@ -6,6 +6,7 @@
  * In plan mode, commands go into the build plan instead (see sim/plan.ts), and
  * the map, tools and inspector all show the plan preview ("viewState").
  */
+import { buildDistrictHospital, DISTRICT_MAP } from "./maps/districtHospital";
 import { scenarioById, type ScenarioId } from "@data/scenarios";
 import { describeGoals, lockReason, startScenario } from "@sim/systems/scenarios";
 import { openingCampaign } from "@sim/systems/recruitment";
@@ -516,9 +517,12 @@ export class Game {
   newScenario(id: ScenarioId): void {
     const def = scenarioById.get(id)!;
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
+    const prebuilt = def.start === "district_hospital";
     const state = createSimState({
       seed,
-      site: true,
+      // A pre-built hospital fits its own road in below it.
+      site: !prebuilt,
+      ...(prebuilt ? DISTRICT_MAP : {}),
       rotas: true,
       funding: def.funding,
       money: def.money,
@@ -527,6 +531,7 @@ export class Game {
       eventFrequency: def.eventFrequency,
       recruitment: true,
     });
+    if (prebuilt) buildDistrictHospital(state);
     startScenario(state, def);
     openingCampaign(state);
     this.loadState(state);
