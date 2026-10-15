@@ -305,6 +305,18 @@ export const rooms: RoomInput[] = [
       "Houses the standby generators that keep the essential supply on in a power cut, and the clinical engineers' workshop: they wait here between repairs.",
   },
   {
+    id: "doctors_office",
+    code: 28,
+    name: "Doctors' Office",
+    department: "Staff",
+    colour: 0xb88f6b,
+    minSize: [3, 3],
+    enclosed: true,
+    required: [{ label: "Desk", anyOf: ["desk"] }],
+    description:
+      "Where consultants and registrars write letters, discharge summaries and other admin between ward rounds, referrals, clinics and theatre. One desk per doctor; without a free desk they wait on their specialty's ward.",
+  },
+  {
     id: "outpatients_reception",
     code: 21,
     name: "Outpatients Reception",

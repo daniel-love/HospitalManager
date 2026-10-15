@@ -70,7 +70,8 @@ const ROLE_NEEDS: Partial<Record<StaffRoleId, string[]>> = {
   ],
   registrar: [
     "Patients who need their specialty (see Conditions)",
-    "A Ward to admit to, ideally one given to their specialty; they wait there between referrals",
+    "A Ward to admit to, ideally one given to their specialty",
+    "A Doctors' Office with a free desk to do their admin between jobs; without one they wait on their specialty's ward",
   ],
   consultant: [
     "As for a registrar",

@@ -2,7 +2,8 @@
  * Where staff wait between jobs. In a real hospital nobody idles where their
  * last job ended, and the staff room is for breaks: each role has a base in
  * its own department. Doctors and nurse practitioners wait at the A&E Staff
- * Base, specialty doctors on their ward, radiographers in X-ray or CT, lab
+ * Base, specialty doctors in the Doctors' Office (or on their ward when it's
+ * full or unbuilt), radiographers in X-ray or CT, lab
  * scientists in the lab, porters in the Porters' Lodge and cleaners in the
  * Domestic Services Room. They sit behind a free desk or on a free seat if
  * there is one, otherwise stand. Nurses wait at a nurse station (systems/staffing.ts)
@@ -22,7 +23,8 @@ import { headTo } from "./movement";
 
 /** A kind of room a role can wait in. */
 type BaseKind =
-  | { type: string }
+  /** `seatedOnly`: full once every desk and seat is taken; nobody stands. */
+  | { type: string; seatedOnly?: true }
   /** A ward given to the member of staff's specialty. */
   | { type: "ward"; ownSpecialty: true }
   /** A ward not given to any specialty. */
@@ -30,6 +32,7 @@ type BaseKind =
 
 const STAFF_ROOM: BaseKind = { type: "staff_room" };
 const STAFF_BASE: BaseKind = { type: "staff_base" };
+const DOCTORS_OFFICE: BaseKind = { type: "doctors_office", seatedOnly: true };
 const SPECIALTY_WARDS: BaseKind[] = [
   { type: "ward", ownSpecialty: true },
   { type: "ward", anySpecialty: true },
@@ -37,8 +40,8 @@ const SPECIALTY_WARDS: BaseKind[] = [
 
 /** Where each role waits, best first. Receptionists have their desk instead. */
 const BASES: Record<StaffRoleId, BaseKind[]> = {
-  consultant: [...SPECIALTY_WARDS, STAFF_BASE, STAFF_ROOM],
-  registrar: [...SPECIALTY_WARDS, STAFF_BASE, STAFF_ROOM],
+  consultant: [DOCTORS_OFFICE, ...SPECIALTY_WARDS, STAFF_BASE, STAFF_ROOM],
+  registrar: [DOCTORS_OFFICE, ...SPECIALTY_WARDS, STAFF_BASE, STAFF_ROOM],
   junior_doctor: [STAFF_BASE, STAFF_ROOM],
   nurse: [STAFF_BASE, STAFF_ROOM],
   nurse_practitioner: [STAFF_BASE, STAFF_ROOM],
@@ -87,7 +90,8 @@ export function waitAtBase(state: SimState, s: Staff): void {
       here !== undefined &&
       (isDeskSpot(state, here, current) ||
         seats(state, here).some((t) => t.seat.x === current.x && t.seat.y === current.y));
-    const standing = here !== undefined && reachableTiles(state, here).has(key);
+    const seatedOnly = "seatedOnly" in kind;
+    const standing = !seatedOnly && here !== undefined && reachableTiles(state, here).has(key);
     // Standing, they take a desk or seat once one comes free.
     const better = standing && !sitting ? freeSpot(state, [here!], s, taken) : null;
     if (here && !taken.has(key) && (sitting || standing) && !better?.seated) {
@@ -95,7 +99,7 @@ export function waitAtBase(state: SimState, s: Staff): void {
       if (d) headTo(state, s, d, { x: d.ax, y: d.ay });
       return;
     }
-    const spot = better?.seated ? better : freeSpot(state, rooms, s, taken);
+    const spot = better?.seated ? better : freeSpot(state, rooms, s, taken, seatedOnly);
     if (!spot) continue; // Full: try the next kind of base.
     headTo(state, s, spot.to, spot.approach);
     return;
@@ -150,10 +154,17 @@ function seats(state: SimState, room: Room): { seat: Point; approach: Point }[] 
 
 /**
  * A free spot in the nearest of the rooms with one: behind a desk, then on
- * a seat, otherwise the free tile nearest the middle of the room. Only spots
+ * a seat, otherwise (unless `seatedOnly`) the free tile nearest the middle
+ * of the room. Only spots
  * that can be walked to from the room's way in count.
  */
-function freeSpot(state: SimState, rooms: Room[], s: Staff, taken: Set<number>): Spot | null {
+function freeSpot(
+  state: SimState,
+  rooms: Room[],
+  s: Staff,
+  taken: Set<number>,
+  seatedOnly = false,
+): Spot | null {
   const grid = state.floors[0]!;
   const centre = (r: Room) => ({ x: r.bounds.x + r.bounds.w / 2, y: r.bounds.y + r.bounds.h / 2 });
   const dist = (a: Point, b: Point) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
@@ -178,6 +189,7 @@ function freeSpot(state: SimState, rooms: Room[], s: Staff, taken: Set<number>):
       .filter((t) => !taken.has(tileIndex(grid, t.seat.x, t.seat.y)))
       .sort((a, b) => dist(a.seat, c) - dist(b.seat, c))[0];
     if (seat) return { to: seat.seat, approach: seat.approach, seated: true };
+    if (seatedOnly) continue;
     let best: Point | null = null;
     let bestD = Infinity;
     for (const i of open) {

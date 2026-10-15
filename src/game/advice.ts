@@ -320,6 +320,12 @@ export function describeAdvice(state: SimState): AdviceData {
         true,
       ),
       item(
+        hasRoom("doctors_office"),
+        "A Doctors' Office with desks",
+        "Where consultants and registrars do letters and discharge summaries between jobs, one per desk. Without one they wait on their ward.",
+        true,
+      ),
+      item(
         hasRoom("porters_lodge"),
         "A Porters' Lodge",
         "Somewhere central keeps porters' walks to A&E, the wards and the lab short.",

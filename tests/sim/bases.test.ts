@@ -104,6 +104,26 @@ describe("idle staff", () => {
     expect(roomAt(state, registrar!)).toBe("staff_base");
   });
 
+  it("send specialty doctors to a Doctors' Office desk first, then on to their next base", () => {
+    const state = bases();
+    // Doctors' Office: inside (1,7)–(3,9), one desk with its staff side at the top.
+    applyAll(state, [
+      { type: "build_walls", floor: F, rect: rect(0, 6, 5, 5), wall: WallType.Standard },
+      place("door_single", 2, 10),
+      { type: "zone", floor: F, rect: rect(1, 7, 3, 3), roomType: "doctors_office" },
+      place("desk", 1, 8),
+    ]);
+    expect(state.rooms.find((r) => r.typeId === "doctors_office")?.valid).toBe(true);
+    const [consultant] = hire(state, "consultant");
+    const [registrar] = hire(state, "registrar");
+    settle(state);
+    const rooms = [consultant!, registrar!].map((s) => roomAt(state, s)).sort();
+    // One at the desk; with no free desk, the other doesn't stand about in the office.
+    expect(rooms).toEqual(["doctors_office", "staff_base"]);
+    const inOffice = [consultant!, registrar!].find((s) => roomAt(state, s) === "doctors_office");
+    expect({ x: inOffice!.x, y: inOffice!.y }).toEqual({ x: 1, y: 7 });
+  });
+
   it("with no base of their own, wait in the Staff Room", () => {
     const state = bases();
     const [radiographer] = hire(state, "radiographer");
