@@ -27,10 +27,9 @@ import {
   MOOD_LIFT_TRIAGED,
   MOOD_RECOVERY_BEING_SEEN,
   MOOD_RECOVERY_ON_WARD,
-  TOILET_MINS,
+  TOILET_FIXTURES,
   TOILET_URGE,
   TOILET_USES_BEFORE_CLEAN,
-  TOILET_CLEAN_MINS,
   TRIAGE_CATEGORIES,
   TRIAGE_MINS,
   TRIAGE_TARGET_MINS,
@@ -215,7 +214,7 @@ function waitInArea(state: SimState, p: Patient, beingSeen: boolean): void {
   // Staggered so not every patient searches every tick.
   const myTurn = (state.tick + p.id) % 10 === 0;
   if (p.bladder >= TOILET_URGE && myTurn && !beingSeen) {
-    const toilet = freeToilet(state, p);
+    const toilet = freeToilet(state, p, p.id);
     if (toilet) {
       reserve(state, toilet.id, 0, p.id);
       p.toilet = { objectId: toilet.id, left: -1 };
@@ -256,7 +255,7 @@ function toiletTrip(state: SimState, p: Patient): void {
   }
   if (trip.left < 0) {
     const arrival = headTo(state, p, { x: toilet.x, y: toilet.y }, frontOf(toilet));
-    if (arrival === "arrived") trip.left = ticksFor(state.rng, TOILET_MINS);
+    if (arrival === "arrived") trip.left = ticksFor(state.rng, TOILET_FIXTURES[toilet.defId]!.mins);
     else if (arrival === "no_route") {
       release(state, toilet.id, 0, p.id);
       p.toilet = null;
@@ -276,7 +275,7 @@ function toiletTrip(state: SimState, p: Patient): void {
       objectId: toilet.id,
       roomType: "toilets",
       dueTick: state.tick,
-      durationTicks: ticksFor(state.rng, TOILET_CLEAN_MINS),
+      durationTicks: ticksFor(state.rng, TOILET_FIXTURES[toilet.defId]!.cleanMins),
     });
   }
 }

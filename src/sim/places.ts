@@ -10,7 +10,7 @@
  */
 import { inService } from "./world/service";
 import { content, equipmentById, equipmentNamesFor, roomById } from "@data/catalogue";
-import { TOILET_USES_BEFORE_CLEAN } from "@data/patients";
+import { TOILET_FIXTURES, TOILET_USES_BEFORE_CLEAN } from "@data/patients";
 import type { Point } from "./agents";
 import type { PlacedObject, Room, SimState } from "./state";
 import { OPEN, patientAccess } from "./world/access";
@@ -296,11 +296,37 @@ export function couchStatus(
 /** A toilet is too dirty to use at twice the cleaning threshold. */
 export const MAX_TOILET_DIRT = TOILET_USES_BEFORE_CLEAN * 2;
 
-export function freeToilet(state: SimState, from: Point): PlacedObject | undefined {
-  const toilets = objectsIn(state, "toilets", (d) => d === "toilet").filter(
+/** Toilets, cubicles and urinals: anything a patient goes to the toilet at. */
+export const isToiletFixture = (defId: string) => defId in TOILET_FIXTURES;
+
+/**
+ * Patients' sex isn't modelled, so half of them (by id) are taken to be men,
+ * who'll use a urinal when one's free.
+ */
+export const usesUrinal = (patientId: number) => patientId % 2 === 0;
+
+/**
+ * The nearest usable fixture: a urinal for those who use one if there's one
+ * free, otherwise a toilet or cubicle. Without a patient, any free fixture.
+ */
+export function freeToilet(
+  state: SimState,
+  from: Point,
+  patientId?: number,
+): PlacedObject | undefined {
+  const free = objectsIn(state, "toilets", isToiletFixture).filter(
     (o) => holder(state, o.id, 0) === undefined && (state.dirt[o.id] ?? 0) < MAX_TOILET_DIRT,
   );
-  return nearest(toilets, from);
+  if (patientId === undefined) return nearest(free, from);
+  const urinal = (o: PlacedObject) => o.defId === "urinal";
+  if (usesUrinal(patientId)) {
+    const found = nearest(free.filter(urinal), from);
+    if (found) return found;
+  }
+  return nearest(
+    free.filter((o) => !urinal(o)),
+    from,
+  );
 }
 
 // ---------- Cleaning ----------
@@ -325,7 +351,7 @@ export function cleaningStatuses(state: SimState): Map<number, CleaningStatus> {
     const id = Number(key);
     const obj = state.objects[id];
     if (!obj) continue;
-    const toilet = obj.defId === "toilet";
+    const toilet = isToiletFixture(obj.defId);
     if (toilet ? uses < TOILET_USES_BEFORE_CLEAN : uses <= MAX_COUCH_DIRT) continue;
     if (working.has(id)) out.set(id, "cleaning");
     else out.set(id, toilet && uses >= MAX_TOILET_DIRT ? "out_of_use" : "dirty");

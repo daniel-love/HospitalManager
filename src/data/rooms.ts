@@ -131,10 +131,11 @@ export const rooms: RoomInput[] = [
     minSize: [2, 2],
     enclosed: true,
     required: [
-      { label: "Toilet", anyOf: ["toilet"] },
+      { label: "Toilet or cubicle", anyOf: ["toilet", "toilet_cubicle"] },
       { label: "Hand-wash sink", anyOf: ["sink"] },
     ],
-    description: "At least 2×2 so it is wheelchair accessible.",
+    description:
+      "At least 2×2 so it is wheelchair accessible. For a bigger block, line up cubicles and urinals with a sink or two.",
   },
   {
     id: "staff_room",

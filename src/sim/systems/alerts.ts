@@ -7,7 +7,7 @@
 import {
   CUBICLE_CLEAN_MINS,
   FOUR_HOUR_MINS,
-  TOILET_CLEAN_MINS,
+  TOILET_FIXTURES,
   TOILET_USES_BEFORE_CLEAN,
 } from "@data/patients";
 import { conditionById, roleNames, roomById, specialtyById } from "@data/catalogue";
@@ -15,6 +15,7 @@ import type { StaffRoleId } from "@data/schema";
 import { warn } from "../events";
 import {
   freeToilet,
+  isToiletFixture,
   holder,
   isCouch,
   missingRoom,
@@ -392,8 +393,11 @@ export function updateAlerts(state: SimState): void {
     warn(state, "standing", COOLDOWN, text);
   }
 
-  const desperate = count((p) => p.bladder >= 90 && !p.toilet && inAE(p));
-  if (desperate > 0 && !freeToilet(state, { x: 0, y: 0 })) {
+  // Only urinals free still leaves those who can't use one stuck.
+  const desperate = count(
+    (p) => p.bladder >= 90 && !p.toilet && inAE(p) && !freeToilet(state, p, p.id),
+  );
+  if (desperate > 0) {
     warn(
       state,
       "no_toilet",
@@ -433,7 +437,7 @@ function tidy(state: SimState): void {
       continue;
     }
     if (hasCleaningJob(state, id)) continue;
-    const isToilet = obj.defId === "toilet";
+    const isToilet = isToiletFixture(obj.defId);
     if (isToilet && state.dirt[id]! < TOILET_USES_BEFORE_CLEAN) continue;
     postJob(state, {
       kind: isToilet ? "clean_toilet" : "clean_cubicle",
@@ -441,7 +445,10 @@ function tidy(state: SimState): void {
       objectId: id,
       roomType: roomOfObject(state, id)?.typeId ?? (isToilet ? "toilets" : "minors_cubicle"),
       dueTick: state.tick,
-      durationTicks: ticksFor(state.rng, isToilet ? TOILET_CLEAN_MINS : CUBICLE_CLEAN_MINS),
+      durationTicks: ticksFor(
+        state.rng,
+        isToilet ? TOILET_FIXTURES[obj.defId]!.cleanMins : CUBICLE_CLEAN_MINS,
+      ),
     });
   }
 }

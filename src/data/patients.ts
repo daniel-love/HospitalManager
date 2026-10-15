@@ -110,11 +110,22 @@ export const FOUR_HOUR_MINS = 240;
 
 export const BOOKING_MINS: [number, number] = [2, 4];
 export const TRIAGE_MINS: [number, number] = [8, 12];
-export const TOILET_MINS: [number, number] = [3, 6];
 /** Wiping down a cubicle between patients. */
 export const CUBICLE_CLEAN_MINS: [number, number] = [5, 10];
-export const TOILET_CLEAN_MINS: [number, number] = [8, 12];
-/** Uses before a toilet is posted for cleaning. */
+/**
+ * Toilet fixtures, by equipment id: a patient's minutes at one, and a
+ * cleaner's minutes to clean it. A urinal is a quick stop and a quick wipe;
+ * a cubicle has less floor and fittings to clean than an accessible toilet.
+ */
+export const TOILET_FIXTURES: Record<
+  string,
+  { mins: [number, number]; cleanMins: [number, number] }
+> = {
+  toilet: { mins: [3, 6], cleanMins: [8, 12] },
+  toilet_cubicle: { mins: [3, 6], cleanMins: [5, 8] },
+  urinal: { mins: [1, 2], cleanMins: [2, 4] },
+};
+/** Uses before a toilet, cubicle or urinal is posted for cleaning. */
 export const TOILET_USES_BEFORE_CLEAN = 8;
 
 /**

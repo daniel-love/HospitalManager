@@ -271,7 +271,7 @@ describe("move_object", () => {
       { type: "zone", floor: 0, rect: rect(0, 0, 3, 3), roomType: "toilets" },
       { type: "place_object", floor: 0, defId: "toilet", x: 6, y: 6, rotation: 0 },
     ]);
-    const hasToilet = () => state.rooms[0]!.checks.find((c) => c.label === "Toilet")!.ok;
+    const hasToilet = () => state.rooms[0]!.checks.find((c) => c.label === "Toilet or cubicle")!.ok;
     expect(hasToilet()).toBe(false);
     applyAll(state, [move(1, 1)]);
     expect(hasToilet()).toBe(true);

@@ -6,7 +6,12 @@ import { conditionEquipment, content, objectDef, roomById } from "@data/catalogu
 import { EQUIPMENT_CATEGORY_NAMES } from "@data/equipment";
 import type { EquipmentDef, RoomDef } from "@data/schema";
 import { describeAccess, formatMoney } from "@game/tools";
-import { cleaningStatuses, roomsPatientsCantReach, type CleaningStatus } from "@sim/places";
+import {
+  cleaningStatuses,
+  isToiletFixture,
+  roomsPatientsCantReach,
+  type CleaningStatus,
+} from "@sim/places";
 import type { SimState } from "@sim/state";
 import { itemsAt } from "@sim/world/objects";
 import { roomAt } from "@sim/world/rooms";
@@ -31,7 +36,7 @@ const nice = (id: string) => id.replace(/_/g, " ");
 /** What a dirty item's waiting for, in words. */
 function cleaningText(state: SimState, defId: string, status: CleaningStatus): string {
   if (status === "cleaning") return "Being cleaned";
-  const toilet = defId === "toilet";
+  const toilet = isToiletFixture(defId);
   const what =
     status === "out_of_use"
       ? "Too dirty to use until it's cleaned"
