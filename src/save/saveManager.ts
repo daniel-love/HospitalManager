@@ -1,6 +1,11 @@
 /**
- * Save slots in IndexedDB, autosave rotation, file export/import, and resuming
- * on start-up.
+ * Save slots in IndexedDB, autosaves, file export/import, and resuming on
+ * start-up.
+ *
+ * Each game (told apart by its seed) has one autosave, overwritten each time,
+ * and a save name belongs to one game: saving under a name another game's
+ * saves already use is refused, so the list never shows two hospitals under
+ * the same name.
  *
  * To resume, localStorage holds the id of the last save written or loaded,
  * plus a "resume snapshot" written as the page closes. The snapshot is
@@ -25,10 +30,15 @@ export interface SaveSlot {
   id: string;
   meta: SaveMeta;
   autosave: boolean;
+  /** The game's seed, which tells one game's saves from another's. */
+  seed: number;
 }
 
-const AUTOSAVE_SLOTS = 3;
-const AUTOSAVE_PREFIX = "autosave-";
+/**
+ * Autosave ids are "autosave:<seed>". Older versions rotated through
+ * "autosave-1" to "autosave-3"; those are still listed until deleted.
+ */
+const AUTOSAVE_PREFIX = "autosave";
 /** Id of the last save written or loaded; "" after New game. */
 const LAST_SAVE_KEY = "hospital-manager:last-save";
 /** Save file of the game as the page was closed, if it had moved on since the last save. */
@@ -69,41 +79,62 @@ export function saveResumeSnapshot(state: SimState, name: string): void {
   }
 }
 
+function toSlot(r: SaveRecord): SaveSlot {
+  return {
+    id: r.id,
+    meta: r.meta,
+    autosave: r.id.startsWith(AUTOSAVE_PREFIX),
+    seed: r.file.state.seed,
+  };
+}
+
 /** All saves, newest first. */
 export async function listSaves(): Promise<SaveSlot[]> {
   const records = await (await db()).getAll("saves");
-  return records
-    .map((r) => ({ id: r.id, meta: r.meta, autosave: r.id.startsWith(AUTOSAVE_PREFIX) }))
-    .sort((a, b) => b.meta.savedAt.localeCompare(a.meta.savedAt));
+  return records.map(toSlot).sort((a, b) => b.meta.savedAt.localeCompare(a.meta.savedAt));
 }
 
-/** Saves under a name; saving again with the same name overwrites it. */
+function nameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/** True if a different game (another seed) already has a save under this name. */
+export function nameTakenByOtherGame(slots: SaveSlot[], name: string, seed: number): boolean {
+  const key = nameKey(name);
+  return slots.some((s) => s.seed !== seed && nameKey(s.meta.name) === key);
+}
+
+/**
+ * `name`, or failing that "name (2)", "name (3)"… — the first that no other
+ * game's saves use.
+ */
+export async function uniqueSaveName(name: string, seed: number): Promise<string> {
+  const slots = await listSaves();
+  let candidate = name;
+  for (let n = 2; nameTakenByOtherGame(slots, candidate, seed); n++) candidate = `${name} (${n})`;
+  return candidate;
+}
+
+/**
+ * Saves under a name; saving the same game again under that name overwrites
+ * it. Throws SaveError if another game's saves use the name.
+ */
 export async function saveGame(state: SimState, name: string): Promise<SaveSlot> {
-  const file = encodeSave(state, name);
-  const id = `save:${name.trim().toLowerCase()}`;
-  await (await db()).put("saves", { id, meta: file.meta, file });
-  rememberLastSave(id);
-  return { id, meta: file.meta, autosave: false };
-}
-
-/** Writes to the oldest of the rotating autosave slots, under the hospital's name. */
-export async function autosave(state: SimState, name: string): Promise<void> {
-  const d = await db();
-  const slots = await Promise.all(
-    Array.from({ length: AUTOSAVE_SLOTS }, (_, n) => d.get("saves", `${AUTOSAVE_PREFIX}${n + 1}`)),
-  );
-  let target = 0;
-  for (let n = 0; n < AUTOSAVE_SLOTS; n++) {
-    const slot = slots[n];
-    if (!slot) {
-      target = n;
-      break;
-    }
-    if (slot.meta.savedAt < slots[target]!.meta.savedAt) target = n;
+  if (nameTakenByOtherGame(await listSaves(), name, state.seed)) {
+    throw new SaveError(`"${name.trim()}" is already used by a different hospital's saves`);
   }
   const file = encodeSave(state, name);
-  const id = `${AUTOSAVE_PREFIX}${target + 1}`;
-  await d.put("saves", { id, meta: file.meta, file });
+  const id = `save:${nameKey(name)}`;
+  await (await db()).put("saves", { id, meta: file.meta, file });
+  rememberLastSave(id);
+  return toSlot({ id, meta: file.meta, file });
+}
+
+/** Overwrites this game's autosave, under the hospital's save name. */
+export async function autosave(state: SimState, name: string): Promise<void> {
+  const file = encodeSave(state, name);
+  const id = `${AUTOSAVE_PREFIX}:${state.seed}`;
+  await (await db()).put("saves", { id, meta: file.meta, file });
   rememberLastSave(id);
 }
 

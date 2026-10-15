@@ -23,6 +23,7 @@ import {
   rememberLastSave,
   saveGame,
   saveResumeSnapshot,
+  uniqueSaveName,
 } from "@save/saveManager";
 import { onSite } from "@sim/agents";
 import { applyCommand, type Command, type CommandResult } from "@sim/commands";
@@ -99,6 +100,7 @@ import {
   staffTable,
   type FinanceTab,
   type HospitalTab,
+  type SidePanel,
   type StaffTab,
   tool,
   type InspectorData,
@@ -179,8 +181,13 @@ export class Game {
   private lastPanels = 0;
   private lastHovered = "";
   private hoverSince = 0;
-  /** Name the hospital was last saved or loaded under; autosaves use it too. */
+  /**
+   * Name the hospital was last saved or loaded under; autosaves use it too.
+   * Kept clear of names other games' saves use (see claimSaveName).
+   */
   saveName = "My hospital";
+  /** Whether the save name follows the hospital's name, as it does until the player saves under another. */
+  private saveNameFollows = true;
   /** Tick of the last save or load, so an unchanged game isn't autosaved again. */
   private savedTick: number;
   /** Which autosave interval the clock was in when last checked (see autosavePeriod). */
@@ -478,6 +485,7 @@ export class Game {
   async save(name: string): Promise<void> {
     await saveGame(this.state, name);
     this.saveName = name;
+    this.saveNameFollows = name === this.state.name;
     this.savedTick = this.state.tick;
   }
 
@@ -495,6 +503,8 @@ export class Game {
     administrationDismissed.value = false;
     this.state = state;
     this.saveName = name;
+    this.saveNameFollows = name === state.name;
+    this.claimSaveName();
     this.savedTick = state.tick;
     this.autosavePeriod = this.currentAutosavePeriod();
     this.selectedTile = null;
@@ -571,8 +581,11 @@ export class Game {
   setHospitalName(name: string): void {
     const trimmed = name.trim();
     if (!trimmed) return;
-    if (this.saveName === this.state.name) this.saveName = trimmed;
     this.state.name = trimmed;
+    if (this.saveNameFollows) {
+      this.saveName = trimmed;
+      this.claimSaveName();
+    }
     this.publishHud();
   }
 
@@ -656,6 +669,19 @@ export class Game {
     if (every === null) return null;
     const minutes = Math.floor(this.state.tick / TICKS_PER_MINUTE) + START_MINUTE_OF_DAY;
     return Math.floor(minutes / every);
+  }
+
+  /**
+   * Adds " (2)" etc. to the save name if another game's saves already use it,
+   * so autosaves never land under another hospital's name.
+   */
+  private claimSaveName(): void {
+    const { state, saveName } = this;
+    uniqueSaveName(saveName, state.seed)
+      .then((unique) => {
+        if (this.state === state && this.saveName === saveName) this.saveName = unique;
+      })
+      .catch((err: unknown) => console.warn("Couldn't check save names", err));
   }
 
   /** Snapshots the game for the next start-up, if it has moved on since it was last saved. */
@@ -761,47 +787,58 @@ export class Game {
 
   /** Opens or closes the Help panel, in place of the build palette or another panel. */
   toggleHelp(): void {
-    sidePanel.value = sidePanel.value === "help" ? null : "help";
+    this.toggleSidePanel("help");
+  }
+
+  /** Opens or closes Reports or Help (closing the build palette and any other panel). */
+  toggleSidePanel(id: SidePanel): void {
+    const open = sidePanel.value !== id;
+    this.closePanels();
+    sidePanel.value = open ? id : null;
     buildTab.value = null;
     tool.value = null;
     this.refreshPanels();
   }
 
   /**
-   * Opens the Staff screen at a tab (closing the Patients dialog, which
-   * sits in the same place), optionally picking out one member of staff.
+   * Opens the Staff screen at a tab (closing whichever panel sits in the
+   * same place), optionally picking out one member of staff.
    */
   openStaff(tab: StaffTab, highlight: number | null = null): void {
-    this.closeCentred();
+    this.closePanels();
     staffScreen.value = tab;
     staffHighlight.value = highlight;
     this.refreshPanels();
   }
 
-  /** Opens or closes the Patients dialog (closing the Staff screen). */
+  /** Opens or closes the Patients dialog (closing any other panel). */
   togglePatients(): void {
     const open = !patientsOpen.value;
-    this.closeCentred();
+    this.closePanels();
     patientsOpen.value = open;
     this.refreshPanels();
   }
 
   /** Opens the Finance dialog at a tab (closing the others in the same place). */
   openFinance(tab: FinanceTab): void {
-    this.closeCentred();
+    this.closePanels();
     financeTab.value = tab;
     this.refreshPanels();
   }
 
   /** Opens the Hospital dialog at a tab (closing the others in the same place). */
   openHospital(tab: HospitalTab): void {
-    this.closeCentred();
+    this.closePanels();
     hospitalTab.value = tab;
     this.refreshPanels();
   }
 
-  /** Closes the dialogs that sit in the middle of the screen. */
-  private closeCentred(): void {
+  /**
+   * Closes the management panels (Staff, Patients, Finance, Hospital,
+   * Reports, Help). They share one place on screen, so only one is open.
+   */
+  private closePanels(): void {
+    sidePanel.value = null;
     staffScreen.value = null;
     patientsOpen.value = false;
     financeTab.value = null;

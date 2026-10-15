@@ -513,6 +513,11 @@ button {
   border: 1px solid var(--panel-border);
   border-radius: 5px;
 }
+.save-warning {
+  margin: -4px 0 12px;
+  font-size: 13px;
+  color: var(--bad);
+}
 .slots {
   flex: 1;
   overflow-y: auto;
@@ -767,14 +772,25 @@ body.planning #game::after {
 
 /* ---------- Staff and reports panels ---------- */
 
+/*
+ * Staff, Patients, Hospital, Finance, Reports and Help all sit in this one
+ * box, the same size whichever is open (only one is at a time), so switching
+ * between them doesn't make it jump.
+ */
+.people-dialog,
 .side-panel {
   position: absolute;
   top: 60px;
-  bottom: 68px;
-  left: 8px;
-  width: 320px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  box-sizing: border-box;
+  width: min(920px, calc(100% - 32px));
+  height: calc(100% - 140px);
   display: flex;
   flex-direction: column;
+  /* Solid, unlike other panels: dense text over the busy map is hard to read. */
+  background: rgb(18, 24, 32);
 }
 .side-scroll {
   flex: 1;
@@ -876,10 +892,6 @@ body.planning #game::after {
 }
 
 /* ---------- Staff screen ---------- */
-.staff-screen {
-  /* A steady size, so switching tabs doesn't make it jump. */
-  height: calc(100% - 140px);
-}
 .staff-summary {
   margin: 8px 0 10px;
 }
@@ -1370,18 +1382,7 @@ body.planning #game::after {
 /* ---------- Patients dialog and Staff screen ---------- */
 
 .people-dialog {
-  position: absolute;
-  top: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5;
-  width: min(920px, calc(100% - 32px));
-  max-height: calc(100% - 140px);
-  display: flex;
-  flex-direction: column;
   padding: 10px 14px 12px;
-  /* Solid, unlike other panels: a dense table over the busy map is hard to read. */
-  background: rgb(18, 24, 32);
 }
 .people-header {
   display: flex;
@@ -1667,13 +1668,6 @@ body.planning #game::after {
 }
 
 /* ---------- Reports panel ---------- */
-.reports-panel {
-  /* Wide enough for two columns, without covering the inspector on the right. */
-  width: min(760px, calc(100vw - 332px));
-  min-width: min(360px, calc(100vw - 16px));
-  /* Mostly opaque: there's a lot of small text to read over the map. */
-  background: rgba(18, 24, 32, 0.96);
-}
 .reports-panel .side-scroll {
   padding: 14px 16px 18px;
 }
@@ -2034,11 +2028,6 @@ body.planning #game::after {
 }
 
 /* ---------- Help panel ---------- */
-.help-panel {
-  width: min(560px, calc(100vw - 332px));
-  min-width: min(360px, calc(100vw - 16px));
-  background: rgba(18, 24, 32, 0.96);
-}
 .help-panel .side-scroll {
   padding: 14px 16px 20px;
 }
@@ -2299,10 +2288,6 @@ body.planning #game::after {
 }
 
 /* ---------- Finance ---------- */
-.finance-dialog {
-  height: calc(100% - 140px);
-  width: min(760px, calc(100% - 32px));
-}
 .borrow-form {
   display: flex;
   flex-direction: column;
@@ -2357,10 +2342,6 @@ body.planning #game::after {
 }
 
 /* ---------- Hospital ---------- */
-.hospital-dialog {
-  height: calc(100% - 140px);
-  width: min(760px, calc(100% - 32px));
-}
 .dept-card {
   display: flex;
   flex-direction: column;

@@ -91,8 +91,8 @@ function SettingsBody({ game }: { game: Game }) {
         <fieldset class="setting">
           <legend>Autosave</legend>
           <p class="dim">
-            Times are in game time. The three most recent autosaves are kept. Whatever you choose,
-            reloading or reopening the game picks up where you left off.
+            Times are in game time. Each hospital keeps one autosave, replaced each time. Whatever
+            you choose, reloading or reopening the game picks up where you left off.
           </p>
           {AUTOSAVE_OPTIONS.map((o) => (
             <label class="setting-choice" key={o.id}>

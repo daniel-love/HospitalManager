@@ -79,7 +79,7 @@ const noFocus = (e: MouseEvent) => e.preventDefault();
 export function BuildBar({
   onTogglePlan,
   onToggleCoverage,
-  onPanel,
+  onSidePanel,
   onStaff,
   onPatients,
   onFinance,
@@ -87,8 +87,8 @@ export function BuildBar({
 }: {
   onTogglePlan: () => void;
   onToggleCoverage: () => void;
-  /** A side panel was opened or closed, so its data needs refreshing. */
-  onPanel: () => void;
+  /** Opens or closes Reports or Help. */
+  onSidePanel: (id: SidePanel) => void;
   /** Opens the Staff screen (at its Team tab). */
   onStaff: () => void;
   onFinance: () => void;
@@ -165,10 +165,7 @@ export function BuildBar({
                 if (active) hospitalTab.value = null;
                 else onHospital();
               } else if (p.kind === "side") {
-                sidePanel.value = active ? null : p.id;
-                buildTab.value = null;
-                tool.value = null;
-                onPanel();
+                onSidePanel(p.id);
               }
             }}
           >

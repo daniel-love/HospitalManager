@@ -56,7 +56,7 @@ export class ObjectLayer {
     const showText = zoom >= 0.55;
     const out = kitsOut(state);
     for (const [id, { view }] of this.views) {
-      const label = view.children[1];
+      const label = view.children.find((c) => c instanceof Text);
       if (label) label.visible = showText;
       view.alpha = out.has(id) ? KIT_AWAY_ALPHA : 1;
     }
@@ -76,6 +76,12 @@ function placement(obj: PlacedObject): string {
 export function drawEquipment(def: EquipmentDef, r: Rect, rotation: Rotation): Container {
   const view = new Container();
   const g = new Graphics();
+  if (def.id === "mortuary_fridge") {
+    // Drawn as what it is; its drawers carry the deceased's tags, so no glyph.
+    drawFridge(g, r, rotation);
+    view.addChild(g);
+    return view;
+  }
   const colour = CATEGORY_COLOURS[def.category];
   let centre = { x: (r.x + r.w / 2) * TILE_SIZE, y: (r.y + r.h / 2) * TILE_SIZE };
   let fontSize = 11;
@@ -154,6 +160,72 @@ export function drawFixture(
 }
 
 const MARK = 0x1d232b;
+
+const FRIDGE_STEEL = 0xa9b4be;
+const FRIDGE_CONDENSER = 0x6f7a86;
+const FRIDGE_DOOR = 0xdde6ee;
+const FRIDGE_SEAM = 0x5f6b77;
+const FRIDGE_LED = 0x4fd18b;
+
+/**
+ * A mortuary fridge: a steel cabinet with the condenser along its back and a
+ * door per body along its front, each with a handle on the staff side. Doors
+ * are split along the front edge, matching where deathMarks puts the tags.
+ */
+function drawFridge(g: Graphics, r: Rect, rotation: Rotation): void {
+  const T = TILE_SIZE;
+  const x = r.x * T + INSET;
+  const y = r.y * T + INSET;
+  const w = r.w * T - INSET * 2;
+  const h = r.h * T - INSET * 2;
+  const { dx, dy } = frontDirection(rotation);
+  const along = dy !== 0;
+  const length = along ? w : h;
+  const depth = along ? h : w;
+  /** A rect at `u` along the front and `v` in from the back, in world pixels. */
+  const at = (u: number, v: number, lu: number, lv: number): [number, number, number, number] =>
+    dy > 0
+      ? [x + u, y + v, lu, lv]
+      : dy < 0
+        ? [x + u, y + depth - v - lv, lu, lv]
+        : dx > 0
+          ? [x + v, y + u, lv, lu]
+          : [x + depth - v - lv, y + u, lv, lu];
+
+  g.roundRect(x, y, w, h, 4).fill(FRIDGE_STEEL);
+
+  // Condenser housing with vent slats, and a green "temperature OK" light.
+  const back = 6;
+  g.roundRect(...at(0, 0, length, back), 3).fill(FRIDGE_CONDENSER);
+  for (let u = 6; u < length - 10; u += 4) g.rect(...at(u, 1.5, 1.5, back - 3));
+  g.fill({ color: MARK, alpha: 0.35 });
+  const [lx, ly, lw, lh] = at(length - 5, back / 2 - 1.5, 3, 3);
+  g.circle(lx + lw / 2, ly + lh / 2, 1.6).fill(FRIDGE_LED);
+
+  // Staff work from the front.
+  const band = 3;
+  g.rect(...at(0, depth - band, length, band)).fill(STAFF_COLOUR);
+
+  // One door per drawer, each with a handle by the front.
+  const doors = 3;
+  const gap = 1.5;
+  const doorLen = length / doors;
+  const doorTop = back + 1.5;
+  const doorDepth = depth - band - 1 - doorTop;
+  for (let i = 0; i < doors; i++) {
+    const u = i * doorLen + gap;
+    g.roundRect(...at(u, doorTop, doorLen - gap * 2, doorDepth), 2)
+      .fill(FRIDGE_DOOR)
+      .stroke({ width: 1, color: FRIDGE_SEAM });
+    const handle = Math.min(9, doorLen - 8);
+    g.roundRect(
+      ...at(i * doorLen + (doorLen - handle) / 2, depth - band - 5.5, handle, 2.5),
+      1,
+    ).fill({ color: MARK, alpha: 0.8 });
+  }
+
+  g.roundRect(x, y, w, h, 4).stroke({ width: 1.5, color: MARK, alpha: 0.7 });
+}
 
 /**
  * An item block with its orientation and access marked (rotation 0 faces

@@ -55,7 +55,7 @@ export function App({ game }: { game: Game }) {
       <BuildBar
         onTogglePlan={() => game.setPlanning(!planning.value)}
         onToggleCoverage={() => game.toggleCoverage()}
-        onPanel={() => game.refreshPanels()}
+        onSidePanel={(id) => game.toggleSidePanel(id)}
         onStaff={() => game.openStaff("team")}
         onPatients={() => game.togglePatients()}
         onFinance={() => game.openFinance("statement")}

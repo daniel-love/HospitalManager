@@ -10,6 +10,7 @@ import {
   exportSave,
   importSaveFile,
   listSaves,
+  nameTakenByOtherGame,
   type SaveSlot,
 } from "@save/saveManager";
 import { newGameOpen, saveDialogOpen, showToast } from "./store";
@@ -31,6 +32,8 @@ function SaveDialogBody({ game }: { game: Game }) {
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const close = () => (saveDialogOpen.value = false);
+  /** A save name belongs to one game, so another hospital's name can't be reused. */
+  const taken = slots !== null && nameTakenByOtherGame(slots, name, game.state.seed);
 
   const refresh = () =>
     listSaves()
@@ -62,7 +65,7 @@ function SaveDialogBody({ game }: { game: Game }) {
   const onSave = (e: Event) => {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed || taken) return;
     void run(async () => {
       await game.save(trimmed);
       showToast(`Saved "${trimmed}"`);
@@ -117,10 +120,16 @@ function SaveDialogBody({ game }: { game: Game }) {
             maxLength={60}
             onInput={(e) => setName(e.currentTarget.value)}
           />
-          <button class="primary" type="submit" disabled={busy || !name.trim()}>
+          <button class="primary" type="submit" disabled={busy || !name.trim() || taken}>
             Save
           </button>
         </form>
+        {taken && (
+          <p class="save-warning" role="alert">
+            A different hospital is already saved as "{name.trim()}". Choose another name, or delete
+            that hospital's saves first.
+          </p>
+        )}
 
         <div class="slots">
           {slots === null && <p class="dim">Loading…</p>}
