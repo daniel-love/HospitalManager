@@ -33,7 +33,7 @@ describe("UI descriptions", () => {
         ["nurse", "nurse_practitioner", "theatre_practitioner", "discharge_coordinator"],
       ],
       ["Diagnostics", ["radiographer", "biomedical_scientist"]],
-      ["Support services", ["porter", "cleaner"]],
+      ["Support services", ["clinical_engineer", "porter", "cleaner"]],
       ["Administrative", ["receptionist"]],
     ]);
   });

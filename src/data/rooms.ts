@@ -292,6 +292,18 @@ export const rooms: RoomInput[] = [
       "The cleaners' base, where their trolleys and supplies are kept. Cleaners wait here between jobs.",
   },
   {
+    id: "plant_room",
+    code: 27,
+    name: "Plant Room",
+    department: "Support",
+    colour: 0x8a8f96,
+    minSize: [3, 3],
+    enclosed: true,
+    required: [],
+    description:
+      "Houses the standby generators that keep the essential supply on in a power cut, and the clinical engineers' workshop: they wait here between repairs.",
+  },
+  {
     id: "outpatients_reception",
     code: 21,
     name: "Outpatients Reception",

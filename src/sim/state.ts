@@ -40,7 +40,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 38;
+export const SIM_STATE_VERSION = 39;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -85,6 +85,8 @@ export interface Room {
   private: boolean;
   /** Wards and side rooms: closed to admissions in an outbreak (see SimState.closedRooms). */
   closed: boolean;
+  /** On the essential supply: the standby generators cover it first (see SimState.essentialRooms). */
+  essential: boolean;
   /**
    * Advisory: equipment some conditions need here, beyond being valid
    * (e.g. an ECG for chest pain). Doesn't affect `valid`.
@@ -160,6 +162,17 @@ export interface SimState {
    * (systems/outbreaks.ts).
    */
   closedRooms: Record<string, { since: number; by: "ipc" | "player" }>;
+  /**
+   * Rooms put on or taken off the essential supply, against their type's
+   * default (data/maintenance.ts POWER), keyed like privateRooms.
+   */
+  essentialRooms: Record<string, boolean>;
+  /**
+   * Equipment that can break down: how worn (0–100) and, if it's broken,
+   * since when, by object id (systems/maintenance.ts). Items not listed are
+   * new and working.
+   */
+  maintenance: Record<number, { wear: number; broken: number | null }>;
   /** Each department's status (GAME_DESIGN §8.3): open, or less than fully open. */
   departments: Departments;
   /** How the hospital is funded (GAME_DESIGN §2.2), chosen when the game starts. */
@@ -414,6 +427,8 @@ export function createSimState(opts: NewGameOptions): SimState {
     emergencyTheatres: {},
     privateRooms: {},
     closedRooms: {},
+    essentialRooms: {},
+    maintenance: {},
     departments: { ae: "open", outpatients: "open", theatres: "open" },
     funding: opts.funding ?? "nhs",
     reputation: REPUTATION.start,

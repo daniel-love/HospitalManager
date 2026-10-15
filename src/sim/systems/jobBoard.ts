@@ -138,6 +138,10 @@ export function dirtyCouch(
   });
 }
 
+export function jobsForObject(state: SimState, objectId: number): Job[] {
+  return Object.values(state.jobs).filter((j) => j.objectId === objectId);
+}
+
 export function jobsForPatient(state: SimState, patientId: number): Job[] {
   return Object.values(state.jobs).filter((j) => j.patientId === patientId);
 }

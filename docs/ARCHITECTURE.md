@@ -61,6 +61,7 @@ src/
       site.ts             # the public road, pavements and bus stop; fitting the road into old saves
       vehicles.ts         # drivable tiles, reachability from the road, lanes and road ends
       los.ts              # line-of-sight raycasts
+      service.ts          # equipment in service: not broken, and powered (generators, essential supply)
     systems/
       arrivals.ts         # walk-in and ambulance arrivals by time of day (specialty gating in M4)
       ambulances.ts       # parking spaces, driving in, queueing on the road, handover
@@ -81,6 +82,7 @@ src/
       strikes.ts          # industrial action: who's out, derogations, acting down, Christmas Day cover
       discharge.ts        # getting inpatients home: medicines, the lounge, social care and delayed discharges
       outbreaks.ts        # norovirus: seeding, spread, isolation, staff sickness, room closures
+      maintenance.ts      # equipment wear, breakdowns, repairs and maintenance; noticing power cuts
       reputation.ts       # 0–100 reputation: a running average of each day's patient experience
       loans.ts            # DHSC and bank loans, repayments, oversight segments and credit ratings
       grants.ts           # grant offers, conditions, deadlines and clawback

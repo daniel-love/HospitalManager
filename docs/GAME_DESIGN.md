@@ -443,6 +443,8 @@ Each event has a **trigger** (scheduled, seasonal, random, or conditional), an *
 
 **As built (M6 step 3, part 2):** norovirus spreads patient to patient in shared rooms, to other rooms on staff hands, and to staff; isolation in side rooms, enhanced infection control and visiting restrictions are the levers, and the infection control team (or the player, by policy) closes rooms with cases.
 
+**As built (M6 step 4):** equipment wears and breaks down, and broken kit is out of service until a clinical engineer repairs it; engineers also do planned maintenance. Power cuts stop powered kit beyond the standby generators' cover, essential rooms first.
+
 **Scenario framework:** a scenario = starting map (blank or pre-built), funding model, budget, an event script and objectives (e.g. "Achieve 90% 4-hour for 4 consecutive weeks" or "Reach a Good rating within 2 years").
 
 ---

@@ -9,6 +9,8 @@
  * Rooms are derived data: detectRooms() rebuilds them all from the grid. At
  * 200×200 that is a few milliseconds, cheap enough to run after every build.
  */
+import { POWER } from "@data/maintenance";
+import { computeSupply, inService } from "./service";
 import {
   conditionEquipment,
   content,
@@ -48,6 +50,7 @@ export function detectRooms(state: SimState): void {
         emergency: false,
         private: false,
         closed: false,
+        essential: POWER.essential.includes(def.id),
         forConditions: [],
       });
     }
@@ -75,6 +78,14 @@ export function detectRooms(state: SimState): void {
     }
   }
 
+  // The essential supply, as the player has changed it; then, in a power cut, what has power.
+  for (const [key, on] of Object.entries(state.essentialRooms)) {
+    const [floor, tile] = key.split(":").map(Number);
+    const id = state.floors[floor!]?.roomId[tile!] ?? 0;
+    const room = id === 0 ? undefined : rooms[id - 1];
+    if (room) room.essential = on;
+  }
+  computeSupply(state, rooms, objectRoom);
   for (const room of rooms) evaluateRoom(state, room, rooms);
   shareKit(state, rooms);
   for (const room of rooms) {
@@ -227,18 +238,24 @@ function evaluateRoom(state: SimState, room: Room, rooms: Room[]): void {
       checks.push({ label: "Lead-lined walls all round", ok: enclosed && shielded });
   }
 
-  const defIds = room.objectIds.map((id) => state.objects[id]!.defId);
+  // Broken or unpowered kit doesn't count until it's working again.
+  const allIds = room.objectIds.map((id) => state.objects[id]!.defId);
+  const working = room.objectIds.filter((id) => inService(state, id));
+  const defIds = working.map((id) => state.objects[id]!.defId);
   for (const req of def.required) {
     const have = defIds.filter((d) => req.anyOf.includes(d)).length;
-    checks.push({
-      label: req.label,
-      ok: have >= req.count,
-      ...(req.count > 1 ? { detail: `${have} of ${req.count}` } : {}),
-    });
+    const out = allIds.filter((d) => req.anyOf.includes(d)).length - have;
+    const detail = [
+      req.count > 1 ? `${have} of ${req.count}` : "",
+      out > 0 ? `${out} out of service` : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+    checks.push({ label: req.label, ok: have >= req.count, ...(detail ? { detail } : {}) });
   }
 
   if (def.minSeats !== undefined) {
-    const seats = defIds.reduce((n, d) => n + (equipmentById.get(d)?.seats ?? 0), 0);
+    const seats = allIds.reduce((n, d) => n + (equipmentById.get(d)?.seats ?? 0), 0);
     checks.push({
       label: `Seating for ${def.minSeats}`,
       ok: seats >= def.minSeats,

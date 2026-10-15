@@ -762,6 +762,12 @@ export function staffState(state: SimState, s: Staff): StaffState {
     case "isolate":
       what = `Moving ${who} to a side room: norovirus`;
       break;
+    case "repair":
+      what = `Repairing the ${kitName(state, job.objectId)}`;
+      break;
+    case "maintain":
+      what = `Servicing the ${kitName(state, job.objectId)}`;
+      break;
     case "verify_death":
       what = `Verifying the death of ${who}`;
       break;

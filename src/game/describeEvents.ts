@@ -3,12 +3,14 @@
  * pressure events forecast or under way, what they do and what the player
  * can do about them, and past ones (systems/pressure.ts).
  */
-import { roomById } from "@data/catalogue";
+import { equipmentById, roomById } from "@data/catalogue";
+import { POWER } from "@data/maintenance";
 import { pressureEventById, type EventFrequency, type StrikeDef } from "@data/pressure";
 import type { SimState } from "@sim/state";
 import { intensity, isCooled, knownEvents } from "@sim/systems/pressure";
 import { strikeCounts } from "@sim/systems/strikes";
 import { outbreakRooms } from "@sim/systems/outbreaks";
+import { generatorCapacity, isPowered, powerCut } from "@sim/world/service";
 import { clockFromTick, formatDate, TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 
 export interface EventChip {
@@ -51,6 +53,14 @@ export interface EventsData {
     coming: number;
     calledIn: number;
   } | null;
+  /** Standby power: generators, how many powered items they cover, and (in a cut) how many are off. */
+  power: {
+    generators: number;
+    capacity: number;
+    poweredItems: number;
+    cut: boolean;
+    without: number;
+  };
   /** Rooms with norovirus cases now. */
   outbreak: ReturnType<typeof outbreakRooms>;
   /** In the heat: patient rooms without enough cooling. */
@@ -145,6 +155,7 @@ export function describeEvents(state: SimState): EventsData {
     frequency: state.settings.eventFrequency,
     majorIncident: majorIncident(state),
     outbreak: outbreakRooms(state),
+    power: powerSummary(state),
     active: knownEvents(state).map((e) => {
       const def = pressureEventById.get(e.defId)!;
       const w = when(state, e.start, e.end);
@@ -167,5 +178,19 @@ export function describeEvents(state: SimState): EventsData {
       name: pressureEventById.get(p.defId)?.name ?? p.defId,
       dates: `${formatDate(dayOf(p.start))} – ${formatDate(dayOf(p.end))}`,
     })),
+  };
+}
+
+function powerSummary(state: SimState): EventsData["power"] {
+  const capacity = generatorCapacity(state, state.rooms);
+  const poweredItems = Object.values(state.objects).filter(
+    (o) => equipmentById.get(o.defId)?.power,
+  ).length;
+  return {
+    generators: capacity / POWER.itemsPerGenerator,
+    capacity,
+    poweredItems,
+    cut: powerCut(state),
+    without: Object.values(state.objects).filter((o) => !isPowered(state, o.id)).length,
   };
 }

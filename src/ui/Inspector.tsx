@@ -13,6 +13,7 @@ export function Inspector({
   onEmergencyTheatre,
   onPrivateRoom,
   onRoomClosed,
+  onEssentialRoom,
 }: {
   onClose: () => void;
   onMove: (objectId: number) => void;
@@ -24,6 +25,7 @@ export function Inspector({
   onEmergencyTheatre: (on: boolean) => void;
   onPrivateRoom: (on: boolean) => void;
   onRoomClosed: (closed: boolean) => void;
+  onEssentialRoom: (on: boolean) => void;
 }) {
   const data = inspector.value;
   if (!data) return null;
@@ -51,6 +53,9 @@ export function Inspector({
             {object.upkeep !== undefined && ` · upkeep ${formatMoney(object.upkeep)}/month`}
           </p>
           {object.access && <p class="dim">Access: {object.access}</p>}
+          {object.condition && (
+            <p class={object.condition.ok ? "dim" : "warn-text"}>{object.condition.text}</p>
+          )}
           {object.cover && (
             <p class={object.cover.ok ? "ok-text" : "warn-text"}>{object.cover.text}</p>
           )}
@@ -109,6 +114,21 @@ export function Inspector({
               <span class="dim">
                 A CEPOD theatre: no planned lists, so emergencies never cancel anyone's operation.
                 Without one, emergencies take the next free slot on a list.
+              </span>
+            </label>
+          )}
+          {room.essential !== undefined && (
+            <label class="duty-toggle">
+              <input
+                type="checkbox"
+                checked={room.essential}
+                onChange={(e) => onEssentialRoom((e.currentTarget as HTMLInputElement).checked)}
+              />{" "}
+              Essential supply
+              <span class="dim">
+                In a power cut, the standby generators keep rooms on the essential supply running
+                first (Resus and theatres before wards and scanners), then the rest while capacity
+                lasts.
               </span>
             </label>
           )}

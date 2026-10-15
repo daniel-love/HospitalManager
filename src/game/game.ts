@@ -6,6 +6,7 @@
  * In plan mode, commands go into the build plan instead (see sim/plan.ts), and
  * the map, tools and inspector all show the plan preview ("viewState").
  */
+import { equipmentCondition, setEssentialRoom } from "@sim/systems/maintenance";
 import { roomClosure, setRoomClosed } from "@sim/systems/outbreaks";
 import { declare, standDown } from "@sim/systems/majorIncident";
 import type { EventFrequency } from "@data/pressure";
@@ -315,6 +316,15 @@ export class Game {
     const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
     if (!room || (room.typeId !== "ward" && room.typeId !== "side_room")) return;
     setRoomClosed(this.state, room, closed, "player");
+    this.publishInspector();
+  }
+
+  /** Puts the selected room on the essential supply, or takes it off. */
+  setEssentialRoom(on: boolean): void {
+    const tile = this.selectedTile;
+    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    if (!room) return;
+    setEssentialRoom(this.state, room, on);
     this.publishInspector();
   }
 
@@ -950,6 +960,8 @@ export class Game {
       if (stationsSeeing(this.viewState).has(obj.id)) {
         data.object.cover = COVER_TEXT[bedCover(this.viewState, obj.id)];
       }
+      const condition = equipmentCondition(this.viewState, obj.id);
+      if (condition) data.object.condition = condition;
     }
 
     const room = roomAt(this.viewState, FLOOR, tile.x, tile.y);
@@ -985,6 +997,9 @@ export class Game {
             }
           : {}),
         ...(room.typeId === "theatre" ? { emergency: room.emergency } : {}),
+        ...(room.objectIds.some((id) => equipmentById.get(this.viewState.objects[id]!.defId)?.power)
+          ? { essential: room.essential }
+          : {}),
         ...(room.typeId === "ward" || room.typeId === "side_room"
           ? { closure: roomClosure(this.state, room) }
           : {}),

@@ -163,6 +163,8 @@ export interface InspectorData {
     emergency?: boolean;
     /** Hybrid trusts: in the Private Patient Unit (rooms that can be). */
     private?: boolean;
+    /** On the essential supply: the standby generators cover it first in a power cut. */
+    essential?: boolean;
     /** Wards and side rooms: closed to admissions in an outbreak, and cases there now. */
     closure?: { closed: boolean; byTeam: boolean; cases: number };
   };
@@ -178,6 +180,8 @@ export interface InspectorData {
     capabilities: string[];
     /** Beds that should be watched: how well they are right now. */
     cover?: { text: string; ok: boolean };
+    /** Equipment that can break down or needs power: its condition now. */
+    condition?: { text: string; ok: boolean };
   };
 }
 

@@ -49,6 +49,7 @@ const BASES: Record<StaffRoleId, BaseKind[]> = {
   theatre_practitioner: [{ type: "recovery" }, { type: "theatre" }, STAFF_ROOM],
   receptionist: [],
   discharge_coordinator: [{ type: "ward", anySpecialty: true }, STAFF_BASE, STAFF_ROOM],
+  clinical_engineer: [{ type: "plant_room" }, STAFF_ROOM],
 };
 
 /** Room types some role waits in, for anything that wants to name them. */

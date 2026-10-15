@@ -43,6 +43,7 @@ export function App({ game }: { game: Game }) {
         onEmergencyTheatre={(on) => game.setEmergencyTheatre(on)}
         onPrivateRoom={(on) => game.setPrivateRoom(on)}
         onRoomClosed={(closed) => game.setRoomClosed(closed)}
+        onEssentialRoom={(on) => game.setEssentialRoom(on)}
       />
       {/* Strips under the top bar stack rather than overlap. */}
       <div class="under-topbar">

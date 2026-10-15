@@ -8,6 +8,7 @@
  * same seat or couch. They refer to object ids, which (unlike room ids)
  * survive rebuilding.
  */
+import { inService } from "./world/service";
 import { content, equipmentById, equipmentNamesFor, roomById } from "@data/catalogue";
 import { TOILET_USES_BEFORE_CLEAN } from "@data/patients";
 import type { Point } from "./agents";
@@ -242,6 +243,8 @@ export function freeCouches(
       if (holder(state, o.id, 0) !== undefined || (state.dirt[o.id] ?? 0) > MAX_COUCH_DIRT) {
         return false;
       }
+      // Broken down, or without power in a power cut.
+      if (!inService(state, o.id)) return false;
       const room = roomOfObject(state, o.id)!;
       if (state.funding === "hybrid" && room.private !== forPrivate) return false;
       // Closed in an outbreak: no admissions.
@@ -262,6 +265,7 @@ export function freeCouch(
     if (holder(state, o.id, 0) !== undefined || (state.dirt[o.id] ?? 0) > MAX_COUCH_DIRT) {
       return false;
     }
+    if (!inService(state, o.id)) return false;
     const room = roomOfObject(state, o.id)!;
     return capabilities.every((c) => room.capabilities.includes(c));
   });

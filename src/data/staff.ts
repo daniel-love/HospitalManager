@@ -256,6 +256,15 @@ export const staffRoles: StaffRoleInput[] = [
       "Band 6, working weekdays 08:00 to 18:00. Sees each newly admitted patient who'll need social care to go home (a package of care, a care home place) and asks for it straight away, so the wait runs alongside their treatment. Without one, a ward nurse asks only once the patient is fit to go, and the whole wait comes after, holding a ward bed.",
   },
   {
+    id: "clinical_engineer",
+    name: "Clinical Engineer",
+    short: "Clinical engineers",
+    group: "support",
+    annualCost: 45_000,
+    description:
+      "Band 5/6 EBME technician (electronic and biomedical engineering). Repairs equipment that breaks down, from monitors to the CT scanner, and does planned preventive maintenance on worn kit between repairs, keeping breakdowns down. Without one, broken equipment stays out of service.",
+  },
+  {
     id: "porter",
     name: "Porter",
     short: "Porters",

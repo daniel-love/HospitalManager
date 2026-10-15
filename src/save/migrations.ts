@@ -900,6 +900,18 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v39: equipment wear and breakdowns, the essential supply.
+  38: (save) => {
+    const state = save.state as { maintenance?: object; essentialRooms?: object };
+    return {
+      ...save,
+      state: {
+        ...state,
+        maintenance: state.maintenance ?? {},
+        essentialRooms: state.essentialRooms ?? {},
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

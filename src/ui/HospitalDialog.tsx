@@ -465,6 +465,18 @@ function Events({ game, data }: { game: Game; data: HospitalData["events"] }) {
           </ul>
         </div>
       ))}
+      <div class="report-group">
+        <h4>Standby power</h4>
+        <p class={`small-note${data.power.cut && data.power.without > 0 ? " warn-text" : " dim"}`}>
+          {data.power.cut
+            ? data.power.without > 0
+              ? `Power cut: ${data.power.without} powered items are without power, beyond the generators' cover.`
+              : "Power cut: the standby generators are covering everything."
+            : data.power.generators === 0
+              ? `No standby generators: in a power cut, all ${data.power.poweredItems} powered items stop. Build them in a Plant Room.`
+              : `${data.power.generators} standby ${data.power.generators === 1 ? "generator covers" : "generators cover"} ${Math.min(data.power.capacity, data.power.poweredItems)} of ${data.power.poweredItems} powered items, rooms on the essential supply first.`}
+        </p>
+      </div>
       {data.outbreak.length > 0 && (
         <div class="report-group">
           <h4>Norovirus on the wards</h4>

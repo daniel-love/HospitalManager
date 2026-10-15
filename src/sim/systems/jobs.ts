@@ -8,6 +8,7 @@
  * Observations and crash calls happen wherever the patient is. A crash call
  * that finds nobody free pulls the nearest qualified person off other work.
  */
+import { engineerSpot, maintained, repaired } from "./maintenance";
 import { dischargePlanned } from "./discharge";
 import { conditionById } from "@data/catalogue";
 import { onDuty, type Job, type Patient, type Point, type Staff } from "../agents";
@@ -344,8 +345,19 @@ export function runJobs(state: SimState): void {
       if (headTo(state, staff, frontOf(kit)) !== "arrived") continue;
       job.kit.at = "staff";
     }
-    const spot = job.kind === "clean_toilet" ? frontOf(obj) : bedside(state, obj);
+    const spot =
+      job.kind === "clean_toilet"
+        ? frontOf(obj)
+        : job.kind === "repair" || job.kind === "maintain"
+          ? engineerSpot(state, obj)
+          : bedside(state, obj);
     const arrival = headTo(state, staff, spot);
+    if (arrival === "no_route" && (job.kind === "repair" || job.kind === "maintain")) {
+      // Can't get to it: try again later rather than stand there.
+      unassignJob(state, job);
+      job.dueTick = state.tick + 6 * 60 * TICKS_PER_MINUTE;
+      continue;
+    }
     if (job.state === "assigned") {
       if (arrival !== "arrived") continue;
       const onBed = ["triage", "in_cubicle", "on_ward"].includes(patient?.stage ?? "triage");
@@ -506,6 +518,12 @@ function complete(state: SimState, job: Job, obj: PlacedObject): void {
     }
     case "clean_cubicle":
       delete state.dirt[obj.id];
+      break;
+    case "repair":
+      repaired(state, obj);
+      break;
+    case "maintain":
+      maintained(state, obj);
       break;
     case "clean_toilet":
       delete state.dirt[obj.id];

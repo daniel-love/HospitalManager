@@ -11,6 +11,7 @@ import type { Room, SimState } from "../state";
 import { inBounds, tileIndex } from "./grid";
 import { objectRect } from "./objects";
 import { isWalkable } from "./pathfinding";
+import { inService } from "./service";
 
 const reachCache = new WeakMap<SimState, Map<number, Set<number>>>();
 
@@ -27,6 +28,8 @@ export function shareKit(state: SimState, rooms: Room[]): void {
   for (const obj of Object.values(state.objects)) {
     const def = equipmentById.get(obj.defId);
     if (!def?.mobile) continue;
+    // Broken or without power, it can't be fetched to anyone.
+    if (!inService(state, obj.id)) continue;
     const ids = roomsWithin(state, obj.id, SHARED_KIT_RANGE);
     reach.set(obj.id, ids);
     for (const id of ids) {

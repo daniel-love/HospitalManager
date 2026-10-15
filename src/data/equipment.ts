@@ -629,6 +629,22 @@ export const equipment: EquipmentInput[] = [
     description: "Drinking water for waiting patients.",
   },
   {
+    id: "standby_generator",
+    name: "Standby generator",
+    category: "facilities",
+    tier: 1,
+    cost: 120_000,
+    upkeep: 800,
+    footprint: [2, 2],
+    reliability: 0.999,
+    power: false,
+    capabilities: ["backup_power"],
+    glyph: "Gn",
+    access: [],
+    description:
+      "A diesel generator that starts within seconds of a power cut. In a Plant Room, each one keeps 40 powered items running, rooms on the essential supply first. Monthly test runs and servicing are in its upkeep.",
+  },
+  {
     id: "portable_air_conditioner",
     name: "Portable air conditioner",
     category: "facilities",

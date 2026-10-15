@@ -204,6 +204,7 @@ export const staffRoleIds = [
   "biomedical_scientist",
   "theatre_practitioner",
   "discharge_coordinator",
+  "clinical_engineer",
 ] as const;
 export type StaffRoleId = (typeof staffRoleIds)[number];
 

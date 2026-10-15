@@ -389,6 +389,9 @@ export type JobKind =
   | "discharge_planning"
   /** A porter (or nurse) moves an inpatient with norovirus to a side room (systems/outbreaks.ts). */
   | "isolate"
+  /** A clinical engineer repairs broken equipment, or maintains worn kit (systems/maintenance.ts). */
+  | "repair"
+  | "maintain"
   /** A porter releases the deceased to the funeral director at the mortuary. */
   | "release_body"
   /** Wheeling shared kit (a 12-lead ECG, say) back to where it's kept. */

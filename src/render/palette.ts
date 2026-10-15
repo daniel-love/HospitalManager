@@ -66,6 +66,8 @@ export const ROLE_COLOURS: Record<StaffRoleId, number> = {
   theatre_practitioner: 0x2e8b7a,
   // Discharge coordinators: a lighter nursing blue.
   discharge_coordinator: 0x5b8fd6,
+  // Clinical engineers: estates navy.
+  clinical_engineer: 0x2c3e66,
 };
 
 /** Patients wear white until triaged, then show their triage colour as a ring. */

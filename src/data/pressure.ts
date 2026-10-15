@@ -17,7 +17,8 @@ export type PressureEventId =
   | "strike_diagnostics"
   | "strike_facilities"
   | "social_care_crisis"
-  | "norovirus_season";
+  | "norovirus_season"
+  | "power_cut";
 
 /**
  * Industrial action (systems/strikes.ts). A walkout: the roles don't come
@@ -74,6 +75,8 @@ export interface PressureEventDef {
   careDelay?: number;
   /** Norovirus going round the community: it comes in with patients and visitors (data/infection.ts). */
   community?: boolean;
+  /** The mains supply is off: only what the standby generators cover keeps working. */
+  powerCut?: boolean;
   /** Industrial action: who strikes, and how. */
   strike?: StrikeDef;
   /** The hour it starts on its first day (default 08:00; strikes start at 07:00). */
@@ -215,6 +218,34 @@ PRESSURE_EVENTS.push({
   sickness: 1,
   heat: false,
   community: true,
+});
+
+PRESSURE_EVENTS.push({
+  id: "power_cut",
+  name: "Power cut",
+  short: "Power cut",
+  description:
+    "The mains supply has failed. Powered equipment stops unless the standby generators cover it: monitors, scanners, the lab's analysers, theatre lights. Rooms that lose a powered item they need stop working until the power's back.",
+  levers: [
+    "Standby generators in a Plant Room keep 40 powered items each running",
+    "Put the rooms that matter most on the essential supply (select a room); they're covered first",
+    "Divert ambulances if A&E can't cope (Hospital → Departments)",
+  ],
+  // Any time of year: a hospital's grid supply fails every year or two.
+  months: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  perSeason: 0.6,
+  maxPerSeason: 2,
+  gapDays: 60,
+  leadDays: 0,
+  leadMins: 0,
+  days: [0, 0],
+  hours: [1, 6],
+  shape: "flat",
+  arrivals: { walk_in: 1, ambulance: 1 },
+  conditions: {},
+  sickness: 1,
+  heat: false,
+  powerCut: true,
 });
 
 /** Industrial action: any time of year, with the two weeks' notice the law requires. */

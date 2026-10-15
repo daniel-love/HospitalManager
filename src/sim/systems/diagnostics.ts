@@ -14,6 +14,7 @@
  *
  * A step with `needsResults` waits until every result is back.
  */
+import { inService } from "../world/service";
 import { ANALYSER_MINS, CT_REPORT_MINS, CT_TARGET_MINS, LAB_PROCESS_MINS } from "@data/diagnostics";
 import { roomById } from "@data/catalogue";
 import type { Investigation, Job, Patient, Point, Staff } from "../agents";
@@ -40,7 +41,9 @@ export function analysers(state: SimState): PlacedObject[] {
   for (const room of state.rooms) {
     if (!room.valid || room.typeId !== "lab") continue;
     for (const id of room.objectIds) {
-      if (state.objects[id]!.defId === "blood_analyser") out.push(state.objects[id]!);
+      if (state.objects[id]!.defId === "blood_analyser" && inService(state, id)) {
+        out.push(state.objects[id]!);
+      }
     }
   }
   return out.sort((a, b) => a.id - b.id);
