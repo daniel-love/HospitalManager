@@ -49,7 +49,7 @@ import type { PlacedObject, SimState } from "../state";
 import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE, tickAt } from "../time";
 import { objectRect, sideTiles } from "../world/objects";
 import { roomOfObject } from "../world/rooms";
-import { trolleyStop } from "./admissions";
+import { wheelTo } from "./admissions";
 import { newPatient } from "./arrivals";
 import { jobPlan } from "./clinics";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor, unassignJob } from "./jobBoard";
@@ -622,8 +622,7 @@ function runOperation(state: SimState, op: Operation): void {
     op.recoveryBed = null;
     return;
   }
-  const from = { x: Math.round(p.x), y: Math.round(p.y) };
-  const stop = trolleyStop(state, from, bed);
+  const stop = wheelTo(state, p, bed);
   let arrival = stop
     ? headTo(state, p, restPoint(bed), stop, true)
     : headTo(state, p, restPoint(bed), bedside(state, bed));
@@ -912,8 +911,7 @@ function wheelToTheatre(state: SimState, op: Operation, p: Patient, table: Place
     p.bed = table.id;
     p.stage = "to_theatre";
   }
-  const from = { x: Math.round(p.x), y: Math.round(p.y) };
-  const stop = trolleyStop(state, from, table);
+  const stop = wheelTo(state, p, table);
   let arrival = stop
     ? headTo(state, p, restPoint(table), stop, true)
     : headTo(state, p, restPoint(table), bedside(state, table));

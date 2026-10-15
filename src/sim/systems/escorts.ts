@@ -19,7 +19,7 @@ import type { SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
 import { tileIndex } from "../world/grid";
 import { roomOfObject } from "../world/rooms";
-import { trolleyStop } from "./admissions";
+import { wheelTo } from "./admissions";
 import { jobsForPatient, postJob, removeJob } from "./jobBoard";
 import { headTo } from "./movement";
 
@@ -152,7 +152,7 @@ export function runEscort(state: SimState, job: Job, staff: Staff, p: Patient): 
     }
     p.stage = "called_treatment";
   }
-  const stop = trolleyStop(state, { x: Math.round(p.x), y: Math.round(p.y) }, to);
+  const stop = wheelTo(state, p, to);
   let arrival = stop
     ? headTo(state, p, restPoint(to), stop, true)
     : headTo(state, p, restPoint(to), bedside(state, to));

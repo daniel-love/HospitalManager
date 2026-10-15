@@ -20,7 +20,7 @@
 import { MAJOR_INCIDENT } from "@data/pressure";
 import { conditionById, equipmentById } from "@data/catalogue";
 import { MOOD_LIFT_DECISION, REFERRAL_MINS, WARD_DISCHARGE_MINS } from "@data/patients";
-import { onDuty, type Job, type Patient, type Point, type Staff } from "../agents";
+import { onDuty, type Job, type Patient, type Point, type Staff, type AgentBase } from "../agents";
 import { emit, warn } from "../events";
 import { bedside, freeCouches, release, reserve, restPoint } from "../places";
 import { chance, nextFloat } from "../rng";
@@ -259,6 +259,27 @@ export function trolleyStop(
 }
 
 /**
+ * Where to wheel a patient's trolley to beside a bed. The first stop
+ * reachable depends on where they are, so recomputing it as they move can
+ * pick a different stop every few steps and send them round in circles:
+ * keep the one already headed for while the layout is unchanged.
+ */
+export function wheelTo(state: SimState, p: AgentBase, bed: PlacedObject): Point | null {
+  const rest = restPoint(bed);
+  const d = p.dest;
+  if (
+    d &&
+    d.x === rest.x &&
+    d.y === rest.y &&
+    d.blocked < 0 &&
+    p.pathVersion === state.layoutVersion
+  ) {
+    return { x: d.ax, y: d.ay };
+  }
+  return trolleyStop(state, { x: Math.round(p.x), y: Math.round(p.y) }, bed);
+}
+
+/**
  * The nearest free, clean ward bed the patient can get to, reserved for
  * them. On a trolley that needs a bed-width route. Null if there's none.
  * `job.step` records which: 1 wheeled on their trolley, 0 walking.
@@ -339,7 +360,7 @@ export function runTransfer(state: SimState, job: Job, porter: Staff, p: Patient
     p.bed = wardBed.id;
   }
   const wheeled = job.step === 1;
-  const stop = wheeled ? trolleyStop(state, tileOf(p), wardBed) : null;
+  const stop = wheeled ? wheelTo(state, p, wardBed) : null;
   let arrival = stop
     ? headTo(state, p, restPoint(wardBed), stop, true)
     : headTo(state, p, restPoint(wardBed), bedside(state, wardBed));
