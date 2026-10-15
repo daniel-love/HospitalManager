@@ -7,6 +7,7 @@
 import { REPUTATION, STARTING_CASH } from "@data/economy";
 import { GRANT_OFFERS, OVERSIGHT, START_CREDIT } from "@data/finance";
 import type { EventFrequency, PressureEventId } from "@data/pressure";
+import { CQC, type CqcRating, type KeyQuestion } from "@data/cqc";
 import type { SpecialtyId } from "@data/schema";
 import { DEFAULT_CATCHMENT } from "@data/patients";
 import {
@@ -31,6 +32,7 @@ import {
   type Patient,
   type SimEvent,
   type Staff,
+  type TourAgent,
   type Visitor,
 } from "./agents";
 import type { PlanEntry } from "./plan";
@@ -40,7 +42,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 39;
+export const SIM_STATE_VERSION = 40;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -211,6 +213,10 @@ export interface SimState {
     /** Finished grants, newest last: met (kept) or missed (clawed back). */
     done: { defId: string; tick: number; met: boolean }[];
   };
+  /** CQC inspections and ratings, and VIP visits (systems/inspections.ts). */
+  cqc: Cqc;
+  /** Inspectors and VIPs touring the hospital, keyed by id (agent ids). */
+  tours: Record<number, TourAgent>;
   /** Pressure events: forecast or under way, and past ones, newest last (systems/pressure.ts). */
   pressure: {
     active: PressureEvent[];
@@ -249,6 +255,43 @@ export interface SimSettings {
   rotas: boolean;
   /** How often pressure events come (data/pressure.ts EVENT_FREQUENCY). Off for test fixtures. */
   eventFrequency: EventFrequency;
+}
+
+/** Something an inspector or VIP saw, good or bad, under one of CQC's key questions. */
+export interface CqcFinding {
+  question: KeyQuestion;
+  good: boolean;
+  text: string;
+}
+
+/** A published (or waiting to be published) inspection report. */
+export interface CqcReport {
+  visited: number;
+  published: number;
+  overall: CqcRating;
+  questions: Record<KeyQuestion, { rating: CqcRating; score: number; evidence: string[] }>;
+  findings: CqcFinding[];
+}
+
+/** Inspections and ratings (systems/inspections.ts). */
+export interface Cqc {
+  /** The published ratings, or null before the first inspection. */
+  overall: CqcRating | null;
+  questions: Record<KeyQuestion, CqcRating> | null;
+  /** When the next inspection is due (unannounced, from then on a weekday morning). */
+  next: number;
+  /** An inspection under way: when it started, and what they've seen. */
+  visit: { started: number; findings: CqcFinding[] } | null;
+  /** The report of the last visit, until it's published. */
+  pending: CqcReport | null;
+  /** Published reports, newest last. */
+  reports: CqcReport[];
+  /** Placed in special measures by an Inadequate rating, until re-rated better. */
+  specialMeasures: boolean;
+  /** When concerns last brought an inspection forward. */
+  concernsAt: number | null;
+  /** A VIP visit under way: who, and what they've seen. */
+  vip: { eventId: number; who: string; findings: CqcFinding[] } | null;
 }
 
 /** A major incident under way (systems/majorIncident.ts). */
@@ -463,6 +506,19 @@ export function createSimState(opts: NewGameOptions): SimState {
       done: [],
     },
     pressure: { active: [], past: [], nextId: 1, vaccinated: null, majorIncident: null },
+    cqc: {
+      overall: null,
+      questions: null,
+      // The first inspection comes in the first few months (systems/inspections.ts).
+      next: CQC.firstInspectionDays[0] * TICKS_PER_DAY,
+      visit: null,
+      pending: null,
+      reports: [],
+      specialMeasures: false,
+      concernsAt: null,
+      vip: null,
+    },
+    tours: {},
     settings: {
       catchment: DEFAULT_CATCHMENT,
       patientVolume: 1,

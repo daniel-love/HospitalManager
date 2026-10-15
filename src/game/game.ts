@@ -6,6 +6,7 @@
  * In plan mode, commands go into the build plan instead (see sim/plan.ts), and
  * the map, tools and inspector all show the plan preview ("viewState").
  */
+import { RATING_NAMES } from "@data/cqc";
 import { equipmentCondition, setEssentialRoom } from "@sim/systems/maintenance";
 import { roomClosure, setRoomClosed } from "@sim/systems/outbreaks";
 import { declare, standDown } from "@sim/systems/majorIncident";
@@ -880,6 +881,11 @@ export class Game {
       fourHour: fourHourShare(this.state.today.stats),
       administration: this.state.rating.administration !== null,
       events: eventChips(this.state),
+      cqc: {
+        rating: this.state.cqc.overall,
+        label: this.state.cqc.overall && RATING_NAMES[this.state.cqc.overall],
+        underWay: this.state.cqc.visit !== null,
+      },
     };
     if (!debugVisible.value) return;
     const { camera } = this.renderer;

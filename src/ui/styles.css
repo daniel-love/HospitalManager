@@ -2533,3 +2533,35 @@ body.planning #game::after {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* ---------- Hospital → Inspections ---------- */
+
+.cqc-head {
+  margin-bottom: 6px;
+}
+.cqc-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d232b;
+}
+.cqc-badge.outstanding {
+  background: #8fd0f2;
+}
+.cqc-badge.good {
+  background: var(--ok);
+}
+.cqc-badge.requires_improvement {
+  background: #f2c94c;
+}
+.cqc-badge.inadequate {
+  background: var(--bad);
+}
+.topbar .cqc-chip {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}

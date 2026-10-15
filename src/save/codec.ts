@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { conditionById, objectDef } from "@data/catalogue";
 import { PRIVATE } from "@data/economy";
+import { KEY_QUESTIONS, RATINGS, type KeyQuestion } from "@data/cqc";
 import { PRESSURE_EVENTS, type PressureEventId } from "@data/pressure";
 import { specialtyIds, staffRoleIds } from "@data/schema";
 import { SERVICE_LINES, type ServiceLine } from "@sim/agents";
@@ -127,6 +128,37 @@ const agentFields = {
   dest: z.object({ x: num, y: num, ax: int, ay: int, blocked: int }).nullable(),
   pathVersion: int.min(0),
 };
+
+const tourSchema = z.object({
+  ...agentFields,
+  kind: z.enum(["inspector", "vip"]),
+  rooms: z.array(z.string()),
+  until: nullableInt,
+  stage: z.enum(["touring", "leaving"]),
+});
+const rating = z.enum(RATINGS);
+const findingSchema = z.object({
+  question: z.enum(KEY_QUESTIONS),
+  good: z.boolean(),
+  text: z.string(),
+});
+const reportSchema = z.object({
+  visited: int,
+  published: int,
+  overall: rating,
+  questions: z.object(
+    Object.fromEntries(
+      KEY_QUESTIONS.map((q) => [
+        q,
+        z.object({ rating, score: num, evidence: z.array(z.string()) }),
+      ]),
+    ) as Record<
+      KeyQuestion,
+      z.ZodObject<{ rating: typeof rating; score: typeof num; evidence: z.ZodArray<z.ZodString> }>
+    >,
+  ),
+  findings: z.array(findingSchema),
+});
 
 const patientSchema = z.object({
   ...agentFields,
@@ -581,6 +613,27 @@ const saveSchema = z.object({
     nextReferralId: int.positive(),
     outpatients: z.array(outpatientSchema),
     visitors: z.array(visitorSchema),
+    tours: z.array(tourSchema),
+    cqc: z.object({
+      overall: rating.nullable(),
+      questions: z
+        .object(
+          Object.fromEntries(KEY_QUESTIONS.map((q) => [q, rating])) as Record<
+            KeyQuestion,
+            typeof rating
+          >,
+        )
+        .nullable(),
+      next: int,
+      visit: z.object({ started: int, findings: z.array(findingSchema) }).nullable(),
+      pending: reportSchema.nullable(),
+      reports: z.array(reportSchema),
+      specialMeasures: z.boolean(),
+      concernsAt: nullableInt,
+      vip: z
+        .object({ eventId: int.positive(), who: z.string(), findings: z.array(findingSchema) })
+        .nullable(),
+    }),
     operations: z.array(operationSchema),
     nextOperationId: int.positive(),
     reserved: z.record(z.string(), int.positive()),
@@ -761,6 +814,8 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       nextReferralId: state.nextReferralId,
       outpatients: Object.values(state.outpatients),
       visitors: Object.values(state.visitors),
+      tours: Object.values(state.tours),
+      cqc: state.cqc,
       operations: Object.values(state.operations),
       nextOperationId: state.nextOperationId,
       nextCollectionId: state.nextCollectionId,
@@ -842,6 +897,8 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     nextReferralId: s.nextReferralId,
     outpatients: byId(s.outpatients, "outpatient"),
     visitors: byId(s.visitors, "visitor"),
+    tours: byId(s.tours, "tour"),
+    cqc: s.cqc,
     operations: byId(s.operations, "operation"),
     nextOperationId: s.nextOperationId,
     nextCollectionId: s.nextCollectionId,

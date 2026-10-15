@@ -16,6 +16,7 @@ const TABS: { id: HospitalTab; label: string }[] = [
   { id: "escalation", label: "Escalation" },
   { id: "policies", label: "Policies" },
   { id: "events", label: "Events" },
+  { id: "inspections", label: "Inspections" },
   { id: "performance", label: "Performance" },
 ];
 
@@ -55,6 +56,7 @@ export function HospitalDialog({ game }: { game: Game }) {
         {tab === "escalation" && <Escalation game={game} data={data} />}
         {tab === "policies" && <Policies game={game} data={data} />}
         {tab === "events" && <Events game={game} data={data.events} />}
+        {tab === "inspections" && <Inspections data={data.inspections} />}
         {tab === "performance" && <Performance data={data.performance} />}
       </div>
     </section>
@@ -517,6 +519,98 @@ function Events({ game, data }: { game: Game; data: HospitalData["events"] }) {
                 <tr key={i}>
                   <td>{p.name}</td>
                   <td class="num dim">{p.dates}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
+const RATING_LABEL = {
+  outstanding: "Outstanding",
+  good: "Good",
+  requires_improvement: "Requires Improvement",
+  inadequate: "Inadequate",
+};
+
+function RatingBadge({ rating }: { rating: keyof typeof RATING_LABEL }) {
+  return <span class={`cqc-badge ${rating}`}>{RATING_LABEL[rating]}</span>;
+}
+
+/** CQC ratings: the latest report by key question, with its evidence, and what's next. */
+function Inspections({ data }: { data: HospitalData["inspections"] }) {
+  return (
+    <>
+      <div class="dept-head cqc-head">
+        <strong>Care Quality Commission rating</strong>
+        {data.overall ? (
+          <RatingBadge rating={data.overall} />
+        ) : (
+          <span class="dim">Not yet rated</span>
+        )}
+      </div>
+      {data.specialMeasures && (
+        <p class="warn-text small-note">
+          In special measures after an Inadequate rating: NHS oversight segment 4, with no agency
+          staff and building capped, until the next inspection rates it better.
+        </p>
+      )}
+      {data.underWay && (
+        <p class="warn-text small-note">
+          Inspectors are here today, walking round patient areas (dark figures on the map).
+        </p>
+      )}
+      {data.pending && (
+        <p class="small-note">
+          The report of their last visit will be published on {data.pending}.
+        </p>
+      )}
+      <p class="dim small-note">{data.next}</p>
+      {data.report && (
+        <>
+          <h4>
+            Report of the visit on {data.report.visited}, published {data.report.published}
+          </h4>
+          {data.report.questions.map((q) => (
+            <div key={q.id} class="dept-card">
+              <div class="dept-head">
+                <strong title={q.text}>{q.name}</strong>
+                <RatingBadge rating={q.rating} />
+              </div>
+              <span class="dim small-note">{q.text}</span>
+              {q.evidence.length > 0 && (
+                <ul class="event-levers">
+                  {q.evidence.map((e) => (
+                    <li key={e} class={e.startsWith("Concern") ? "warn-text" : ""}>
+                      {e}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+          <p class="dim small-note">
+            Each key question is scored from the last three months' data (about two thirds) and what
+            the inspectors saw on the day. The overall rating follows CQC's rules: Inadequate with
+            two key questions Inadequate; Requires Improvement with one Inadequate or two Requires
+            Improvement; Outstanding with two Outstanding and the rest Good.
+          </p>
+        </>
+      )}
+      {data.history.length > 1 && (
+        <div class="report-group">
+          <h4>Past ratings</h4>
+          <table class="report-table">
+            <tbody>
+              {data.history.map((h, i) => (
+                <tr key={i}>
+                  <td>{h.date}</td>
+                  <td class="num">
+                    <RatingBadge rating={h.overall} />
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -912,6 +912,29 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v40: CQC inspections and ratings, inspectors and VIPs touring.
+  39: (save) => {
+    const state = save.state as { cqc?: object; tours?: object[]; tick: number };
+    return {
+      ...save,
+      state: {
+        ...state,
+        tours: state.tours ?? [],
+        // An inspection a couple of months from now, in a game already under way.
+        cqc: state.cqc ?? {
+          overall: null,
+          questions: null,
+          next: state.tick + 60 * 24 * 60 * 10,
+          visit: null,
+          pending: null,
+          reports: [],
+          specialMeasures: false,
+          concernsAt: null,
+          vip: null,
+        },
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

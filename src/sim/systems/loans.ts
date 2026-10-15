@@ -231,6 +231,8 @@ export function reviewRating(state: SimState, m: MonthReport): void {
   if (segment === 3 && before >= 3 && surplus < -deficit4 * income_) segment = 4;
   // Confidence comes back slowly: one step a month.
   segment = Math.max(segment, before - 1);
+  // In special measures after an Inadequate CQC rating: segment 4 until re-rated.
+  if (state.cqc.specialMeasures) segment = 4;
   state.rating.segment = segment;
   if (segment === 4 && state.policies.gapFill === "bank_agency") state.policies.gapFill = "bank";
   if (segment !== before) {

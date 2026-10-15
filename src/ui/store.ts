@@ -29,6 +29,8 @@ export interface HudState {
   administration: boolean;
   /** Pressure events forecast or under way. */
   events: EventChip[];
+  /** The CQC rating, once inspected, and whether inspectors are here now. */
+  cqc: { rating: string | null; label: string | null; underWay: boolean };
 }
 
 export interface DebugStats {
@@ -201,6 +203,7 @@ export const hud = signal<HudState>({
   fourHour: null,
   administration: false,
   events: [],
+  cqc: { rating: null, label: null, underWay: false },
 });
 /** The player has seen the administration notice for this game and chosen to play on. */
 export const administrationDismissed = signal(false);
@@ -394,7 +397,8 @@ export const patientsOpen = signal(false);
 export type StaffTab = "team" | "hire" | "rota";
 export const staffScreen = signal<StaffTab | null>(null);
 /** The Hospital dialog and its tab, and what it shows. */
-export type HospitalTab = "departments" | "escalation" | "policies" | "events" | "performance";
+export type HospitalTab =
+  "departments" | "escalation" | "policies" | "events" | "inspections" | "performance";
 export const hospitalTab = signal<HospitalTab | null>(null);
 export const hospitalData = signal<HospitalData | null>(null);
 

@@ -146,6 +146,10 @@ export class AgentLayer {
       live.add(v.id);
       this.place(v, alpha, "visitor", drawVisitor);
     }
+    for (const t of Object.values(state.tours)) {
+      live.add(t.id);
+      this.place(t, alpha, t.kind, t.kind === "inspector" ? drawInspector : drawVip);
+    }
     for (const c of Object.values(state.collections)) {
       if (!crewOnFoot(c)) continue;
       live.add(c.crew.id);
@@ -433,6 +437,16 @@ function drawVisitor(g: Graphics): void {
   g.circle(0, 0, PATIENT_RADIUS - 1)
     .fill(VISITOR_COLOUR)
     .stroke({ width: 1.5, color: 0xffffff });
+}
+
+/** A CQC inspector: a dark suit, with a white lanyard ring. */
+function drawInspector(g: Graphics): void {
+  g.circle(0, 0, PATIENT_RADIUS).fill(0x1f2937).stroke({ width: 2.5, color: 0xffffff });
+}
+
+/** A VIP and their party: gold, so they stand out. */
+function drawVip(g: Graphics): void {
+  g.circle(0, 0, PATIENT_RADIUS).fill(0xd4a72c).stroke({ width: 2, color: 0x1f2937 });
 }
 
 function drawStaff(g: Graphics, s: Staff, selected: boolean): void {

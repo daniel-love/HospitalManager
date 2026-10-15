@@ -13,7 +13,14 @@ import { escalationBeds, opel, patientsInEscalation } from "@sim/systems/escalat
 import { holder } from "@sim/places";
 import { statusPenalty } from "@sim/systems/reputation";
 import { VISITING } from "@sim/systems/visitors";
-import { dateOf, firstDayOf, monthName } from "@sim/time";
+import { clockFromTick, dateOf, firstDayOf, formatDate, monthName } from "@sim/time";
+import {
+  KEY_QUESTIONS,
+  KEY_QUESTION_NAMES,
+  KEY_QUESTION_TEXT,
+  type CqcRating,
+  type KeyQuestion,
+} from "@data/cqc";
 import { describeEvents, type EventsData } from "./describeEvents";
 import { KPIS, type KpiSection, type Rag } from "./kpis";
 
@@ -56,6 +63,29 @@ export interface HospitalData {
     outbreakClosures: "ipc" | "manual";
   };
   events: EventsData;
+  inspections: {
+    overall: CqcRating | null;
+    specialMeasures: boolean;
+    underWay: boolean;
+    /** When the visited report comes out, if one's waiting. */
+    pending: string | null;
+    /** When the next is likely, roughly. */
+    next: string;
+    report: {
+      visited: string;
+      published: string;
+      overall: CqcRating;
+      questions: {
+        id: KeyQuestion;
+        name: string;
+        text: string;
+        rating: CqcRating;
+        score: number;
+        evidence: string[];
+      }[];
+    } | null;
+    history: { date: string; overall: CqcRating }[];
+  };
   performance: {
     /** This month so far first, then earlier months. */
     months: { name: string; days: number }[];
@@ -122,6 +152,7 @@ export function describeHospital(state: SimState): HospitalData {
       outbreakClosures: state.policies.outbreakClosures,
     },
     events: describeEvents(state),
+    inspections: inspections(state),
     performance: performance(state),
   };
 }
@@ -146,5 +177,41 @@ function performance(state: SimState): HospitalData["performance"] {
         return v === null ? { text: "—", rag: "none" } : { text: k.format(v), rag: k.rate(v) };
       }),
     })),
+  };
+}
+
+const dateOfTick = (tick: number) => formatDate(clockFromTick(tick).day);
+
+function inspections(state: SimState): HospitalData["inspections"] {
+  const c = state.cqc;
+  const last = c.reports[c.reports.length - 1];
+  const month = monthName(dateOf(clockFromTick(Math.max(c.next, state.tick)).day));
+  return {
+    overall: c.overall,
+    specialMeasures: c.specialMeasures,
+    underWay: c.visit !== null,
+    pending: c.pending ? dateOfTick(c.pending.published) : null,
+    next:
+      c.overall === null
+        ? `The first inspection is unannounced, some time in your first few months (from around ${month}).`
+        : `The next is unannounced, from around ${month}: sooner after a poor rating, or if concerns pile up (unexpected deaths, complaints, safety incidents).`,
+    report: last
+      ? {
+          visited: dateOfTick(last.visited),
+          published: dateOfTick(last.published),
+          overall: last.overall,
+          questions: KEY_QUESTIONS.map((q) => ({
+            id: q,
+            name: KEY_QUESTION_NAMES[q],
+            text: KEY_QUESTION_TEXT[q],
+            rating: last.questions[q].rating,
+            score: last.questions[q].score,
+            evidence: last.questions[q].evidence,
+          })),
+        }
+      : null,
+    history: [...c.reports]
+      .reverse()
+      .map((r) => ({ date: dateOfTick(r.published), overall: r.overall })),
   };
 }

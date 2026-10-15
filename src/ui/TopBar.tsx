@@ -25,7 +25,7 @@ const HINTS: Record<Speed, string> = {
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
 export function TopBar({ game }: { game: Game }) {
-  const { clock, speed, money, patients, fourHour, events } = hud.value;
+  const { clock, speed, money, patients, fourHour, events, cqc } = hud.value;
   return (
     <div class="topbar">
       <span class="clock">{clock}</span>
@@ -48,6 +48,20 @@ export function TopBar({ game }: { game: Game }) {
       >
         4-hr {fourHour === null ? "—" : `${Math.round(fourHour * 100)}%`}
       </span>
+      {(cqc.label || cqc.underWay) && (
+        <button
+          class="cqc-chip"
+          title="Care Quality Commission rating: click for the report"
+          onMouseDown={noFocus}
+          onClick={() => game.openHospital("inspections")}
+        >
+          {cqc.underWay ? (
+            <span class="event-chip">CQC inspecting</span>
+          ) : (
+            <span class={`cqc-badge ${cqc.rating}`}>CQC {cqc.label}</span>
+          )}
+        </button>
+      )}
       {events.map((e) => (
         <button
           key={e.id}

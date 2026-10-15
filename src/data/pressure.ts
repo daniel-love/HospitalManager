@@ -18,7 +18,8 @@ export type PressureEventId =
   | "strike_facilities"
   | "social_care_crisis"
   | "norovirus_season"
-  | "power_cut";
+  | "power_cut"
+  | "vip_visit";
 
 /**
  * Industrial action (systems/strikes.ts). A walkout: the roles don't come
@@ -77,6 +78,8 @@ export interface PressureEventDef {
   community?: boolean;
   /** The mains supply is off: only what the standby generators cover keeps working. */
   powerCut?: boolean;
+  /** A VIP or media visit: a party tours a department (systems/inspections.ts). */
+  vip?: boolean;
   /** Industrial action: who strikes, and how. */
   strike?: StrikeDef;
   /** The hour it starts on its first day (default 08:00; strikes start at 07:00). */
@@ -246,6 +249,34 @@ PRESSURE_EVENTS.push({
   sickness: 1,
   heat: false,
   powerCut: true,
+});
+
+PRESSURE_EVENTS.push({
+  id: "vip_visit",
+  name: "VIP visit",
+  short: "VIP visit",
+  description:
+    "A VIP or a news crew is coming to see one of your departments, usually A&E. What they see makes the news: clean, calm and well run, and reputation rises; dirty beds, crowding, corridor care or broken kit, and it falls.",
+  levers: [
+    "Clear the backlog in A&E before they arrive: divert if you must",
+    "Make sure beds and trolleys are clean and broken kit is repaired",
+    "Keep patients off corridor trolleys",
+  ],
+  // Any time of year, now and then.
+  months: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  perSeason: 1,
+  maxPerSeason: 2,
+  gapDays: 90,
+  leadDays: 3,
+  days: [0, 0],
+  hours: [1, 2],
+  startHour: 10,
+  shape: "flat",
+  arrivals: { walk_in: 1, ambulance: 1 },
+  conditions: {},
+  sickness: 1,
+  heat: false,
+  vip: true,
 });
 
 /** Industrial action: any time of year, with the two weeks' notice the law requires. */

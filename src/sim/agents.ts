@@ -677,6 +677,20 @@ export interface Visitor extends AgentBase {
   until: number;
 }
 
+/**
+ * Someone touring the hospital (systems/inspections.ts): a CQC inspector,
+ * or a VIP and their party. They walk from room to room, stay a while in
+ * each and note what they see, then leave.
+ */
+export interface TourAgent extends AgentBase {
+  kind: "inspector" | "vip";
+  /** Rooms still to see, as "floor:tile" keys (a tile in each). */
+  rooms: string[];
+  /** In a room until this tick, or null while walking to the next. */
+  until: number | null;
+  stage: "touring" | "leaving";
+}
+
 export interface Outpatient extends AgentBase {
   referralId: number;
   specialty: SpecialtyId;
@@ -1019,7 +1033,7 @@ export interface SimEvent {
   /** A money matter: the Finance dialog tab to open when clicked. */
   finance?: "statement" | "departments" | "loans" | "grants";
   /** A matter for the Hospital dialog: the tab to open when clicked. */
-  hospital?: "departments" | "escalation" | "policies" | "performance" | "events";
+  hospital?: "departments" | "escalation" | "policies" | "performance" | "events" | "inspections";
 }
 
 /** In the hospital: not off duty at home, nor on call at home or on the way in. */
