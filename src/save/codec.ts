@@ -678,6 +678,7 @@ const saveSchema = z.object({
       z.string().regex(/^\d+:\d+$/),
       z.object({ since: int, by: z.enum(["ipc", "player"]) }),
     ),
+    name: z.string().min(1),
     funding: z.enum(["nhs", "private", "hybrid"]),
     departments: z.object({
       ae: z.enum(["open", "divert", "closed"]),
@@ -850,6 +851,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       closedRooms: state.closedRooms,
       essentialRooms: state.essentialRooms,
       maintenance: state.maintenance,
+      name: state.name,
       funding: state.funding,
       departments: state.departments,
       reputation: state.reputation,
@@ -938,6 +940,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     maintenance: Object.fromEntries(
       Object.entries(s.maintenance).map(([k, v]) => [Number(k), { ...v }]),
     ),
+    name: s.name,
     funding: s.funding,
     departments: { ...s.departments },
     reputation: s.reputation,

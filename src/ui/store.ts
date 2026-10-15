@@ -18,6 +18,8 @@ import type { NurseBand } from "@data/staff";
 import type { HelpContent } from "./help";
 
 export interface HudState {
+  /** The hospital's name. */
+  name: string;
   clock: string;
   speed: Speed;
   money: number;
@@ -196,6 +198,7 @@ export interface Toast {
 }
 
 export const hud = signal<HudState>({
+  name: "",
   clock: "",
   speed: 1,
   money: 0,

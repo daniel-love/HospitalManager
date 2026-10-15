@@ -2,6 +2,7 @@ import { h, render } from "preact";
 import { openingCampaign } from "@sim/systems/recruitment";
 import { Game } from "@game/game";
 import { Renderer } from "@render/renderer";
+import { randomHospitalName } from "@data/names";
 import { loadLastSave } from "@save/saveManager";
 import { createSimState } from "@sim/state";
 import { siteView } from "@sim/world/site";
@@ -20,6 +21,7 @@ async function main(): Promise<void> {
   const seed = seedParam();
   const state = createSimState({
     seed: seed ?? crypto.getRandomValues(new Uint32Array(1))[0]!,
+    name: seed === null ? randomHospitalName() : randomHospitalName(seed),
     site: true,
     rotas: true,
     eventFrequency: "realistic",

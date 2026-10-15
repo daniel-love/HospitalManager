@@ -353,7 +353,7 @@ describe("the site in saves", () => {
 
   it("upgrades a version-8 save as all the hospital's own land, with no road", () => {
     const state = buildSmallAE();
-    const save = JSON.parse(JSON.stringify(encodeSave(state, "v8")));
+    const save = JSON.parse(JSON.stringify(encodeSave(state, state.name)));
     save.version = 8;
     delete save.state.site;
     for (const f of save.state.floors) delete f.land;
@@ -387,7 +387,7 @@ describe("old saves get the road", () => {
     const { applyAll, SMALL_AE_COMMANDS } = await import("../fixtures/smallAE");
     const state = createSimState({ seed: 1, width: 60, height: 60, money: 1_000_000 });
     applyAll(state, SMALL_AE_COMMANDS);
-    const save = JSON.parse(JSON.stringify(encodeSave(state, "v10")));
+    const save = JSON.parse(JSON.stringify(encodeSave(state, state.name)));
     save.version = 10;
     save.state.ambulances = [
       {
@@ -418,7 +418,7 @@ describe("old saves get the road", () => {
 
   it("leaves a save that already has a road alone", () => {
     const state = createSimState({ seed: 4, width: 40, height: 40, site: true });
-    const save = JSON.parse(JSON.stringify(encodeSave(state, "v10")));
+    const save = JSON.parse(JSON.stringify(encodeSave(state, state.name)));
     save.version = 10;
     expect(snapshot(decodeSave(save).state)).toEqual(snapshot(state));
   });
@@ -427,7 +427,7 @@ describe("old saves get the road", () => {
 describe("catchment in saves", () => {
   it("upgrades a version-11 save to a small town's catchment, with no deflections", () => {
     const state = busyDayBeforeTransfers();
-    const save = JSON.parse(JSON.stringify(encodeSave(state, "v11")));
+    const save = JSON.parse(JSON.stringify(encodeSave(state, state.name)));
     save.version = 11;
     delete save.state.settings.catchment;
     delete save.state.today.stats.deflected;
@@ -462,7 +462,7 @@ describe("specialties in saves", () => {
 
   it("upgrades a version-12 save with no specialties", () => {
     const state = busyDayBeforeTransfers();
-    const save = JSON.parse(JSON.stringify(encodeSave(state, "v12")));
+    const save = JSON.parse(JSON.stringify(encodeSave(state, state.name)));
     save.version = 12;
     delete save.state.wardSpecialties; // Its name before v22.
     for (const p of save.state.patients) {
@@ -498,7 +498,7 @@ describe("the Medical Examiner in saves", () => {
     });
     if (!r.ok) throw new Error(r.error);
     applyStaffCommand(state, { type: "set_me_duty", id: r.staff.id, on: true });
-    const save = JSON.parse(JSON.stringify(encodeSave(state, "v13")));
+    const save = JSON.parse(JSON.stringify(encodeSave(state, state.name)));
     save.version = 13;
     for (const p of save.state.patients) delete p.consultants;
     for (const s of save.state.staff) {
@@ -544,7 +544,7 @@ describe("transfers in saves", () => {
     expect(snapshot(roundTrip(state))).toEqual(snapshot({ ...state, events: [] }));
 
     p.transfer = null;
-    const save = JSON.parse(JSON.stringify(encodeSave(state, "v14")));
+    const save = JSON.parse(JSON.stringify(encodeSave(state, state.name)));
     save.version = 14;
     for (const q of save.state.patients) delete q.transfer;
     for (const d of [save.state.today, ...save.state.history]) {
@@ -622,5 +622,21 @@ describe("plans in saves", () => {
     const { state } = decodeSave(save);
     expect(state.plan).toEqual([]);
     expect(state.version).toBe(SIM_STATE_VERSION);
+  });
+});
+
+describe("the hospital's name in saves", () => {
+  it("saves and restores the name", () => {
+    const state = createSimState({ seed: 1, name: "Thornbury General Hospital" });
+    expect(roundTrip(state).name).toBe("Thornbury General Hospital");
+  });
+
+  it("names a version-42 hospital after the save it was saved under", () => {
+    const save = JSON.parse(JSON.stringify(encodeSave(buildSmallAE(), " St Mary's ")));
+    save.version = 42;
+    delete save.state.name;
+    expect(decodeSave(save).state.name).toBe("St Mary's");
+    save.meta.name = "";
+    expect(decodeSave(save).state.name).toBe("My hospital");
   });
 });

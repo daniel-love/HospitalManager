@@ -134,3 +134,15 @@ describe("list sections (Hire panel and build palettes)", () => {
     ).toThrow();
   });
 });
+
+describe("hospital names", () => {
+  it("makes up a plausible name that fits", async () => {
+    const { HOSPITAL_NAME_MAX, randomHospitalName } = await import("@data/names");
+    for (let n = 0; n < 200; n++) {
+      const name = randomHospitalName();
+      expect(name).toMatch(/Hospital|Infirmary/);
+      expect(name.length).toBeLessThanOrEqual(HOSPITAL_NAME_MAX);
+    }
+    expect(randomHospitalName(42)).toBe(randomHospitalName(42));
+  });
+});

@@ -52,6 +52,20 @@ body {
   user-select: none;
 }
 
+.hospital-name {
+  font-weight: 600;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* On narrower screens the bar needs the room; the name stays in the tab title. */
+@media (max-width: 1200px) {
+  .hospital-name {
+    display: none;
+  }
+}
+
 .clock {
   font-variant-numeric: tabular-nums;
   white-space: pre;
@@ -2676,4 +2690,24 @@ body.planning #game::after {
 .tutorial-glow {
   animation: tutorial-glow 1.4s ease-in-out infinite;
   border-radius: 6px;
+}
+
+/* The hospital's name, in the New hospital dialog and Settings. */
+.hospital-name-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+
+.hospital-name-field input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  padding: 5px 8px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
 }

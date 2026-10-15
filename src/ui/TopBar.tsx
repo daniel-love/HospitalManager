@@ -1,3 +1,4 @@
+import { useEffect } from "preact/hooks";
 import type { Game } from "@game/game";
 import { SPEEDS, type Speed } from "@game/loop";
 import { formatMoney } from "@game/tools";
@@ -25,9 +26,15 @@ const HINTS: Record<Speed, string> = {
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
 export function TopBar({ game }: { game: Game }) {
-  const { clock, speed, money, patients, fourHour, events, cqc } = hud.value;
+  const { name, clock, speed, money, patients, fourHour, events, cqc } = hud.value;
+  useEffect(() => {
+    document.title = name ? `${name} · Hospital Manager` : "Hospital Manager";
+  }, [name]);
   return (
     <div class="topbar">
+      <span class="hospital-name" title={`${name}: rename in Settings`}>
+        {name}
+      </span>
       <span class="clock">{clock}</span>
       <span class={`money${money < 0 ? " negative" : ""}`} title="Cash">
         {formatMoney(money)}

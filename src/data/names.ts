@@ -1,9 +1,9 @@
-/** Names for patients and staff, picked with the seeded RNG. */
+/** Names for patients and staff, picked with the seeded RNG, and for hospitals. */
+import { createRng, pick } from "@sim/rng";
 
 export const FIRST_NAMES = [
   "Oliver",
   "Amelia",
-  "George",
   "Isla",
   "Harry",
   "Ava",
@@ -105,3 +105,111 @@ export const SURNAMES = [
   "Pearce",
   "Doyle",
 ];
+
+/**
+ * Hospital names, made up from English place-name parts so they sound real
+ * without (mostly) being a real hospital; the saints leave out the famous
+ * London ones. Picked when a game starts, not by
+ * the sim.
+ */
+const TOWN_STARTS = [
+  "Ash",
+  "Brack",
+  "Bram",
+  "Calder",
+  "Chet",
+  "Clay",
+  "Dun",
+  "Elm",
+  "Fern",
+  "Hart",
+  "Hay",
+  "Holm",
+  "Kings",
+  "Lang",
+  "Marl",
+  "Mel",
+  "Mill",
+  "Nor",
+  "Oak",
+  "Ped",
+  "Rad",
+  "Rook",
+  "Sal",
+  "Sand",
+  "Shep",
+  "Stan",
+  "Stock",
+  "Thorn",
+  "Wal",
+  "Whit",
+  "Wold",
+  "Wyn",
+];
+const TOWN_ENDS = [
+  "bridge",
+  "bury",
+  "by",
+  "caster",
+  "chester",
+  "combe",
+  "dale",
+  "field",
+  "ford",
+  "ham",
+  "hurst",
+  "ley",
+  "minster",
+  "mouth",
+  "stead",
+  "stoke",
+  "ton",
+  "well",
+  "wick",
+  "worth",
+];
+const SAINTS = [
+  "Alban",
+  "Andrew",
+  "Catherine",
+  "Chad",
+  "Cuthbert",
+  "Edmund",
+  "George",
+  "Helen",
+  "Hilda",
+  "Luke",
+  "Margaret",
+  "Mary",
+  "Michael",
+  "Peter",
+  "Richard",
+  "Swithun",
+];
+/** How UK acute hospitals tend to be named; repeats make a pattern commoner. */
+const HOSPITAL_PATTERNS: ((town: string, saint: string) => string)[] = [
+  (t) => `${t} General Hospital`,
+  (t) => `${t} General Hospital`,
+  (t) => `${t} District General Hospital`,
+  (t) => `${t} Hospital`,
+  (t) => `${t} Hospital`,
+  (t) => `${t} Royal Infirmary`,
+  (t) => `Royal ${t} Hospital`,
+  (t) => `${t} University Hospital`,
+  (_, s) => `St ${s}'s Hospital`,
+];
+
+/** The longest name the player can give a hospital. */
+export const HOSPITAL_NAME_MAX = 60;
+
+/**
+ * A plausible name for a UK hospital, e.g. "Thornbury General Hospital":
+ * from `seed`, or a fresh one each time without.
+ */
+export function randomHospitalName(
+  seed: number = crypto.getRandomValues(new Uint32Array(1))[0]!,
+): string {
+  const rng = createRng(seed);
+  const town = pick(rng, TOWN_STARTS) + pick(rng, TOWN_ENDS);
+  return pick(rng, HOSPITAL_PATTERNS)(town, pick(rng, SAINTS));
+}

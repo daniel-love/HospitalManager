@@ -1,10 +1,11 @@
 /**
- * Settings: the hospital's catchment (saved with the game), shifts for
+ * Settings: the hospital's name and catchment (saved with the game), shifts for
  * hospitals saved before rotas, and how often to
  * autosave and whether to smooth edges (kept in this browser for every
  * game). A fuller menu comes later.
  */
 import { useEffect, useState } from "preact/hooks";
+import { HOSPITAL_NAME_MAX, randomHospitalName } from "@data/names";
 import { AMBULANCES_PER_100K, CATCHMENTS, WALK_INS_PER_100K } from "@data/patients";
 import type { EventFrequency } from "@data/pressure";
 import type { Game } from "@game/game";
@@ -47,6 +48,8 @@ function SettingsBody({ game }: { game: Game }) {
           ×
         </button>
         <h2 id="settings-title">Settings</h2>
+
+        <NameSetting game={game} />
 
         <fieldset class="setting">
           <legend>Catchment</legend>
@@ -132,6 +135,34 @@ function SettingsBody({ game }: { game: Game }) {
         </fieldset>
       </div>
     </div>
+  );
+}
+
+/** The hospital's name (saved with the game). Renames as you type; a blank name isn't kept. */
+function NameSetting({ game }: { game: Game }) {
+  const [name, setName] = useState(game.state.name);
+  const rename = (value: string) => {
+    setName(value);
+    game.setHospitalName(value);
+  };
+  return (
+    <fieldset class="setting">
+      <legend>Hospital name</legend>
+      <div class="hospital-name-field">
+        <input
+          aria-label="Hospital name"
+          type="text"
+          value={name}
+          maxLength={HOSPITAL_NAME_MAX}
+          spellcheck={false}
+          onInput={(e) => rename(e.currentTarget.value)}
+          onBlur={() => setName(game.state.name)}
+        />
+        <button title="Make up another name" onClick={() => rename(randomHospitalName())}>
+          Another
+        </button>
+      </div>
+    </fieldset>
   );
 }
 

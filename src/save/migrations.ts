@@ -971,6 +971,12 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v43: the hospital has a name of its own (old games take the name they were saved under).
+  42: (save) => {
+    const saved = (save.meta as { name?: unknown } | undefined)?.name;
+    const name = typeof saved === "string" && saved.trim() ? saved.trim() : "My hospital";
+    return { ...save, state: { ...(save.state as object), name } };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

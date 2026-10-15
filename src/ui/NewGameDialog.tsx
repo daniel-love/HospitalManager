@@ -8,6 +8,7 @@ import { STARTING_CASH } from "@data/economy";
 import type { Game } from "@game/game";
 import { formatMoney } from "@game/tools";
 import type { Funding } from "@sim/state";
+import { HOSPITAL_NAME_MAX, randomHospitalName } from "@data/names";
 import { CATCHMENTS, DEFAULT_CATCHMENT } from "@data/patients";
 import type { EventFrequency } from "@data/pressure";
 import { SCENARIOS, scenarioById, type ScenarioId } from "@data/scenarios";
@@ -93,6 +94,7 @@ function Chips<T extends string | number | boolean>(props: {
 
 function NewGameBody({ game }: { game: Game }) {
   const [mode, setMode] = useState<"sandbox" | "scenario">("sandbox");
+  const [name, setName] = useState(randomHospitalName);
   const [funding, setFunding] = useState<Funding>("nhs");
   const [money, setMoney] = useState(STARTING_CASH);
   const [catchment, setCatchment] = useState<number>(DEFAULT_CATCHMENT);
@@ -108,9 +110,12 @@ function NewGameBody({ game }: { game: Game }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   const start = () => {
-    if (mode === "scenario") game.newScenario(scenario);
+    // Left blank, it gets a made-up name anyway.
+    const chosenName = name.trim() || randomHospitalName();
+    if (mode === "scenario") game.newScenario(scenario, chosenName);
     else {
       game.newGame({
+        name: chosenName,
         funding,
         money,
         catchment,
@@ -130,6 +135,20 @@ function NewGameBody({ game }: { game: Game }) {
           ×
         </button>
         <h2 id="new-title">New hospital</h2>
+        <div class="hospital-name-field">
+          <label for="new-hospital-name">Name</label>
+          <input
+            id="new-hospital-name"
+            type="text"
+            value={name}
+            maxLength={HOSPITAL_NAME_MAX}
+            spellcheck={false}
+            onInput={(e) => setName(e.currentTarget.value)}
+          />
+          <button title="Make up another name" onClick={() => setName(randomHospitalName())}>
+            Another
+          </button>
+        </div>
         <div class="tabs" role="tablist">
           {(
             [

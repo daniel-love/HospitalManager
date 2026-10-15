@@ -472,7 +472,7 @@ export class Game {
    * Replaces the running game, e.g. after loading. Pauses so the player can get
    * their bearings. `name` is what the save was called, if it came from one.
    */
-  loadState(state: SimState, name = "My hospital"): void {
+  loadState(state: SimState, name = state.name): void {
     administrationDismissed.value = false;
     this.state = state;
     this.saveName = name;
@@ -499,6 +499,7 @@ export class Game {
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
     const state = createSimState({
       seed,
+      ...(opts.name ? { name: opts.name } : {}),
       site: true,
       rotas: true,
       funding: opts.funding ?? "nhs",
@@ -517,12 +518,13 @@ export class Game {
   }
 
   /** A new game of a scenario. */
-  newScenario(id: ScenarioId): void {
+  newScenario(id: ScenarioId, name?: string): void {
     const def = scenarioById.get(id)!;
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
     const prebuilt = def.start === "district_hospital";
     const state = createSimState({
       seed,
+      ...(name ? { name } : {}),
       // A pre-built hospital fits its own road in below it.
       site: !prebuilt,
       ...(prebuilt ? DISTRICT_MAP : {}),
@@ -541,6 +543,18 @@ export class Game {
     if (state.site) this.focus(siteView(state.site));
     rememberLastSave(null);
     scenarioBriefing.value = true;
+  }
+
+  /**
+   * Renames the hospital. The save name follows it unless the player saved
+   * under a different name.
+   */
+  setHospitalName(name: string): void {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (this.saveName === this.state.name) this.saveName = trimmed;
+    this.state.name = trimmed;
+    this.publishHud();
   }
 
   /** Sets the population the hospital serves (a sandbox setting saved with the game). */
@@ -948,6 +962,7 @@ export class Game {
   private publishHud(): void {
     this.publishGoals();
     hud.value = {
+      name: this.state.name,
       clock: formatClock(clockFromTick(this.state.tick)),
       speed: this.loop.speed,
       money: this.state.money,
@@ -1156,6 +1171,7 @@ export class Game {
 
 /** The New hospital dialog's sandbox settings. */
 export interface SandboxOptions {
+  name?: string;
   funding?: Funding;
   money?: number;
   catchment?: number;

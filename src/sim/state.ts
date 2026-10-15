@@ -43,7 +43,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 42;
+export const SIM_STATE_VERSION = 43;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -99,6 +99,8 @@ export interface Room {
 
 export interface SimState {
   version: number;
+  /** The hospital's name, chosen (or made up) when the game starts and renamable in Settings. */
+  name: string;
   seed: number;
   rng: RngState;
   /** Ticks elapsed since the game started. */
@@ -441,6 +443,8 @@ export interface Cover {
 
 export interface NewGameOptions {
   seed: number;
+  /** The hospital's name (default "My hospital"). */
+  name?: string;
   width?: number;
   height?: number;
   money?: number;
@@ -519,6 +523,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     essentialRooms: {},
     maintenance: {},
     departments: { ae: "open", outpatients: "open", theatres: "open" },
+    name: opts.name ?? "My hospital",
     funding: opts.funding ?? "nhs",
     reputation: REPUTATION.start,
     cover: {},
