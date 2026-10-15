@@ -979,11 +979,11 @@ function theatrePlan(state: SimState, s: Staff) {
   };
 }
 
-/** A Hybrid trust's employed consultants: their private sessions, on top of their NHS job plan. */
+/** A Hybrid trust's employed consultants: their private sessions, on top of their PHS job plan. */
 function privatePlans(state: SimState, s: Staff) {
   if (state.funding !== "hybrid" || s.role !== "consultant" || s.contract !== "resident") return {};
-  const nhs = (runsClinics(s) ? s.clinicSessions : 0) + (operates(s) ? s.theatreSessions : 0);
-  const free = MAX_WEEK_SESSIONS - nhs;
+  const phs = (runsClinics(s) ? s.clinicSessions : 0) + (operates(s) ? s.theatreSessions : 0);
+  const free = MAX_WEEK_SESSIONS - phs;
   const slots = jobPlan(state, s).filter((p) => p.private);
   const when = (kind: "clinic" | "theatre") => {
     const mine = slots.filter((p) => p.kind === kind);
@@ -995,7 +995,7 @@ function privatePlans(state: SimState, s: Staff) {
           privateClinics: {
             sessions: s.privateClinicSessions,
             max: free - s.privateTheatreSessions,
-            note: `${when("clinic")}Private patients, in a Private Patient Unit clinic room: the hospital earns the facility fee and they bill their own. Outside their NHS job plan, but they can't be in two places at once.`,
+            note: `${when("clinic")}Private patients, in a Private Patient Unit clinic room: the hospital earns the facility fee and they bill their own. Outside their PHS job plan, but they can't be in two places at once.`,
           },
         }
       : {}),

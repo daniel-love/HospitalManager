@@ -1025,6 +1025,34 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v48: the health service is the fictional PHS, and its inspectorate the CSI.
+  47: (save) => {
+    type Payer = { payer: string };
+    const state = save.state as {
+      funding: string;
+      patients: { elective: Payer | null }[];
+      referrals: Payer[];
+      policies: { nhsReferrals?: object; phsReferrals?: object };
+      cqc?: object;
+      csi?: object;
+    };
+    const payer = <T extends Payer>(x: T) => (x.payer === "nhs" ? { ...x, payer: "phs" } : x);
+    const { nhsReferrals, ...policies } = state.policies;
+    const { cqc, ...rest } = state;
+    return {
+      ...save,
+      state: {
+        ...rest,
+        funding: state.funding === "nhs" ? "phs" : state.funding,
+        patients: state.patients.map((p) =>
+          p.elective ? { ...p, elective: payer(p.elective) } : p,
+        ),
+        referrals: state.referrals.map(payer),
+        policies: { ...policies, phsReferrals: policies.phsReferrals ?? nhsReferrals ?? {} },
+        csi: rest.csi ?? cqc,
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

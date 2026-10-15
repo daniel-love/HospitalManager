@@ -1,6 +1,6 @@
 /**
  * Loans, ratings and grants (ROADMAP M5 step 5): DHSC capital and revenue
- * support loans, NHS oversight segments and special measures, bank loans
+ * support loans, PHS oversight segments and special measures, bank loans
  * and credit ratings, administration, and grants with conditions.
  */
 import { describe, expect, it } from "vitest";
@@ -23,7 +23,7 @@ import { TICKS_PER_DAY, tickAt } from "@sim/time";
 import { buildMajorsAE } from "../fixtures/majorsAE";
 import { buildSmallAE } from "../fixtures/smallAE";
 
-function hospital(funding: Funding = "nhs"): SimState {
+function hospital(funding: Funding = "phs"): SimState {
   return createSimState({ seed: 1, width: 30, height: 30, money: 1_000_000, funding });
 }
 
@@ -43,9 +43,9 @@ describe("instalments", () => {
   });
 });
 
-describe("an NHS trust's borrowing", () => {
+describe("a PHS trust's borrowing", () => {
   it("takes DHSC capital loans, not bank loans, within limits", () => {
-    const state = hospital("nhs");
+    const state = hospital("phs");
     expect(cantBorrow(state, "bank", 500_000, 5)).not.toBeNull();
     expect(cantBorrow(state, "capital", 50_000, 10)).not.toBeNull();
     expect(cantBorrow(state, "capital", 500_000, 30)).not.toBeNull();
@@ -59,7 +59,7 @@ describe("an NHS trust's borrowing", () => {
   });
 
   it("repays monthly: interest as a running cost, principal as a cash flow", () => {
-    const state = hospital("nhs");
+    const state = hospital("phs");
     const loan = borrow(state, "capital", 600_000, 5);
     const cash = state.money;
     repayLoans(state);
@@ -70,7 +70,7 @@ describe("an NHS trust's borrowing", () => {
   });
 
   it("gets revenue support when cash runs out, and drops to segment 3", () => {
-    const state = hospital("nhs");
+    const state = hospital("phs");
     state.money = -120_000;
     checkCash(state);
     expect(state.money).toBeGreaterThanOrEqual(LOANS.revenueSupport.floor);
@@ -80,7 +80,7 @@ describe("an NHS trust's borrowing", () => {
   });
 
   it("is reviewed monthly into oversight segments, improving a step at a time", () => {
-    const state = hospital("nhs");
+    const state = hospital("phs");
     state.rating.segment = 3;
     reviewRating(state, month(300_000, 250_000, 1_000_000));
     expect(state.rating.segment).toBe(2);
@@ -89,7 +89,7 @@ describe("an NHS trust's borrowing", () => {
   });
 
   it("goes into financial special measures after a second bad month", () => {
-    const state = hospital("nhs");
+    const state = hospital("phs");
     borrow(state, "revenue_support", 500_000, 3);
     state.policies.gapFill = "bank_agency";
     reviewRating(state, month(300_000, 400_000, 10_000));

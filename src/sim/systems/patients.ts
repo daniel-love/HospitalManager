@@ -610,7 +610,7 @@ export function leave(state: SimState, p: Patient, outcome: Outcome): void {
     stats.stayMins += (state.tick - p.times.admitted) / TICKS_PER_MINUTE;
     // A planned inpatient's stay is planned care, paid in full.
     if (condition.planned) {
-      earnPlanned(state, condition.admission?.tariff ?? 0, p.elective?.payer ?? "nhs", false);
+      earnPlanned(state, condition.admission?.tariff ?? 0, p.elective?.payer ?? "phs", false);
     } else earnEmergency(state, condition.admission?.tariff ?? 0, "wards");
     return;
   }

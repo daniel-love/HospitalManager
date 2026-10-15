@@ -67,10 +67,10 @@ describe("a Private Hospital", () => {
     const c = consultant(state, { privileges: true });
     expect(c.contract).toBe("privileges");
     expect(annualCost(c)).toBe(0);
-    // An NHS trust employs its consultants.
-    const nhs = outpatients("nhs");
+    // A PHS trust employs its consultants.
+    const phs = outpatients("phs");
     expect(
-      applyStaffCommand(nhs, {
+      applyStaffCommand(phs, {
         type: "hire_staff",
         role: "consultant",
         specialty: "cardiology",
@@ -79,7 +79,7 @@ describe("a Private Hospital", () => {
     ).toBe(false);
   });
 
-  it("gets private patients, paying facility fees, and NHS patients only if it takes them", () => {
+  it("gets private patients, paying facility fees, and PHS patients only if it takes them", () => {
     const state = outpatients("private");
     const c = consultant(state, { privileges: true });
     applyStaffCommand(state, { type: "set_clinic_sessions", id: c.id, sessions: 6 });
@@ -89,16 +89,16 @@ describe("a Private Hospital", () => {
     runDays(state, 14);
     const refs = Object.values(state.referrals);
     expect(refs.length).toBeGreaterThan(0);
-    expect(refs.every((r) => r.payer !== "nhs")).toBe(true);
+    expect(refs.every((r) => r.payer !== "phs")).toBe(true);
     const seen = state.history.reduce((n, d) => n + d.stats.privateSeen, 0);
     expect(seen).toBeGreaterThan(0);
     expect(state.history.reduce((n, d) => n + d.ledger.private, 0)).toBeGreaterThan(0);
     expect(state.history.reduce((n, d) => n + d.ledger.outpatients, 0)).toBe(0);
 
-    state.policies.nhsReferrals.cardiology = true;
+    state.policies.phsReferrals.cardiology = true;
     expect(offersClinic(state, "cardiology")).toBe(true);
     runDays(state, 7);
-    expect(Object.values(state.referrals).some((r) => r.payer === "nhs")).toBe(true);
+    expect(Object.values(state.referrals).some((r) => r.payer === "phs")).toBe(true);
   });
 
   it("has no emergency department and no block contract", () => {
@@ -170,7 +170,7 @@ describe("private surgery", () => {
 });
 
 describe("a Hybrid trust's Private Patient Unit", () => {
-  it("holds private sessions in its rooms and NHS ones outside it", () => {
+  it("holds private sessions in its rooms and PHS ones outside it", () => {
     const state = outpatients("hybrid");
     const c = consultant(state);
     applyStaffCommand(state, { type: "set_clinic_sessions", id: c.id, sessions: 2 });
@@ -181,17 +181,17 @@ describe("a Hybrid trust's Private Patient Unit", () => {
       sessions: 2,
     });
     expect(c.privateClinicSessions).toBe(2);
-    // No Private Patient Unit yet: NHS clinics, but nowhere for private ones.
+    // No Private Patient Unit yet: PHS clinics, but nowhere for private ones.
     expect(offersClinic(state, "cardiology")).toBe(true);
     expect(offersPrivateClinic(state, "cardiology")).toBe(false);
     setPrivateRoom(state, roomAt(state, 0, CLINIC_B.x, CLINIC_B.y)!, true);
     expect(offersPrivateClinic(state, "cardiology")).toBe(true);
-    // Clinic A is cardiology's and outside the unit: NHS still fine.
+    // Clinic A is cardiology's and outside the unit: PHS still fine.
     expect(offersClinic(state, "cardiology")).toBe(true);
     runDays(state, 14);
     const refs = Object.values(state.referrals);
-    expect(refs.some((r) => r.payer === "nhs")).toBe(true);
-    expect(refs.some((r) => r.payer !== "nhs")).toBe(true);
+    expect(refs.some((r) => r.payer === "phs")).toBe(true);
+    expect(refs.some((r) => r.payer !== "phs")).toBe(true);
   });
 
   it("caps private income at 49% of all income", () => {
@@ -212,7 +212,7 @@ describe("a Hybrid trust's Private Patient Unit", () => {
   });
 
   it("is only for Hybrid trusts' employed consultants", () => {
-    const state = outpatients("nhs");
+    const state = outpatients("phs");
     const c = consultant(state);
     expect(
       applyStaffCommand(state, {

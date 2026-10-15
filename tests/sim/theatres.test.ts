@@ -1,7 +1,7 @@
 /**
  * Theatres and elective surgery (M4 step 7).
  */
-import { NHS_FUNDING } from "@data/economy";
+import { PHS_FUNDING } from "@data/economy";
 import { describe, expect, it } from "vitest";
 import { conditionById } from "@data/catalogue";
 import type { Patient, Referral } from "@sim/agents";
@@ -220,7 +220,7 @@ describe("emergency surgery", () => {
     expect(state.today.stats.emergencyOps).toBe(1);
     expect(state.today.stats.emergencyOnTime).toBe(1);
     // An emergency operation is paid at the marginal rate, on top of the block contract.
-    expect(state.today.ledger.tariff).toBeCloseTo(6000 * (1 - NHS_FUNDING.blockShare));
+    expect(state.today.ledger.tariff).toBeCloseTo(6000 * (1 - PHS_FUNDING.blockShare));
     runUntil(state, () => p.stage === "on_ward", 1);
     // Back from theatre: not a new admission.
     expect(state.today.stats.admissions).toBe(0);

@@ -439,7 +439,7 @@ function drawVisitor(g: Graphics): void {
     .stroke({ width: 1.5, color: 0xffffff });
 }
 
-/** A CQC inspector: a dark suit, with a white lanyard ring. */
+/** A CSI inspector: a dark suit, with a white lanyard ring. */
 function drawInspector(g: Graphics): void {
   g.circle(0, 0, PATIENT_RADIUS).fill(0x1f2937).stroke({ width: 2.5, color: 0xffffff });
 }

@@ -1,5 +1,5 @@
 /**
- * Major incidents (GAME_DESIGN §9), as the NHS runs them. The ambulance
+ * Major incidents (GAME_DESIGN §9), as UK hospitals run them. The ambulance
  * service puts the hospital on standby, then sends a wave of casualties
  * over a few hours: critically injured (P1) for Resus, seriously injured
  * (P2) for Majors, and walking wounded (P3) who make their own way in. The

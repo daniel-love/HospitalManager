@@ -36,7 +36,7 @@ describe("scenarios", () => {
     const state = createSimState({ seed: 1, width: 20, height: 20, startDay: winter.startDay });
     expect(clockFromTick(state.tick).day).toBe(winter.startDay);
     expect(state.month.monthIndex).toBe(dateOf(winter.startDay).monthIndex);
-    expect(state.cqc.next).toBeGreaterThan(state.tick);
+    expect(state.csi.next).toBeGreaterThan(state.tick);
   });
 
   it("sets off scripted events on their day, for the hour they're due", () => {

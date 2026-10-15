@@ -310,7 +310,7 @@ export interface Staff extends AgentBase {
    * staff come for one shift to fill a rota gap, and are gone after it.
    */
   contract: "resident" | "on_call" | "bank" | "agency" | "privileges";
-  /** Nurses: their Agenda for Change band (5, 6 or 7). Null for everyone else. */
+  /** Nurses: their pay band (5, 6 or 7). Null for everyone else. */
   band: NurseBand | null;
   /** 0–100: how quickly they work (data/staff.ts SKILL). Grows with hours worked. */
   skill: number;
@@ -349,7 +349,7 @@ export interface Staff extends AgentBase {
   theatreSessions: number;
   /**
    * Hybrid trusts: private clinic sessions and theatre lists a week, in the
-   * Private Patient Unit, on top of their NHS job plan. (In a Private
+   * Private Patient Unit, on top of their PHS job plan. (In a Private
    * Hospital every session is private, and these stay 0.)
    */
   privateClinicSessions: number;
@@ -539,16 +539,16 @@ export interface Job {
 
 /** Money in and out over a period, £. */
 export interface Ledger {
-  /** The NHS block contract for emergency care (systems/funding.ts). */
+  /** The PHS block contract for emergency care (systems/funding.ts). */
   block: number;
   /**
-   * NHS tariff for emergency care: A&E attendances, emergency admissions and
+   * PHS tariff for emergency care: A&E attendances, emergency admissions and
    * operations, at the marginal rate on top of the block.
    */
   tariff: number;
-  /** NHS tariff for planned operations (day cases and inpatient stays). */
+  /** PHS tariff for planned operations (day cases and inpatient stays). */
   elective: number;
-  /** NHS tariff for outpatient appointments. */
+  /** PHS tariff for outpatient appointments. */
   outpatients: number;
   /** Private patients' facility fees (insurers and self-pay). */
   private: number;
@@ -700,7 +700,7 @@ export interface Visitor extends AgentBase {
 }
 
 /**
- * Someone touring the hospital (systems/inspections.ts): a CQC inspector,
+ * Someone touring the hospital (systems/inspections.ts): a CSI inspector,
  * or a VIP and their party. They walk from room to room, stay a while in
  * each and note what they see, then leave.
  */
@@ -736,10 +736,10 @@ export interface Outpatient extends AgentBase {
  * half-day) and when in it, as a tick.
  */
 /**
- * Who pays for someone's care: the NHS, a private medical insurer, or the
+ * Who pays for someone's care: the PHS, a private medical insurer, or the
  * patient themselves.
  */
-export type Payer = "nhs" | "insured" | "self_pay";
+export type Payer = "phs" | "insured" | "self_pay";
 
 export interface Booking {
   day: number;
@@ -760,7 +760,7 @@ export interface Referral {
   id: number;
   name: string;
   specialty: SpecialtyId;
-  /** NHS, or a private patient (insured or self-pay). */
+  /** PHS, or a private patient (insured or self-pay). */
   payer: Payer;
   kind: "first" | "follow_up" | "surgery";
   /** Referred as suspected cancer: to be seen within 2 weeks. */
@@ -782,7 +782,7 @@ export interface Referral {
   dayCase: boolean;
   /**
    * Surgery cancelled on the day: they must be rebooked by this tick (the
-   * NHS 28-day standard), so they go ahead of the list. Null otherwise.
+   * PHS 28-day standard), so they go ahead of the list. Null otherwise.
    */
   rebookBy: number | null;
 }
@@ -854,7 +854,7 @@ export type ServiceLedgers = Record<ServiceLine, Ledger>;
 /** Figures that are a snapshot rather than a sum over the month, for the KPIs. */
 export interface MonthEnd {
   reputation: number;
-  /** NHS patients with an 18-week clock running, and how many are within 18 weeks. */
+  /** PHS patients with an 18-week clock running, and how many are within 18 weeks. */
   rttWaiting: number;
   rttWithin18w: number;
   /** The hospital's own staff (not bank or agency). */
@@ -879,7 +879,7 @@ export function emptyFlows(): CashFlows {
 
 /**
  * A loan (systems/loans.ts): a DHSC capital or revenue support loan for an
- * NHS or Hybrid trust, or a bank loan for a Private Hospital, repaid in
+ * PHS or Hybrid trust, or a bank loan for a Private Hospital, repaid in
  * equal monthly instalments (an annuity) at the start of each month.
  */
 export interface Loan {

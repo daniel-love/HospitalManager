@@ -1,6 +1,6 @@
 # Hospital Simulator
 
-A UK-set, top-down hospital **design and management** sim inspired by _Prison Architect_ and real emergency department design. You're the hospital director: you build the layout, buy the equipment, staff the departments and set the policies, and then you keep the hospital running under pressure.
+A UK-set, top-down hospital **design and management** sim inspired by classic top-down construction games and real emergency department design. You're the hospital director: you build the layout, buy the equipment, staff the departments and set the policies, and then you keep the hospital running under pressure.
 
 **Stack:** TypeScript · Vite · PixiJS v8 · Preact · Zod · IndexedDB saves · Vitest · Tauri (desktop, later)
 

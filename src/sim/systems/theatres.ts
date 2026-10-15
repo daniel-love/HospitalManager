@@ -62,7 +62,7 @@ import { inClinic } from "./outpatients";
 
 /** Minutes between cases on a list, for cleaning and setting up: booked into each slot. */
 export const TURNAROUND_MINS = 15;
-/** Patients cancel on the day for their own reasons (about 3% in the NHS). */
+/** Patients cancel on the day for their own reasons (about 3% in UK hospitals). */
 export const ELECTIVE_DNA = 0.03;
 /** Patients arrive this long before their slot, at most. */
 const ARRIVE_BEFORE_MINS: [number, number] = [60, 90];
@@ -185,7 +185,7 @@ function weekLists(state: SimState, weekStart: number): TheatreList[] {
     for (const half of ["am", "pm"] as const) {
       const free = [...theatres];
       const here = lists.filter((l) => l.day === weekStart + d && l.half === half);
-      // In a Hybrid trust, private lists use Private Patient Unit theatres and NHS lists the rest.
+      // In a Hybrid trust, private lists use Private Patient Unit theatres and PHS lists the rest.
       const take = (l: TheatreList, test: (r: (typeof free)[number]) => boolean) => {
         const i = free.findIndex(
           (r) => (state.funding !== "hybrid" || r.private === l.private) && test(r),
@@ -427,7 +427,7 @@ function runList(state: SimState, live: LiveList): void {
       cancelOnTheDay(
         state,
         r,
-        r.payer === "nhs" ? "no ward bed for afterwards" : "no private room for afterwards",
+        r.payer === "phs" ? "no ward bed for afterwards" : "no private room for afterwards",
         p,
       );
       return;
@@ -451,10 +451,10 @@ function runList(state: SimState, live: LiveList): void {
 /**
  * A free bed for after their operation. A private patient has a room of
  * their own: a side room (in a Hybrid trust, in the Private Patient Unit).
- * An NHS patient goes to a ward: their specialty's, then any, then another's.
+ * A PHS patient goes to a ward: their specialty's, then any, then another's.
  */
 function wardBedFor(state: SimState, p: Patient): PlacedObject | undefined {
-  if (p.elective?.payer !== "nhs") {
+  if (p.elective?.payer !== "phs") {
     return freeCouches(state, "side_room", ["inpatient_bed"], p, true)[0];
   }
   const beds = freeCouches(state, "ward", ["inpatient_bed"], p);
@@ -656,7 +656,7 @@ function recordOperation(state: SimState, p: Patient, op: Operation): void {
   if (op.emergency) return; // Counted when it started (startEmergency).
   stats.electiveOps++;
   if (p.elective?.dayCase) stats.dayCases++;
-  if (p.elective && p.elective.payer !== "nhs") stats.privateOps++;
+  if (p.elective && p.elective.payer !== "phs") stats.privateOps++;
   if (p.elective) delete state.referrals[p.elective.referralId];
 }
 
@@ -704,7 +704,7 @@ export function recovered(state: SimState, p: Patient): void {
     roles: ["porter"],
     patientId: p.id,
     // A private patient has a room of their own.
-    roomType: p.elective && p.elective.payer !== "nhs" ? "side_room" : "ward",
+    roomType: p.elective && p.elective.payer !== "phs" ? "side_room" : "ward",
     capabilities: ["inpatient_bed"],
     dueTick: state.tick,
     durationTicks: 1,

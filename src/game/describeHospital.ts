@@ -18,9 +18,9 @@ import {
   KEY_QUESTIONS,
   KEY_QUESTION_NAMES,
   KEY_QUESTION_TEXT,
-  type CqcRating,
+  type CsiRating,
   type KeyQuestion,
-} from "@data/cqc";
+} from "@data/csi";
 import { describeEvents, type EventsData } from "./describeEvents";
 import { KPIS, type KpiSection, type Rag } from "./kpis";
 
@@ -55,7 +55,7 @@ export interface HospitalData {
     priceLevel: number;
     priceLevels: readonly [number, number];
     priceElasticity: number;
-    nhsReferrals: { id: SpecialtyId; name: string; on: boolean }[];
+    phsReferrals: { id: SpecialtyId; name: string; on: boolean }[];
     fluVaccination: boolean;
     fluVaccinationCost: number;
     infectionControl: boolean;
@@ -64,7 +64,7 @@ export interface HospitalData {
   };
   events: EventsData;
   inspections: {
-    overall: CqcRating | null;
+    overall: CsiRating | null;
     specialMeasures: boolean;
     underWay: boolean;
     /** When the visited report comes out, if one's waiting. */
@@ -74,17 +74,17 @@ export interface HospitalData {
     report: {
       visited: string;
       published: string;
-      overall: CqcRating;
+      overall: CsiRating;
       questions: {
         id: KeyQuestion;
         name: string;
         text: string;
-        rating: CqcRating;
+        rating: CsiRating;
         score: number;
         evidence: string[];
       }[];
     } | null;
-    history: { date: string; overall: CqcRating }[];
+    history: { date: string; overall: CsiRating }[];
   };
   performance: {
     /** This month so far first, then earlier months. */
@@ -142,9 +142,9 @@ export function describeHospital(state: SimState): HospitalData {
       priceLevel: state.policies.priceLevel,
       priceLevels: PRIVATE.priceLevels,
       priceElasticity: PRIVATE.priceElasticity,
-      nhsReferrals: content.specialties
+      phsReferrals: content.specialties
         .filter((sp) => sp.outpatients)
-        .map((sp) => ({ id: sp.id, name: sp.name, on: !!state.policies.nhsReferrals[sp.id] })),
+        .map((sp) => ({ id: sp.id, name: sp.name, on: !!state.policies.phsReferrals[sp.id] })),
       fluVaccination: state.policies.fluVaccination,
       fluVaccinationCost: FLU_VACCINATION.costPerHead,
       infectionControl: state.policies.infectionControl,
@@ -183,7 +183,7 @@ function performance(state: SimState): HospitalData["performance"] {
 const dateOfTick = (tick: number) => formatDate(clockFromTick(tick).day);
 
 function inspections(state: SimState): HospitalData["inspections"] {
-  const c = state.cqc;
+  const c = state.csi;
   const last = c.reports[c.reports.length - 1];
   const month = monthName(dateOf(clockFromTick(Math.max(c.next, state.tick)).day));
   return {

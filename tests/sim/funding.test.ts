@@ -1,10 +1,10 @@
 /**
- * NHS funding (ROADMAP M5 step 3): the block contract for emergency care,
+ * PHS funding (ROADMAP M5 step 3): the block contract for emergency care,
  * the marginal rate on emergency tariff, planned care at full tariff, and
  * the monthly financial statement.
  */
 import { describe, expect, it } from "vitest";
-import { NHS_FUNDING } from "@data/economy";
+import { PHS_FUNDING } from "@data/economy";
 import { net, type Ledger, type MonthReport } from "@sim/agents";
 import { migrate } from "@save/migrations";
 import { applyCommand } from "@sim/commands";
@@ -26,7 +26,7 @@ describe("the block contract", () => {
     const state = buildSmallAE(1);
     const value = emergencyValuePerDay(state);
     expect(value).toBeGreaterThan(0);
-    expect(dailyBlock(state)).toBeCloseTo(value * NHS_FUNDING.blockShare);
+    expect(dailyBlock(state)).toBeCloseTo(value * PHS_FUNDING.blockShare);
   });
 
   it("is sized to the rooms there are to treat the catchment's patients in", () => {
@@ -72,7 +72,7 @@ describe("tariff", () => {
     const state = createSimState({ seed: 1 });
     earnEmergency(state, 1000, "ae");
     earnElective(state, 1000, "theatres");
-    expect(state.today.ledger.tariff).toBeCloseTo(1000 * (1 - NHS_FUNDING.blockShare));
+    expect(state.today.ledger.tariff).toBeCloseTo(1000 * (1 - PHS_FUNDING.blockShare));
     expect(state.today.ledger.elective).toBe(1000);
   });
 });

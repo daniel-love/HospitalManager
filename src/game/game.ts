@@ -10,7 +10,7 @@ import { buildDistrictHospital, DISTRICT_MAP } from "./maps/districtHospital";
 import { scenarioById, type ScenarioId } from "@data/scenarios";
 import { advanceTutorial, describeGoals, lockReason, startScenario } from "@sim/systems/scenarios";
 import { openingCampaign } from "@sim/systems/recruitment";
-import { RATING_NAMES } from "@data/cqc";
+import { RATING_NAMES } from "@data/csi";
 import { equipmentCondition, setEssentialRoom } from "@sim/systems/maintenance";
 import { roomClosure, setRoomClosed } from "@sim/systems/outbreaks";
 import { declare, standDown } from "@sim/systems/majorIncident";
@@ -394,10 +394,10 @@ export class Game {
     this.refreshPanels();
   }
 
-  /** Private Hospitals: whether to take NHS referrals for a specialty. */
-  setNhsReferrals(specialty: SpecialtyId, on: boolean): void {
-    if (on) this.state.policies.nhsReferrals[specialty] = true;
-    else delete this.state.policies.nhsReferrals[specialty];
+  /** Private Hospitals: whether to take PHS referrals for a specialty. */
+  setPhsReferrals(specialty: SpecialtyId, on: boolean): void {
+    if (on) this.state.policies.phsReferrals[specialty] = true;
+    else delete this.state.policies.phsReferrals[specialty];
     this.refreshPanels();
   }
 
@@ -531,7 +531,7 @@ export class Game {
       ...(opts.name ? { name: opts.name } : {}),
       site: true,
       rotas: true,
-      funding: opts.funding ?? "nhs",
+      funding: opts.funding ?? "phs",
       ...(opts.money !== undefined ? { money: opts.money } : {}),
       ...(opts.catchment !== undefined ? { catchment: opts.catchment } : {}),
       ...(opts.patientVolume !== undefined ? { patientVolume: opts.patientVolume } : {}),
@@ -1028,10 +1028,10 @@ export class Game {
       fourHour: fourHourShare(this.state.today.stats),
       administration: this.state.rating.administration !== null,
       events: eventChips(this.state),
-      cqc: {
-        rating: this.state.cqc.overall,
-        label: this.state.cqc.overall && RATING_NAMES[this.state.cqc.overall],
-        underWay: this.state.cqc.visit !== null,
+      csi: {
+        rating: this.state.csi.overall,
+        label: this.state.csi.overall && RATING_NAMES[this.state.csi.overall],
+        underWay: this.state.csi.visit !== null,
       },
     };
     if (!debugVisible.value) return;

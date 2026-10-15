@@ -3,7 +3,7 @@
  * loans and grants. Statement: the monthly statement over the last few
  * months and the year to date. Departments: service-line reporting, each
  * department's income, direct costs and contribution, and the shared costs
- * below the line. Loans: DHSC capital loans for an NHS or Hybrid
+ * below the line. Loans: DHSC capital loans for a PHS or Hybrid
  * trust, bank loans for a Private Hospital, priced and limited by the
  * rating. Grants: the offer open now (take it on or turn it down), those
  * under way with their progress, and those finished.
@@ -381,7 +381,7 @@ function Departments({ data }: { data: FinanceData }) {
   return (
     <>
       <p class="dim small-note">
-        Like an NHS trust's service-line reports. Each department's income is the care it gave; its
+        Like a PHS trust's service-line reports. Each department's income is the care it gave; its
         direct costs are the pay of the staff working in it (hour by hour, wherever they were), and
         its supplies, equipment and floor space. What's left is its contribution towards the shared
         costs: Diagnostics (paid for within other departments' tariffs) and support services,

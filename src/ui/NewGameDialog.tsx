@@ -16,10 +16,11 @@ import { newGameOpen } from "./store";
 
 const MODELS: { id: Funding; name: string; tagline: string; points: string[] }[] = [
   {
-    id: "nhs",
-    name: "NHS Trust",
+    id: "phs",
+    name: "PHS Trust",
     tagline: "Survival under pressure.",
     points: [
+      "Part of the Public Health Service (PHS), the country's tax-funded health service: care is free to patients, and the PHS pays the hospital for it.",
       "Run the A&E your catchment depends on, with wards, clinics and theatres behind it.",
       "A block contract pays for the emergency care you're equipped for, with a share of the tariff per patient; planned care is paid in full.",
       "The 4-hour and 18-week standards are yours to meet.",
@@ -32,18 +33,18 @@ const MODELS: { id: Funding; name: string; tagline: string; points: string[] }[]
     points: [
       "Planned care only: clinics, day cases and operations, with no emergency department.",
       "Consultants have practising privileges: no salaries, they bring their patients and bill their own fees, and you earn the facility fee.",
-      "Insured and self-pay patients follow your reputation and prices, and you can take NHS patients who choose you.",
+      "Insured and self-pay patients follow your reputation and prices, and you can take PHS patients who choose you.",
       "Private inpatients have a room of their own.",
     ],
   },
   {
     id: "hybrid",
     name: "Hybrid Trust",
-    tagline: "An NHS trust with a Private Patient Unit.",
+    tagline: "A PHS trust with a Private Patient Unit.",
     points: [
-      "Everything an NHS Trust does, plus private rooms, wards and theatres in a Private Patient Unit.",
-      "Your consultants add private sessions on top of their NHS work, competing with it for rooms and theatres.",
-      "Private income can't pass 49% of all income: the regulator keeps an NHS trust's private work from outgrowing its NHS work.",
+      "Everything a PHS Trust does, plus private rooms, wards and theatres in a Private Patient Unit.",
+      "Your consultants add private sessions on top of their PHS work, competing with it for rooms and theatres.",
+      "Private income can't pass 49% of all income: the regulator keeps a PHS trust's private work from outgrowing its PHS work.",
     ],
   },
 ];
@@ -95,7 +96,7 @@ function Chips<T extends string | number | boolean>(props: {
 function NewGameBody({ game }: { game: Game }) {
   const [mode, setMode] = useState<"sandbox" | "scenario">("sandbox");
   const [name, setName] = useState(randomHospitalName);
-  const [funding, setFunding] = useState<Funding>("nhs");
+  const [funding, setFunding] = useState<Funding>("phs");
   const [money, setMoney] = useState(STARTING_CASH);
   const [catchment, setCatchment] = useState<number>(DEFAULT_CATCHMENT);
   const [volume, setVolume] = useState(1);
@@ -244,8 +245,8 @@ function NewGameBody({ game }: { game: Game }) {
               />
               {failStates && (
                 <p class="dim small-note">
-                  Lost after three months in NHS oversight segment 4, in administration (a Private
-                  Hospital), or with two Inadequate CQC ratings in a row.
+                  Lost after three months in PHS oversight segment 4, in administration (a Private
+                  Hospital), or with two Inadequate CSI ratings in a row.
                 </p>
               )}
             </div>

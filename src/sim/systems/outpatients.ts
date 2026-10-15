@@ -47,7 +47,7 @@ import { roomOfObject } from "../world/rooms";
 import { bookAppointments, serviceOf } from "./referrals";
 import { earnOutpatient, earnPrivate } from "./finance";
 
-/** Chance of not attending: first appointments, follow-ups (NHS about 7%). */
+/** Chance of not attending: first appointments, follow-ups (UK hospitals about 7%). */
 export const DNA_CHANCE = { first: 0.06, follow_up: 0.08 };
 /** Patients set off so as to arrive this many minutes early (at most). */
 const ARRIVE_EARLY_MINS: [number, number] = [5, 25];
@@ -187,7 +187,7 @@ function setOff(state: SimState): void {
 
 /**
  * Missed their appointment. The first time it's rebooked (a missed first
- * appointment restarts the RTT clock, as the NHS rules allow); the second
+ * appointment restarts the RTT clock, as the UK RTT rules allow); the second
  * time they're discharged back to their GP.
  */
 function didNotAttend(state: SimState, r: Referral): void {
@@ -391,9 +391,9 @@ function seen(state: SimState, o: Outpatient): void {
   delete state.referrals[r.id]; // Discharged back to their GP.
 }
 
-/** An appointment's income: tariff for the NHS, a facility fee for a private patient. */
+/** An appointment's income: tariff for the PHS, a facility fee for a private patient. */
 function earnAppointment(state: SimState, r: Referral, tariff: number): void {
-  if (r.payer === "nhs") earnOutpatient(state, tariff);
+  if (r.payer === "phs") earnOutpatient(state, tariff);
   else {
     earnPrivate(state, tariff, r.payer, "outpatients", true);
     state.today.stats.privateSeen++;

@@ -191,7 +191,7 @@ export function Inspector({
               Private Patient Unit
               <span class="dim">
                 For private patients only: private clinics and theatre lists are held in the unit's
-                rooms, and private inpatients stay in its side rooms. NHS work uses the rest.
+                rooms, and private inpatients stay in its side rooms. PHS work uses the rest.
               </span>
             </label>
           )}

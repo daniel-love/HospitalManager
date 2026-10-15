@@ -4,11 +4,11 @@
  * deadline), unlocks rooms and equipment as conditions are met, and ends
  * the game won (every objective met) or lost (one failed, or a fail
  * state). A sandbox game with fail states on can be lost the same ways:
- * an NHS trust three months in oversight segment 4, a Private Hospital in
- * administration, or two Inadequate CQC ratings in a row. After the end,
+ * a PHS trust three months in oversight segment 4, a Private Hospital in
+ * administration, or two Inadequate CSI ratings in a row. After the end,
  * play can carry on as a sandbox.
  */
-import { RATINGS } from "@data/cqc";
+import { RATINGS } from "@data/csi";
 import { pressureEventById } from "@data/pressure";
 import {
   FAIL,
@@ -209,8 +209,8 @@ function unlock(state: SimState, def: ScenarioDef): void {
     const ok =
       "objective" in u
         ? g.objectives[u.objective]?.status === "met"
-        : state.cqc.overall !== null &&
-          RATINGS.indexOf(state.cqc.overall) >= RATINGS.indexOf(u.cqcAtLeast);
+        : state.csi.overall !== null &&
+          RATINGS.indexOf(state.csi.overall) >= RATINGS.indexOf(u.csiAtLeast);
     if (!ok) continue;
     g.unlocked.push(lock.id);
     emit(state, `Unlocked: ${lock.reason.replace(/^./, (c) => c.toLowerCase())}.`, "info");
@@ -228,11 +228,11 @@ function failStates(state: SimState): void {
       return end(
         state,
         false,
-        `${FAIL.segment4Days} days in NHS oversight segment 4: the trust has been taken over.`,
+        `${FAIL.segment4Days} days in PHS oversight segment 4: the trust has been taken over.`,
       );
     }
   } else g.segment4Since = null;
-  const reports = state.cqc.reports.slice(-FAIL.inadequateInARow);
+  const reports = state.csi.reports.slice(-FAIL.inadequateInARow);
   g.inadequateRun =
     reports.length === FAIL.inadequateInARow && reports.every((r) => r.overall === "inadequate")
       ? reports.length

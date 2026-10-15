@@ -216,9 +216,9 @@ export function updateAlerts(state: SimState): void {
   const stranded = new Map<string, number>();
   for (const r of Object.values(state.referrals)) {
     if (r.kind === "surgery") continue;
-    // NHS and private patients wait for clinics of their own kind.
+    // PHS and private patients wait for clinics of their own kind.
     const running =
-      r.payer === "nhs"
+      r.payer === "phs"
         ? offersClinic(state, r.specialty) ||
           (state.funding === "private" && offersPrivateClinic(state, r.specialty))
         : offersPrivateClinic(state, r.specialty) || overPrivateCap(state);

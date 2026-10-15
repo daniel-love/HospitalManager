@@ -3,7 +3,7 @@
  * applicants rather than instant. For every kind of post (a role, a nurse
  * band, a consultant or registrar in a specialty) applicants come in over
  * time and stay a few weeks before taking a job elsewhere. More apply, and
- * more skilled, with a good reputation and CQC rating; few with a poor one.
+ * more skilled, with a good reputation and CSI rating; few with a poor one.
  * Hiring takes the most skilled applicant there is. A new hospital opens
  * with a recruitment campaign's worth to choose from. Bank and agency staff
  * aren't affected.
@@ -47,7 +47,7 @@ const rateOf = (key: string) =>
 export function appealFactor(state: SimState): number {
   const [lo, hi] = RECRUITMENT.factorRange;
   const rep = Math.max(lo, Math.min(hi, state.reputation / RECRUITMENT.neutralReputation));
-  const rating = state.cqc.overall ? RECRUITMENT.ratingFactor[state.cqc.overall] : 1;
+  const rating = state.csi.overall ? RECRUITMENT.ratingFactor[state.csi.overall] : 1;
   return rep * rating;
 }
 
@@ -57,7 +57,7 @@ function newApplicant(state: SimState, key: string): Applicant {
   const [lo, hi] = band ? NURSE_BANDS.find((b) => b.band === band)!.skill : RECRUITMENT.skill;
   const shift =
     (state.reputation - RECRUITMENT.neutralReputation) * RECRUITMENT.skillPerReputation +
-    (state.cqc.overall ? RECRUITMENT.ratingSkill[state.cqc.overall] : 0);
+    (state.csi.overall ? RECRUITMENT.ratingSkill[state.csi.overall] : 0);
   const skill = Math.max(10, Math.min(SKILL.max, nextInt(state.rng, lo, hi) + Math.round(shift)));
   return {
     id: state.nextApplicantId++,

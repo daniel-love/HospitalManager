@@ -53,10 +53,10 @@ describe("recruitment", () => {
   });
 
   it("brings more applicants with a better reputation and rating", () => {
-    const count = (reputation: number, rating: SimState["cqc"]["overall"]) => {
+    const count = (reputation: number, rating: SimState["csi"]["overall"]) => {
       const state = recruiting();
       state.reputation = reputation;
-      state.cqc.overall = rating;
+      state.csi.overall = rating;
       hours(state, 24 * 28);
       return state.applicants.length;
     };
@@ -83,7 +83,7 @@ describe("recruitment", () => {
 describe("grants and ratings", () => {
   it("offers no grants to a hospital rated Inadequate", () => {
     const state = createSimState({ seed: 1, width: 20, height: 20 });
-    state.cqc.overall = "inadequate";
+    state.csi.overall = "inadequate";
     for (let d = 0; d < 200; d++) {
       state.tick += TICKS_PER_DAY;
       updateGrants(state);

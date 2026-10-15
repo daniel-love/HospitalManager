@@ -147,7 +147,7 @@ export function describeFinance(state: SimState): FinanceData {
         bad: r.credit >= 4 || r.administration !== null,
       }
     : {
-        label: `NHS oversight segment ${r.segment}`,
+        label: `PHS oversight segment ${r.segment}`,
         note: SEGMENT_NOTES[r.segment]!,
         bad: r.segment >= 3,
       };
@@ -159,7 +159,7 @@ export function describeFinance(state: SimState): FinanceData {
         ? "The bank won't lend any more"
         : null
     : r.segment >= 3
-      ? `In NHS oversight segment ${r.segment}, the trust can't take new capital loans`
+      ? `In PHS oversight segment ${r.segment}, the trust can't take new capital loans`
       : capitalLimit(state) < LOANS.capital.min
         ? "The trust has borrowed as much as the DHSC will lend"
         : null;

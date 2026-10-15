@@ -1,7 +1,7 @@
 /**
  * Borrowing, ratings and grants (GAME_DESIGN §8.1). All amounts in £.
  *
- * NHS and Hybrid trusts borrow from the Department of Health and Social
+ * PHS and Hybrid trusts borrow from the Department of Health and Social
  * Care at the National Loans Fund rate: capital loans for building, and
  * revenue support loans when cash runs out, which come with oversight. A
  * Private Hospital borrows from a bank, at a rate set by its credit rating.
@@ -48,7 +48,7 @@ export const START_CREDIT = 3;
 export const ADMINISTRATION_MISSES = 3;
 
 /**
- * NHS oversight segments (the NHS Oversight Framework), 1 best to 4, reviewed
+ * PHS oversight segments (modelled on the UK oversight framework), 1 best to 4, reviewed
  * each month from the finances: segment 3 trusts can't take new capital
  * loans; segment 4 is the Recovery Support Programme, with financial
  * special measures (no agency staff, building spend capped).
@@ -83,7 +83,7 @@ export type GrantCondition =
   | { kind: "fourHour"; atLeast: number }
   /** No 12-hour trolley waits for a ward bed in the last two weeks. */
   | { kind: "noTrolleyWaits" }
-  /** NHS patients waiting under 18 weeks. */
+  /** PHS patients waiting under 18 weeks. */
   | { kind: "rtt"; atLeast: number }
   /** Average staff morale. */
   | { kind: "morale"; atLeast: number }
@@ -95,7 +95,7 @@ export interface GrantDef {
   name: string;
   /** Who's offering it. */
   funder: string;
-  funding: ("nhs" | "private" | "hybrid")[];
+  funding: ("phs" | "private" | "hybrid")[];
   amount: number;
   /** Weeks to meet the condition. */
   weeks: number;
@@ -112,8 +112,8 @@ export const GRANTS: GrantDef[] = [
   {
     id: "cdc",
     name: "Community Diagnostic Centre",
-    funder: "NHS England",
-    funding: ["nhs", "hybrid"],
+    funder: "PHS England",
+    funding: ["phs", "hybrid"],
     amount: 600_000,
     weeks: 12,
     condition: { kind: "ct" },
@@ -123,8 +123,8 @@ export const GRANTS: GrantDef[] = [
   {
     id: "elective_hub",
     name: "Elective surgical hub",
-    funder: "NHS England",
-    funding: ["nhs", "hybrid"],
+    funder: "PHS England",
+    funding: ["phs", "hybrid"],
     amount: 800_000,
     weeks: 16,
     condition: { kind: "operations", perWeek: 15 },
@@ -135,7 +135,7 @@ export const GRANTS: GrantDef[] = [
     id: "uec_capacity",
     name: "Urgent and emergency care capacity",
     funder: "DHSC",
-    funding: ["nhs", "hybrid"],
+    funding: ["phs", "hybrid"],
     amount: 500_000,
     weeks: 10,
     condition: { kind: "rooms", room: "majors_bay", add: 2 },
@@ -145,7 +145,7 @@ export const GRANTS: GrantDef[] = [
     id: "winter_beds",
     name: "Winter beds",
     funder: "DHSC",
-    funding: ["nhs", "hybrid"],
+    funding: ["phs", "hybrid"],
     amount: 400_000,
     weeks: 10,
     condition: { kind: "beds", add: 6 },
@@ -154,8 +154,8 @@ export const GRANTS: GrantDef[] = [
   {
     id: "four_hour",
     name: "A&E improvement funding",
-    funder: "NHS England",
-    funding: ["nhs", "hybrid"],
+    funder: "PHS England",
+    funding: ["phs", "hybrid"],
     amount: 350_000,
     weeks: 8,
     condition: { kind: "fourHour", atLeast: 0.78 },
@@ -165,8 +165,8 @@ export const GRANTS: GrantDef[] = [
   {
     id: "sdec",
     name: "Same-day emergency care",
-    funder: "NHS England",
-    funding: ["nhs", "hybrid"],
+    funder: "PHS England",
+    funding: ["phs", "hybrid"],
     amount: 300_000,
     weeks: 8,
     condition: { kind: "noTrolleyWaits" },
@@ -176,18 +176,18 @@ export const GRANTS: GrantDef[] = [
   {
     id: "elective_recovery",
     name: "Elective recovery fund",
-    funder: "NHS England",
-    funding: ["nhs", "hybrid"],
+    funder: "PHS England",
+    funding: ["phs", "hybrid"],
     amount: 300_000,
     weeks: 16,
     condition: { kind: "rtt", atLeast: 0.75 },
-    description: "Funding to bring waits down: 75% of NHS patients waiting under 18 weeks.",
+    description: "Funding to bring waits down: 75% of PHS patients waiting under 18 weeks.",
   },
   {
     id: "outpatients",
     name: "Outpatient transformation",
-    funder: "NHS England",
-    funding: ["nhs", "hybrid", "private"],
+    funder: "PHS England",
+    funding: ["phs", "hybrid", "private"],
     amount: 250_000,
     weeks: 12,
     condition: { kind: "appointments", perWeek: 60 },
@@ -196,8 +196,8 @@ export const GRANTS: GrantDef[] = [
   {
     id: "retention",
     name: "Staff retention fund",
-    funder: "NHS England",
-    funding: ["nhs", "hybrid"],
+    funder: "PHS England",
+    funding: ["phs", "hybrid"],
     amount: 150_000,
     weeks: 8,
     condition: { kind: "morale", atLeast: 70 },
@@ -247,7 +247,7 @@ export const GRANT_OFFERS = {
   reputationMet: 2,
   reputationMissed: 3,
   /**
-   * The wait between offers, times this by CQC rating: funders back
+   * The wait between offers, times this by CSI rating: funders back
    * well-rated hospitals. Inadequate (or special measures) gets none.
    */
   ratingPace: { outstanding: 0.7, good: 1, requires_improvement: 1.4, inadequate: 1 },

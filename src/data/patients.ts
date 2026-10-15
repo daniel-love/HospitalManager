@@ -82,7 +82,7 @@ export const AMBULANCE_TURNAROUND_MINS: [number, number] = [5, 15];
 
 /**
  * Relative walk-in arrivals per hour of the day, midnight first. Quiet
- * overnight, rising from 8am, busiest late morning to early evening (NHS
+ * overnight, rising from 8am, busiest late morning to early evening (UK
  * A&E attendance profile).
  */
 export const ARRIVALS_BY_HOUR = [
@@ -185,7 +185,7 @@ export const TOILET_URGE = 70;
  */
 export const REFERRAL_MINS: [number, number] = [20, 40];
 /**
- * The daily specialty ward round (NHS seven-day services: every inpatient
+ * The daily specialty ward round (UK seven-day services: every inpatient
  * seen by a senior doctor each day). Between these times (minutes after
  * midnight) a resident consultant or registrar of the patient's specialty
  * sees each of their inpatients not seen today, a few minutes at the

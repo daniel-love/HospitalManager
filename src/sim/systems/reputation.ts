@@ -10,7 +10,7 @@
  * - A&E: the share leaving within 4 hours, and the share not leaving unseen;
  * - planned care: appointments and operations that went ahead rather than
  *   being cancelled by the hospital;
- * - waiting lists: NHS patients within 18 weeks;
+ * - waiting lists: PHS patients within 18 weeks;
  * - inpatients: their average mood (visiting helps);
  * less penalties for unexpected deaths, safety incidents and complaints. A
  * day with nothing to judge leaves reputation where it is.
@@ -39,7 +39,7 @@ export function dayScore(state: SimState, s: FlowStats): number | null {
   let pathways = 0;
   let within = 0;
   for (const r of Object.values(state.referrals)) {
-    if (r.clockStart === null || r.payer !== "nhs") continue;
+    if (r.clockStart === null || r.payer !== "phs") continue;
     pathways++;
     if (state.tick - r.clockStart < RTT_TARGET_DAYS * TICKS_PER_DAY) within++;
   }

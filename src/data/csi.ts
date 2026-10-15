@@ -1,15 +1,15 @@
 /**
- * Care Quality Commission inspections (GAME_DESIGN §10), as CQC rates NHS
+ * Care Standards Inspectorate inspections (GAME_DESIGN §10), as CSI rates PHS
  * and independent hospitals: five key questions, each Outstanding, Good,
  * Requires Improvement or Inadequate, aggregated to an overall rating by
- * CQC's rules. systems/inspections.ts runs them.
+ * CSI's rules. systems/inspections.ts runs them.
  */
 
 /** Worst first, so a higher index is better. */
 export const RATINGS = ["inadequate", "requires_improvement", "good", "outstanding"] as const;
-export type CqcRating = (typeof RATINGS)[number];
+export type CsiRating = (typeof RATINGS)[number];
 
-export const RATING_NAMES: Record<CqcRating, string> = {
+export const RATING_NAMES: Record<CsiRating, string> = {
   outstanding: "Outstanding",
   good: "Good",
   requires_improvement: "Requires Improvement",
@@ -27,7 +27,7 @@ export const KEY_QUESTION_NAMES: Record<KeyQuestion, string> = {
   well_led: "Well-led",
 };
 
-/** What each asks, as CQC puts it. */
+/** What each asks, as CSI puts it. */
 export const KEY_QUESTION_TEXT: Record<KeyQuestion, string> = {
   safe: "Are people protected from abuse and avoidable harm?",
   effective: "Does care achieve good outcomes, based on the best evidence?",
@@ -36,16 +36,16 @@ export const KEY_QUESTION_TEXT: Record<KeyQuestion, string> = {
   well_led: "Does leadership make sure the hospital delivers high-quality care, sustainably?",
 };
 
-export const CQC = {
+export const CSI = {
   /** Days into the game of the first inspection (unannounced). */
   firstInspectionDays: [60, 120] as [number, number],
-  /** Days until the next one, by the current rating: compressed from CQC's years. */
+  /** Days until the next one, by the current rating: compressed from CSI's years. */
   nextAfterDays: {
     inadequate: 90,
     requires_improvement: 180,
     good: 365,
     outstanding: 540,
-  } as Record<CqcRating, number>,
+  } as Record<CsiRating, number>,
   /**
    * Concerns bring inspectors early: over the last 30 days, this many
    * unexpected deaths, complaints or safety incidents…
@@ -67,7 +67,7 @@ export const CQC = {
   dataWeight: 0.65,
   /** Reputation moves this much when a rating is published. */
   reputation: { outstanding: 8, good: 3, requires_improvement: -5, inadequate: -12 } as Record<
-    CqcRating,
+    CsiRating,
     number
   >,
   /** Days of data inspectors look at. */
@@ -81,7 +81,7 @@ export const VIP = {
     "A member of the Royal Family",
     "A BBC News crew",
     "The local MP",
-    "The regional director of NHS England",
+    "The regional director of PHS England",
   ],
   /** Rooms they see, and how long in each. */
   rooms: 3,

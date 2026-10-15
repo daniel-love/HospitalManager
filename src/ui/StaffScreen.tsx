@@ -505,10 +505,10 @@ function SpecialistRow({ game, role, data }: { game: Game; role: RosterRole; dat
       privileges: contract === "privileges",
     });
   const consultant = role.id === "consultant";
-  // A Private Hospital's consultants have practising privileges; an NHS trust employs its own;
+  // A Private Hospital's consultants have practising privileges; a PHS trust employs its own;
   // a Hybrid trust can do either.
   const privateOnly = consultant && data.funding === "private";
-  const privileges = consultant && data.funding !== "nhs";
+  const privileges = consultant && data.funding !== "phs";
   return (
     <RoleRow
       role={role}

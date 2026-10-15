@@ -12,7 +12,7 @@
 import { z } from "zod";
 import { conditionById, objectDef } from "@data/catalogue";
 import { PRIVATE } from "@data/economy";
-import { KEY_QUESTIONS, RATINGS, type KeyQuestion } from "@data/cqc";
+import { KEY_QUESTIONS, RATINGS, type KeyQuestion } from "@data/csi";
 import { SCENARIOS, type ScenarioId } from "@data/scenarios";
 import { PRESSURE_EVENTS, type PressureEventId } from "@data/pressure";
 import { specialtyIds, staffRoleIds } from "@data/schema";
@@ -116,7 +116,7 @@ const commandSchema = z.discriminatedUnion("type", [
 
 const num = z.number().finite();
 const nullableInt = int.nullable();
-const payerSchema = z.enum(["nhs", "insured", "self_pay"]);
+const payerSchema = z.enum(["phs", "insured", "self_pay"]);
 
 const agentFields = {
   id: int.positive(),
@@ -642,7 +642,7 @@ const saveSchema = z.object({
       z.object({ id: int.positive(), key: z.string(), skill: num.min(0).max(100), until: int }),
     ),
     nextApplicantId: int.positive(),
-    cqc: z.object({
+    csi: z.object({
       overall: rating.nullable(),
       questions: z
         .object(
@@ -675,7 +675,7 @@ const saveSchema = z.object({
     policies: z.object({
       gapFill: z.enum(["none", "bank", "bank_agency"]),
       priceLevel: num.min(PRIVATE.priceLevels[0]).max(PRIVATE.priceLevels[1]),
-      nhsReferrals: z.partialRecord(z.enum(specialtyIds), z.literal(true)),
+      phsReferrals: z.partialRecord(z.enum(specialtyIds), z.literal(true)),
       escalation: z.boolean(),
       dischargeBeforeNoon: z.boolean(),
       visiting: z.enum(["open", "set", "restricted", "none"]),
@@ -693,7 +693,7 @@ const saveSchema = z.object({
       z.object({ since: int, by: z.enum(["ipc", "player"]) }),
     ),
     name: z.string().min(1),
-    funding: z.enum(["nhs", "private", "hybrid"]),
+    funding: z.enum(["phs", "private", "hybrid"]),
     departments: z.object({
       ae: z.enum(["open", "divert", "closed"]),
       outpatients: z.enum(["open", "urgent", "closed"]),
@@ -851,7 +851,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       goals: state.goals,
       applicants: state.applicants,
       nextApplicantId: state.nextApplicantId,
-      cqc: state.cqc,
+      csi: state.csi,
       operations: Object.values(state.operations),
       nextOperationId: state.nextOperationId,
       nextCollectionId: state.nextCollectionId,
@@ -940,7 +940,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     goals: s.goals,
     applicants: s.applicants,
     nextApplicantId: s.nextApplicantId,
-    cqc: s.cqc,
+    csi: s.csi,
     operations: byId(s.operations, "operation"),
     nextOperationId: s.nextOperationId,
     nextCollectionId: s.nextCollectionId,
@@ -949,7 +949,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     roomSpecialties: { ...s.roomSpecialties },
     emergencyTheatres: { ...s.emergencyTheatres },
     cover: { ...s.cover },
-    policies: { ...s.policies, nhsReferrals: { ...s.policies.nhsReferrals } },
+    policies: { ...s.policies, phsReferrals: { ...s.policies.phsReferrals } },
     privateRooms: { ...s.privateRooms },
     closedRooms: { ...s.closedRooms },
     essentialRooms: { ...s.essentialRooms },

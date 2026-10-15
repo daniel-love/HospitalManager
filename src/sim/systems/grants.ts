@@ -85,7 +85,7 @@ export function progress(state: SimState, g: Grant): { share: number; text: stri
       let pathways = 0;
       let within = 0;
       for (const r of Object.values(state.referrals)) {
-        if (r.clockStart === null || r.payer !== "nhs") continue;
+        if (r.clockStart === null || r.payer !== "phs") continue;
         pathways++;
         if (state.tick - r.clockStart < RTT_TARGET_DAYS * TICKS_PER_DAY) within++;
       }
@@ -141,7 +141,7 @@ function fits(state: SimState, def: GrantDef): boolean {
       return lastDays(state, 14).some((d) => d.stats.bedWaitsOver12h > 0);
     case "rtt":
       return (
-        Object.values(state.referrals).some((r) => r.payer === "nhs" && r.clockStart !== null) &&
+        Object.values(state.referrals).some((r) => r.payer === "phs" && r.clockStart !== null) &&
         progressOf(state, def) < 1
       );
     case "morale":
@@ -179,12 +179,12 @@ export function updateGrants(state: SimState): void {
   if (g.offer || state.tick < g.nextOffer) return;
   const [lo, hi] = GRANT_OFFERS.everyDays;
   // Funders come sooner to a well-rated hospital, later to a poorly rated one.
-  const rated = state.cqc.overall;
+  const rated = state.csi.overall;
   const pace = rated ? GRANT_OFFERS.ratingPace[rated] : 1;
   g.nextOffer = state.tick + Math.round(nextInt(state.rng, lo, hi) * pace) * TICKS_PER_DAY;
   if (g.active.length >= GRANT_OFFERS.maxActive) return;
   // Nobody funds a hospital rated Inadequate, or in special measures.
-  if (rated === "inadequate" || state.cqc.specialMeasures) return;
+  if (rated === "inadequate" || state.csi.specialMeasures) return;
   const options = GRANTS.filter((d) => fits(state, d));
   if (options.length === 0) return;
   const def = pick(state.rng, options);

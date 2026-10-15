@@ -36,7 +36,7 @@ export const CATEGORY_COLOURS: Record<EquipmentDef["category"], number> = {
   surgical: 0x3a9bb8,
 };
 
-/** Marks the side of an item that staff work from (NHS-ish blue). */
+/** Marks the side of an item that staff work from (hospital blue). */
 export const STAFF_COLOUR = 0x2f7fd8;
 
 /** Plan mode blueprint tints. */
@@ -48,7 +48,7 @@ export const GHOST_BAD = 0xe0504a;
 export const GHOST_REMOVE = 0xe0a040;
 
 /**
- * Staff uniforms (GAME_DESIGN §11), loosely NHS: nurses in blue, senior nurses
+ * Staff uniforms (GAME_DESIGN §11), loosely UK hospital style: nurses in blue, senior nurses
  * (nurse practitioners) in navy, doctors in maroon scrubs, reception in grey-purple, domestic staff in green.
  */
 export const ROLE_COLOURS: Record<StaffRoleId, number> = {

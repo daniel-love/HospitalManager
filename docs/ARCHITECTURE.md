@@ -15,7 +15,7 @@
 | Tests                     | **Vitest**                | Fast unit and simulation tests in the same toolchain                                                                                                    |
 | Desktop packaging (later) | **Tauri**                 | Small native app for macOS/Windows; saves can go to disk                                                                                                |
 
-**Why not a full engine?** The game is mostly simulation (pathfinding, queues, jobs, economics) with simple 2D visuals. Keeping the sim as plain TypeScript makes it testable, deterministic and easy to save. Prison Architect itself is a custom engine for the same reasons.
+**Why not a full engine?** The game is mostly simulation (pathfinding, queues, jobs, economics) with simple 2D visuals. Keeping the sim as plain TypeScript makes it testable, deterministic and easy to save.
 
 ## 2. Core principle: separate simulation from presentation
 
@@ -76,7 +76,7 @@ src/
       jobs.ts             # job board: assign, run, complete
       movement.ts         # route following, re-planning after layout changes
       finance.ts          # tariff (emergency at the marginal rate, planned in full), pay, supplies, estates, daily reports, monthly statements
-      funding.ts          # the NHS block contract: sized to rooms and beds, capped by delivered activity
+      funding.ts          # the PHS block contract: sized to rooms and beds, capped by delivered activity
       serviceLines.ts     # service-line reporting: books each ledger entry to a department too
       pressure.ts         # pressure events: the calendar, forecasts, intensity and effects (winter, heat)
       majorIncident.ts    # major incidents: casualties, declaring (call-ins, stand-downs), standing down
@@ -84,7 +84,7 @@ src/
       discharge.ts        # getting inpatients home: medicines, the lounge, social care and delayed discharges
       outbreaks.ts        # norovirus: seeding, spread, isolation, staff sickness, room closures
       maintenance.ts      # equipment wear, breakdowns, repairs and maintenance; noticing power cuts
-      inspections.ts      # CQC inspections: the tour, ratings by key question, special measures; VIP visits
+      inspections.ts      # CSI inspections: the tour, ratings by key question, special measures; VIP visits
       recruitment.ts      # applicants for posts, by reputation and rating; hiring the best
       scenarios.ts        # scenarios: scripted events, objectives, locks, winning and losing; sandbox fail states
       reputation.ts       # 0–100 reputation: a running average of each day's patient experience

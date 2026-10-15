@@ -279,7 +279,7 @@ export function describeAdvice(state: SimState): AdviceData {
       item(
         hasRoom("ct_room"),
         "A CT Room near A&E (lead-lined walls)",
-        "For head injuries and falls that need a CT head (NICE: within an hour). Expensive, but without one those patients are transferred.",
+        "For head injuries and falls that need a CT head (NCG: within an hour). Expensive, but without one those patients are transferred.",
         true,
       ),
     ],
@@ -450,7 +450,7 @@ export function describeAdvice(state: SimState): AdviceData {
   );
   const money: AdviceGroup = {
     heading: "Paying your way",
-    intro: `NHS money comes three ways. A block contract pays for the emergency care you're equipped to provide, sized to your rooms and ward beds and capped by what you actually deliver (worth ${formatMoney(block)} a day now). Each emergency patient earns 30% of their tariff on top, about what their drugs and supplies cost. Planned care, clinics and operations, is paid in full. A&E alone runs at a loss: admissions, clinics and theatres are what pay.`,
+    intro: `PHS money comes three ways. A block contract pays for the emergency care you're equipped to provide, sized to your rooms and ward beds and capped by what you actually deliver (worth ${formatMoney(block)} a day now). Each emergency patient earns 30% of their tariff on top, about what their drugs and supplies cost. Planned care, clinics and operations, is paid in full. A&E alone runs at a loss: admissions, clinics and theatres are what pay.`,
     items: [
       item(
         hasRoom("ward") && Object.values(state.staff).some((s) => s.role === "registrar"),
@@ -491,8 +491,8 @@ export function describeAdvice(state: SimState): AdviceData {
     heading: funding === "private" ? "Private hospital" : "Private Patient Unit",
     intro:
       funding === "private"
-        ? `Insured and self-pay patients come for clinics and planned operations, as many as your reputation (${Math.round(state.reputation)}) and prices draw. You earn the facility fee; consultants bill their own. You can also take NHS patients who choose you, at tariff (Hospital → Policies).`
-        : `Private patients in rooms set aside as the Private Patient Unit (in each room's inspector), seen in your consultants' private sessions on top of their NHS work. Private income can't pass ${Math.round(PRIVATE.incomeCap * 100)}% of all income.`,
+        ? `Insured and self-pay patients come for clinics and planned operations, as many as your reputation (${Math.round(state.reputation)}) and prices draw. You earn the facility fee; consultants bill their own. You can also take PHS patients who choose you, at tariff (Hospital → Policies).`
+        : `Private patients in rooms set aside as the Private Patient Unit (in each room's inspector), seen in your consultants' private sessions on top of their PHS work. Private income can't pass ${Math.round(PRIVATE.incomeCap * 100)}% of all income.`,
     items: [
       item(
         funding === "private" ? hasRoom("outpatient_clinic") : unit("outpatient_clinic"),
@@ -508,7 +508,7 @@ export function describeAdvice(state: SimState): AdviceData {
           : "Consultants with private clinic sessions",
         funding === "private"
           ? "Grant privileges in the Staff screen, then set their sessions in their inspector. They aren't paid by you, and come in only for their sessions."
-          : "Set in a consultant's inspector, alongside their NHS job plan. They can't be in two places at once.",
+          : "Set in a consultant's inspector, alongside their PHS job plan. They can't be in two places at once.",
       ),
       item(
         funding === "private" ? hasRoom("theatre") : unit("theatre"),
@@ -545,7 +545,7 @@ export function describeAdvice(state: SimState): AdviceData {
     ],
   };
   if (funding === "private") {
-    money.intro = `A private hospital earns facility fees: insurers pay their negotiated rates, self-pay patients your prices (Hospital → Policies), and NHS patients who choose you pay tariff. There's no block contract, and no A&E. Consultants with practising privileges cost you nothing; nurses, theatre staff and the building do.`;
+    money.intro = `A private hospital earns facility fees: insurers pay their negotiated rates, self-pay patients your prices (Hospital → Policies), and PHS patients who choose you pay tariff. There's no block contract, and no A&E. Consultants with practising privileges cost you nothing; nurses, theatre staff and the building do.`;
     money.items = money.items.filter((i) => i.text !== "Wards, and doctors to admit to them");
   }
 

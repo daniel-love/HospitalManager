@@ -7,10 +7,10 @@
  * come from England's first outpatient attendances by specialty (about 0.75
  * of them from GPs), follow-up chances from the national follow-up ratios
  * (ophthalmology about 3 per first appointment, ENT about 1), and tariffs are
- * rough 2025/26 NHS prices for consultant-led attendances.
+ * rough 2025/26 UK prices for consultant-led attendances.
  *
  * `surgery` is what its clinics list patients for (M4 step 7): day-case
- * shares from NHS day surgery rates (the British Association of Day
+ * shares from UK day surgery rates (the British Association of Day
  * Surgery's targets), lengths of stay with enhanced recovery, and tariffs for
  * the whole spell (a hip replacement about £6,000, a cataract under £1,000).
  */
@@ -196,6 +196,6 @@ export const specialties: SpecialtyInput[] = [
       examples: "cataract operations, almost all day cases",
     },
     description:
-      "Eyes: cataracts (the commonest operation in the NHS), glaucoma and macular degeneration, which need many follow-up visits.",
+      "Eyes: cataracts (the commonest operation in the PHS), glaucoma and macular degeneration, which need many follow-up visits.",
   },
 ];

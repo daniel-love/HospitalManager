@@ -32,8 +32,8 @@ export interface HudState {
   administration: boolean;
   /** Pressure events forecast or under way. */
   events: EventChip[];
-  /** The CQC rating, once inspected, and whether inspectors are here now. */
-  cqc: { rating: string | null; label: string | null; underWay: boolean };
+  /** The CSI rating, once inspected, and whether inspectors are here now. */
+  csi: { rating: string | null; label: string | null; underWay: boolean };
 }
 
 export interface DebugStats {
@@ -228,7 +228,7 @@ export const hud = signal<HudState>({
   fourHour: null,
   administration: false,
   events: [],
-  cqc: { rating: null, label: null, underWay: false },
+  csi: { rating: null, label: null, underWay: false },
 });
 /** The player has seen the administration notice for this game and chosen to play on. */
 export const administrationDismissed = signal(false);

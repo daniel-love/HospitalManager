@@ -248,7 +248,7 @@ export const outpatientServiceSchema = z.object({
   followUpWeeks: z.tuple([mins, mins]),
   /** Chance a first appointment ends in a decision to operate (the admitted waiting list). */
   surgeryChance: z.number().min(0).max(1),
-  /** NHS tariff, £: first attendance, follow-up. */
+  /** PHS tariff, £: first attendance, follow-up. */
   firstTariff: z.number().int().positive(),
   followUpTariff: z.number().int().positive(),
 });
@@ -265,7 +265,7 @@ export const surgicalServiceSchema = z.object({
   opMins: z.tuple([mins, mins]),
   /** Inpatients: days on the ward afterwards. */
   stayDays: z.tuple([z.number().positive(), z.number().positive()]),
-  /** NHS tariff, £, for the whole spell: day case, inpatient. */
+  /** PHS tariff, £, for the whole spell: day case, inpatient. */
   dayCaseTariff: z.number().int().positive(),
   inpatientTariff: z.number().int().positive(),
   /** What's typically done, e.g. "hip and knee replacements". */
@@ -369,7 +369,7 @@ export const conditionDefSchema = z.object({
    * team reviews them in A&E and decides to admit, and they belong on its ward.
    */
   specialty: z.enum(specialtyIds).optional(),
-  /** Income on discharge, £ (NHS tariff for the attendance). */
+  /** Income on discharge, £ (PHS tariff for the attendance). */
   tariff: z.number().int().nonnegative(),
   /** Treatment after triage, in order. The outcome follows the last step. */
   pathway: z.array(pathwayStepSchema).min(1),
@@ -381,7 +381,7 @@ export const conditionDefSchema = z.object({
   outcome: z.enum(["discharge", "icu", "trauma_centre"]).default("discharge"),
   /**
    * Chance the doctor decides to admit them to a ward after the last step
-   * (instead of the outcome above), how long they stay, and the NHS tariff
+   * (instead of the outcome above), how long they stay, and the PHS tariff
    * for the inpatient stay.
    */
   admission: z

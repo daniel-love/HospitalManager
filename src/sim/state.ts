@@ -7,7 +7,7 @@
 import { REPUTATION, STARTING_CASH } from "@data/economy";
 import { GRANT_OFFERS, OVERSIGHT, START_CREDIT } from "@data/finance";
 import type { EventFrequency, PressureEventId } from "@data/pressure";
-import { CQC, type CqcRating, type KeyQuestion } from "@data/cqc";
+import { CSI, type CsiRating, type KeyQuestion } from "@data/csi";
 import type { ScenarioId } from "@data/scenarios";
 import type { SpecialtyId } from "@data/schema";
 import { DEFAULT_CATCHMENT } from "@data/patients";
@@ -43,7 +43,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 47;
+export const SIM_STATE_VERSION = 48;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -233,8 +233,8 @@ export interface SimState {
   };
   /** A scenario's objectives, or a sandbox game's fail states (systems/scenarios.ts). */
   goals: Goals;
-  /** CQC inspections and ratings, and VIP visits (systems/inspections.ts). */
-  cqc: Cqc;
+  /** CSI inspections and ratings, and VIP visits (systems/inspections.ts). */
+  csi: Csi;
   /** Inspectors and VIPs touring the hospital, keyed by id (agent ids). */
   tours: Record<number, TourAgent>;
   /** Applicants for posts, with recruitment on (systems/recruitment.ts). */
@@ -294,41 +294,41 @@ export interface Applicant {
   until: number;
 }
 
-/** Something an inspector or VIP saw, good or bad, under one of CQC's key questions. */
-export interface CqcFinding {
+/** Something an inspector or VIP saw, good or bad, under one of CSI's key questions. */
+export interface CsiFinding {
   question: KeyQuestion;
   good: boolean;
   text: string;
 }
 
 /** A published (or waiting to be published) inspection report. */
-export interface CqcReport {
+export interface CsiReport {
   visited: number;
   published: number;
-  overall: CqcRating;
-  questions: Record<KeyQuestion, { rating: CqcRating; score: number; evidence: string[] }>;
-  findings: CqcFinding[];
+  overall: CsiRating;
+  questions: Record<KeyQuestion, { rating: CsiRating; score: number; evidence: string[] }>;
+  findings: CsiFinding[];
 }
 
 /** Inspections and ratings (systems/inspections.ts). */
-export interface Cqc {
+export interface Csi {
   /** The published ratings, or null before the first inspection. */
-  overall: CqcRating | null;
-  questions: Record<KeyQuestion, CqcRating> | null;
+  overall: CsiRating | null;
+  questions: Record<KeyQuestion, CsiRating> | null;
   /** When the next inspection is due (unannounced, from then on a weekday morning). */
   next: number;
   /** An inspection under way: when it started, and what they've seen. */
-  visit: { started: number; findings: CqcFinding[] } | null;
+  visit: { started: number; findings: CsiFinding[] } | null;
   /** The report of the last visit, until it's published. */
-  pending: CqcReport | null;
+  pending: CsiReport | null;
   /** Published reports, newest last. */
-  reports: CqcReport[];
+  reports: CsiReport[];
   /** Placed in special measures by an Inadequate rating, until re-rated better. */
   specialMeasures: boolean;
   /** When concerns last brought an inspection forward. */
   concernsAt: number | null;
   /** A VIP visit under way: who, and what they've seen. */
-  vip: { eventId: number; who: string; findings: CqcFinding[] } | null;
+  vip: { eventId: number; who: string; findings: CsiFinding[] } | null;
 }
 
 /**
@@ -343,7 +343,7 @@ export interface Goals {
   unlocked: string[];
   /** Won or lost, and why; null while it's still going. */
   outcome: { won: boolean; text: string; tick: number } | null;
-  /** Since when an NHS trust has been in oversight segment 4. */
+  /** Since when a PHS trust has been in oversight segment 4. */
   segment4Since: number | null;
   inadequateRun: number;
 }
@@ -394,8 +394,8 @@ export interface Policies {
   gapFill: GapFill;
   /** Private care: the self-pay price level, as a multiple of the standard price (PRIVATE.priceLevels). */
   priceLevel: number;
-  /** Private Hospitals: specialties taking NHS-funded referrals (patient choice), at tariff. */
-  nhsReferrals: Partial<Record<SpecialtyId, true>>;
+  /** Private Hospitals: specialties taking PHS-funded referrals (patient choice), at tariff. */
+  phsReferrals: Partial<Record<SpecialtyId, true>>;
   /** Escalation beds open: admitted patients with no ward bed go to escalation trolleys. */
   escalation: boolean;
   /** Ward patients fit to go home that day are reviewed in the morning. */
@@ -430,7 +430,7 @@ export interface Departments {
 }
 
 /**
- * An NHS trust's oversight segment (1 best to 4, financial special measures),
+ * A PHS trust's oversight segment (1 best to 4, financial special measures),
  * and a Private Hospital's credit rating (an index into CREDIT_RATINGS, 0
  * best) and administration. Each is reviewed monthly.
  */
@@ -444,11 +444,11 @@ export interface Rating {
 }
 
 /**
- * NHS Trust: NHS funding only. Private Hospital: private patients (and NHS
+ * PHS Trust: PHS funding only. Private Hospital: private patients (and PHS
  * referrals it chooses to take), consultants with practising privileges, no
- * emergency department. Hybrid: an NHS trust with a Private Patient Unit.
+ * emergency department. Hybrid: a PHS trust with a Private Patient Unit.
  */
-export type Funding = "nhs" | "private" | "hybrid";
+export type Funding = "phs" | "private" | "hybrid";
 
 /** People wanted on each day shift and each night shift. */
 export interface Cover {
@@ -541,13 +541,13 @@ export function createSimState(opts: NewGameOptions): SimState {
     maintenance: {},
     departments: { ae: "open", outpatients: "open", theatres: "open" },
     name: opts.name ?? "My hospital",
-    funding: opts.funding ?? "nhs",
+    funding: opts.funding ?? "phs",
     reputation: REPUTATION.start,
     cover: {},
     policies: {
       gapFill: "bank",
       priceLevel: 1,
-      nhsReferrals: {},
+      phsReferrals: {},
       escalation: false,
       dischargeBeforeNoon: false,
       visiting: "set",
@@ -574,11 +574,11 @@ export function createSimState(opts: NewGameOptions): SimState {
       done: [],
     },
     pressure: { active: [], past: [], nextId: 1, vaccinated: null, majorIncident: null },
-    cqc: {
+    csi: {
       overall: null,
       questions: null,
       // The first inspection comes in the first few months (systems/inspections.ts).
-      next: start + CQC.firstInspectionDays[0] * TICKS_PER_DAY,
+      next: start + CSI.firstInspectionDays[0] * TICKS_PER_DAY,
       visit: null,
       pending: null,
       reports: [],

@@ -1,11 +1,11 @@
 /**
  * Borrowing and ratings (GAME_DESIGN §8.1).
  *
- * NHS and Hybrid trusts borrow from the Department of Health and Social
+ * PHS and Hybrid trusts borrow from the Department of Health and Social
  * Care at the National Loans Fund rate: capital loans the player takes for
  * building, and revenue support loans that arrive by themselves at midnight
  * when cash has run out, bringing it back up to a floor. A trust doesn't go
- * bust; instead its NHS oversight segment, reviewed each month from the
+ * bust; instead its PHS oversight segment, reviewed each month from the
  * finances, falls: segment 3 can't take new capital loans, and segment 4
  * (the Recovery Support Programme) is financial special measures, with no
  * agency staff and building capped each month.
@@ -52,7 +52,7 @@ export function bankLimit(state: SimState): number {
   return Math.max(0, limit - owed(state, "bank"));
 }
 
-/** The most an NHS trust can borrow for building now, on top of what it owes. */
+/** The most a PHS trust can borrow for building now, on top of what it owes. */
 export function capitalLimit(state: SimState): number {
   return Math.max(0, LOANS.capital.maxOutstanding - owed(state, "capital"));
 }
@@ -67,7 +67,7 @@ export function cantBorrow(
   if (kind === "capital") {
     if (state.funding === "private") return "A private hospital borrows from a bank, not the DHSC";
     if (state.rating.segment >= 3) {
-      return `In NHS oversight segment ${state.rating.segment}, the trust can't take new capital loans`;
+      return `In PHS oversight segment ${state.rating.segment}, the trust can't take new capital loans`;
     }
     const [lo, hi] = LOANS.capital.termYears;
     if (years < lo || years > hi) return `Capital loans run ${lo} to ${hi} years`;
@@ -75,7 +75,7 @@ export function cantBorrow(
     if (amount > capitalLimit(state)) return "That's more than the DHSC will lend";
     return null;
   }
-  if (state.funding !== "private") return "An NHS trust borrows from the DHSC, not a bank";
+  if (state.funding !== "private") return "A PHS trust borrows from the DHSC, not a bank";
   if (state.rating.administration !== null) return "The hospital is in administration";
   const [lo, hi] = LOANS.bank.termYears;
   if (years < lo || years > hi) return `Bank loans run ${lo} to ${hi} years`;
@@ -147,7 +147,7 @@ export function repayLoans(state: SimState): void {
 }
 
 /**
- * At midnight: an NHS trust out of cash gets a revenue support loan back up
+ * At midnight: a PHS trust out of cash gets a revenue support loan back up
  * to the floor; a Private Hospital overdrawn too long goes into administration.
  */
 export function checkCash(state: SimState): void {
@@ -162,7 +162,7 @@ export function checkCash(state: SimState): void {
     state.rating.segment = Math.max(state.rating.segment, 3);
     emit(
       state,
-      `The trust ran out of cash: the DHSC has lent ${pounds(amount)} in revenue support, repayable over ${LOANS.revenueSupport.termYears} years. That puts it in NHS oversight segment ${state.rating.segment}: no new capital loans until it recovers.`,
+      `The trust ran out of cash: the DHSC has lent ${pounds(amount)} in revenue support, repayable over ${LOANS.revenueSupport.termYears} years. That puts it in PHS oversight segment ${state.rating.segment}: no new capital loans until it recovers.`,
       "bad",
       undefined,
       undefined,
@@ -190,7 +190,7 @@ function enterAdministration(state: SimState): void {
 }
 
 /**
- * At the end of each month, from its statement: an NHS trust's oversight
+ * At the end of each month, from its statement: a PHS trust's oversight
  * segment (it improves at most one step a month), or a Private Hospital's
  * credit rating.
  */
@@ -231,17 +231,17 @@ export function reviewRating(state: SimState, m: MonthReport): void {
   if (segment === 3 && before >= 3 && surplus < -deficit4 * income_) segment = 4;
   // Confidence comes back slowly: one step a month.
   segment = Math.max(segment, before - 1);
-  // In special measures after an Inadequate CQC rating: segment 4 until re-rated.
-  if (state.cqc.specialMeasures) segment = 4;
+  // In special measures after an Inadequate CSI rating: segment 4 until re-rated.
+  if (state.csi.specialMeasures) segment = 4;
   state.rating.segment = segment;
   if (segment === 4 && state.policies.gapFill === "bank_agency") state.policies.gapFill = "bank";
   if (segment !== before) {
     emit(
       state,
       segment === 4
-        ? "The trust is in NHS oversight segment 4: financial special measures. No agency staff, and building is capped at " +
+        ? "The trust is in PHS oversight segment 4: financial special measures. No agency staff, and building is capped at " +
             `${pounds(OVERSIGHT.specialMeasuresCapitalCap)} a month, until the finances recover.`
-        : `The trust is now in NHS oversight segment ${segment} (was ${before})${segment >= 3 ? ": no new capital loans" : ""}.`,
+        : `The trust is now in PHS oversight segment ${segment} (was ${before})${segment >= 3 ? ": no new capital loans" : ""}.`,
       segment > before ? "warn" : "info",
       undefined,
       undefined,

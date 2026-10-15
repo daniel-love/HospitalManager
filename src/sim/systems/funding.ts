@@ -1,6 +1,6 @@
 /**
- * NHS funding (GAME_DESIGN §2.2): the block contract for emergency care.
- * Commissioners pay a fixed share (NHS_FUNDING.blockShare) of the expected
+ * PHS funding (GAME_DESIGN §2.2): the block contract for emergency care.
+ * Commissioners pay a fixed share (PHS_FUNDING.blockShare) of the expected
  * value of the emergency care the hospital is equipped to provide for its
  * catchment: the A&E attendances it can treat, and the emergency admissions
  * and operations that follow where it has a ward, the specialty's doctors
@@ -12,7 +12,7 @@
  * raises it from the next day, and closing one lowers it.
  */
 import { content } from "@data/catalogue";
-import { NHS_FUNDING } from "@data/economy";
+import { PHS_FUNDING } from "@data/economy";
 import type { ConditionDef, SpecialtyId } from "@data/schema";
 import type { SimState } from "../state";
 import { parkingSpaces } from "./ambulances";
@@ -104,14 +104,14 @@ export function emergencyValueByLine(state: SimState): EmergencyValue {
       const mins = ((step.mins[0] + step.mins[1]) / 2) * step.chance;
       needed.set(
         step.room,
-        (needed.get(step.room) ?? 0) + n * mins * NHS_FUNDING.roomOccupancyPerTreatment,
+        (needed.get(step.room) ?? 0) + n * mins * PHS_FUNDING.roomOccupancyPerTreatment,
       );
     }
   }
   const roomShare = new Map<string, number>();
   for (const [room, mins] of needed) {
     const rooms = state.rooms.filter((r) => r.valid && r.typeId === room).length;
-    const available = rooms * MINUTES_PER_DAY * NHS_FUNDING.roomUtilisation;
+    const available = rooms * MINUTES_PER_DAY * PHS_FUNDING.roomUtilisation;
     roomShare.set(room, Math.min(1, available / mins));
   }
 
@@ -145,10 +145,10 @@ export function emergencyValueByLine(state: SimState): EmergencyValue {
  * null with too little history yet.
  */
 export function deliveredValuePerDay(state: SimState): number | null {
-  const days = state.history.slice(-NHS_FUNDING.activityDays);
-  if (days.length < NHS_FUNDING.activityGraceDays) return null;
+  const days = state.history.slice(-PHS_FUNDING.activityDays);
+  if (days.length < PHS_FUNDING.activityGraceDays) return null;
   const marginal = days.reduce((n, d) => n + d.ledger.tariff, 0) / days.length;
-  return marginal / (1 - NHS_FUNDING.blockShare);
+  return marginal / (1 - PHS_FUNDING.blockShare);
 }
 
 /**
@@ -157,10 +157,10 @@ export function deliveredValuePerDay(state: SimState): number | null {
  * actually been doing.
  */
 export function dailyBlock(state: SimState): number {
-  // A Private Hospital has no NHS emergency contract.
+  // A Private Hospital has no PHS emergency contract.
   if (state.funding === "private") return 0;
   let value = emergencyValuePerDay(state);
   const delivered = deliveredValuePerDay(state);
-  if (delivered !== null) value = Math.min(value, delivered * NHS_FUNDING.activityTolerance);
-  return value * NHS_FUNDING.blockShare;
+  if (delivered !== null) value = Math.min(value, delivered * PHS_FUNDING.activityTolerance);
+  return value * PHS_FUNDING.blockShare;
 }

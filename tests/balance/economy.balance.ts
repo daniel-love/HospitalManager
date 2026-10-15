@@ -169,7 +169,7 @@ function hospital(catchment: number): SimState {
 }
 
 /** A Private Hospital: clinics, two theatres, three side rooms; a lean planned-care rota. */
-function privateHospital(catchment: number, nhs: boolean): SimState {
+function privateHospital(catchment: number, phs: boolean): SimState {
   const state = buildPlannedCare(1, "private");
   state.settings.catchment = catchment;
   staff(state, [
@@ -188,9 +188,9 @@ function privateHospital(catchment: number, nhs: boolean): SimState {
     { specialty: "anaesthetics", clinics: 0, lists: 4 },
     { specialty: "anaesthetics", clinics: 0, lists: 1 },
   ]);
-  if (nhs) {
+  if (phs) {
     for (const sp of ["cardiology", "trauma_orthopaedics", "general_surgery"] as const) {
-      state.policies.nhsReferrals[sp] = true;
+      state.policies.phsReferrals[sp] = true;
     }
   }
   return state;
@@ -205,7 +205,7 @@ it(
   900_000,
 );
 it(
-  "private hospital with NHS referrals, 80k",
-  () => report("privateNhs80k", privateHospital(80_000, true), 56),
+  "private hospital with PHS referrals, 80k",
+  () => report("privatePhs80k", privateHospital(80_000, true), 56),
   900_000,
 );

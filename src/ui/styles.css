@@ -2285,7 +2285,7 @@ body.planning #game::after {
   font-size: 13px;
   margin: 6px 0 10px;
 }
-.nhs-referrals {
+.phs-referrals {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 }
@@ -2567,10 +2567,10 @@ body.planning #game::after {
 
 /* ---------- Hospital → Inspections ---------- */
 
-.cqc-head {
+.csi-head {
   margin-bottom: 6px;
 }
-.cqc-badge {
+.csi-badge {
   display: inline-block;
   padding: 1px 8px;
   border-radius: 10px;
@@ -2578,19 +2578,19 @@ body.planning #game::after {
   font-weight: 600;
   color: #1d232b;
 }
-.cqc-badge.outstanding {
+.csi-badge.outstanding {
   background: #8fd0f2;
 }
-.cqc-badge.good {
+.csi-badge.good {
   background: var(--ok);
 }
-.cqc-badge.requires_improvement {
+.csi-badge.requires_improvement {
   background: #f2c94c;
 }
-.cqc-badge.inadequate {
+.csi-badge.inadequate {
   background: var(--bad);
 }
-.topbar .cqc-chip {
+.topbar .csi-chip {
   padding: 0;
   border: none;
   background: none;
@@ -2649,8 +2649,8 @@ body.planning #game::after {
 }
 .scenario-card {
   position: absolute;
-  top: 64px;
-  left: 16px;
+  top: 60px;
+  right: 8px;
   z-index: 4;
   max-width: 320px;
   padding: 8px 10px;
@@ -2659,6 +2659,10 @@ body.planning #game::after {
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+}
+/* Just left of the inspector (right 8px + 300px wide). */
+.scenario-card.beside-inspector {
+  right: 316px;
 }
 .scenario-card ul {
   margin: 4px 0;

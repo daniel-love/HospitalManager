@@ -295,7 +295,7 @@ export function claimWardBed(state: SimState, job: Job): Point | null {
     wheeled
       ? trolleyStop(state, from, b) !== null
       : walkRouteExists(state, from, bedside(state, b));
-  const isPrivate = !!p.elective && p.elective.payer !== "nhs";
+  const isPrivate = !!p.elective && p.elective.payer !== "phs";
   // At the end of life, a side room for privacy if one's free.
   const bed =
     (p.endOfLife

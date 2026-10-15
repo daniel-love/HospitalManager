@@ -22,9 +22,9 @@
  * Private Patient Unit, also gets private referrals, insured or self-pay,
  * at a share of the catchment's GP referral rate that follows reputation
  * (and, for self-pay, the price level). They're booked into private
- * sessions only. A Private Hospital can also take NHS referrals for a
+ * sessions only. A Private Hospital can also take PHS referrals for a
  * specialty (patient choice), into the same sessions after private
- * patients. The 18-week standard is for NHS patients.
+ * patients. The 18-week standard is for PHS patients.
  */
 import { content, specialtyById } from "@data/catalogue";
 import { FIRST_NAMES, SURNAMES } from "@data/names";
@@ -60,9 +60,9 @@ export function serviceOf(specialty: SpecialtyId): OutpatientService | undefined
 
 /**
  * Whether there's somewhere to hold this specialty's clinics of a kind
- * (private or NHS): an Outpatients Reception, a working clinic room for it
+ * (private or PHS): an Outpatients Reception, a working clinic room for it
  * (or open to any; in a Hybrid trust, inside the Private Patient Unit for
- * private clinics and outside it for NHS ones), and a consultant of it
+ * private clinics and outside it for PHS ones), and a consultant of it
  * with sessions of that kind.
  */
 function holdsClinics(state: SimState, specialty: SpecialtyId, isPrivate: boolean): boolean {
@@ -87,12 +87,12 @@ function holdsClinics(state: SimState, specialty: SpecialtyId, isPrivate: boolea
 }
 
 /**
- * Whether GPs can refer NHS patients to this specialty's clinics here. In a
- * Private Hospital, only for specialties it takes NHS referrals for.
+ * Whether GPs can refer PHS patients to this specialty's clinics here. In a
+ * Private Hospital, only for specialties it takes PHS referrals for.
  */
 export function offersClinic(state: SimState, specialty: SpecialtyId): boolean {
   if (state.funding === "private") {
-    return !!state.policies.nhsReferrals[specialty] && holdsClinics(state, specialty, true);
+    return !!state.policies.phsReferrals[specialty] && holdsClinics(state, specialty, true);
   }
   return holdsClinics(state, specialty, false);
 }
@@ -103,7 +103,7 @@ export function offersClinic(state: SimState, specialty: SpecialtyId): boolean {
  * private income is under the cap.
  */
 export function offersPrivateClinic(state: SimState, specialty: SpecialtyId): boolean {
-  if (state.funding === "nhs") return false;
+  if (state.funding === "phs") return false;
   if (state.funding === "hybrid" && overPrivateCap(state)) return false;
   return holdsClinics(state, specialty, true);
 }
@@ -141,11 +141,11 @@ export function privateReferralsPerDay(
 }
 
 /**
- * Referrals a day this hospital can expect to a specialty's clinics, NHS
+ * Referrals a day this hospital can expect to a specialty's clinics, PHS
  * and private, for what it offers now (the Help panel's capacity guide).
  */
 export function clinicDemandPerDay(state: SimState, specialty: SpecialtyId): number {
-  let n = offersClinic(state, specialty) ? nhsReferralsPerDay(state, specialty) : 0;
+  let n = offersClinic(state, specialty) ? phsReferralsPerDay(state, specialty) : 0;
   if (offersPrivateClinic(state, specialty)) {
     const p = privateReferralsPerDay(state, specialty);
     n += p.insured + p.selfPay;
@@ -153,10 +153,10 @@ export function clinicDemandPerDay(state: SimState, specialty: SpecialtyId): num
   return n;
 }
 
-/** NHS referrals a day to this specialty here (a Private Hospital gets those who choose it). */
-function nhsReferralsPerDay(state: SimState, specialty: SpecialtyId): number {
+/** PHS referrals a day to this specialty here (a Private Hospital gets those who choose it). */
+function phsReferralsPerDay(state: SimState, specialty: SpecialtyId): number {
   const all = referralsPerDay(state, specialty);
-  return state.funding === "private" ? all * PRIVATE.nhsChoiceShare * reputationFactor(state) : all;
+  return state.funding === "private" ? all * PRIVATE.phsChoiceShare * reputationFactor(state) : all;
 }
 
 /** GP referrals a day to this specialty's clinics, for the catchment. */
@@ -184,7 +184,7 @@ export function updateReferrals(state: SimState): void {
         seedWaitingList(state, sp.id);
         added = true;
       }
-      const perMinute = (nhsReferralsPerDay(state, sp.id) * 7) / minutes;
+      const perMinute = (phsReferralsPerDay(state, sp.id) * 7) / minutes;
       if (chance(state.rng, perMinute)) {
         const urgent = chance(state.rng, sp.outpatients.urgentShare);
         // Taking urgent referrals only: GPs send routine ones elsewhere.
@@ -219,7 +219,7 @@ function seedWaitingList(state: SimState, specialty: SpecialtyId): void {
   state.inheritedLists.push(specialty);
   const service = serviceOf(specialty);
   if (!service) return;
-  const mean = nhsReferralsPerDay(state, specialty) * INHERITED_LIST_DAYS;
+  const mean = phsReferralsPerDay(state, specialty) * INHERITED_LIST_DAYS;
   const n = Math.floor(mean + nextFloat(state.rng));
   for (let i = 0; i < n; i++) {
     const urgent = chance(state.rng, service.urgentShare);
@@ -243,7 +243,7 @@ export function refer(
   state: SimState,
   specialty: SpecialtyId,
   urgent = false,
-  payer: Payer = "nhs",
+  payer: Payer = "phs",
 ): Referral {
   const r: Referral = {
     id: state.nextReferralId++,
@@ -261,7 +261,7 @@ export function refer(
     rebookBy: null,
   };
   state.referrals[r.id] = r;
-  if (payer === "nhs") state.today.stats.gpReferrals++;
+  if (payer === "phs") state.today.stats.gpReferrals++;
   else state.today.stats.privateReferrals++;
   return r;
 }
@@ -345,17 +345,17 @@ function bookingOrder(a: Referral, b: Referral): number {
   const when = (r: Referral) =>
     r.rebookBy ?? (r.kind === "follow_up" ? r.due! : (r.clockStart ?? r.added));
   // Where they share sessions (a Private Hospital), private patients come first.
-  const nhs = (r: Referral) => (r.payer === "nhs" ? 1 : 0);
-  return rank(a) - rank(b) || nhs(a) - nhs(b) || when(a) - when(b) || a.id - b.id;
+  const phs = (r: Referral) => (r.payer === "phs" ? 1 : 0);
+  return rank(a) - rank(b) || phs(a) - phs(b) || when(a) - when(b) || a.id - b.id;
 }
 
 /**
  * Whether a session can take this patient: private patients only private
- * sessions; NHS patients NHS ones, or in a Private Hospital (where every
+ * sessions; PHS patients PHS ones, or in a Private Hospital (where every
  * session is private), any.
  */
 function canBook(state: SimState, r: Referral, d: Diary): boolean {
-  if (r.payer !== "nhs") return d.private;
+  if (r.payer !== "phs") return d.private;
   return !d.private || state.funding === "private";
 }
 
@@ -480,9 +480,9 @@ export function waitingLists(state: SimState): ListSummary[] {
         if (r.booking) s.booked++;
       } else if (r.kind === "follow_up") s.followUps++;
       else s.surgery++;
-      if (r.payer !== "nhs") s.private++;
-      // The 18-week standard is for NHS patients.
-      if (r.clockStart === null || r.payer !== "nhs") continue;
+      if (r.payer !== "phs") s.private++;
+      // The 18-week standard is for PHS patients.
+      if (r.clockStart === null || r.payer !== "phs") continue;
       const days = (state.tick - r.clockStart) / TICKS_PER_DAY;
       s.pathways++;
       if (days < RTT_TARGET_DAYS) s.within18w++;

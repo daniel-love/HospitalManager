@@ -1,6 +1,6 @@
 /**
  * Escalation (GAME_DESIGN §8.3): the hospital's pressure as an OPEL level
- * (Operational Pressures Escalation Levels, 1 to 4, as NHS trusts report
+ * (Operational Pressures Escalation Levels, 1 to 4, as UK trusts report
  * them), and escalation beds. With escalation open, an admitted patient
  * with no ward bed goes to a free escalation trolley in a ward or a
  * corridor rather than waiting on an A&E trolley: corridor care. It frees

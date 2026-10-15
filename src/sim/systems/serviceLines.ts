@@ -1,5 +1,5 @@
 /**
- * Service-line reporting (GAME_DESIGN §8.1), like an NHS trust's: every
+ * Service-line reporting (GAME_DESIGN §8.1), like a PHS trust's: every
  * pound of income and running cost is booked to a department as well as to
  * its ledger line, so the Finance dialog can show what each department
  * earns, what it costs directly, and the contribution it leaves towards the

@@ -1,6 +1,6 @@
 /**
  * Key performance indicators (GAME_DESIGN §8.5): the monthly measures an
- * NHS trust board sees in its integrated performance report, each against
+ * PHS trust board sees in its integrated performance report, each against
  * its national standard (or a usual benchmark where there's no standard),
  * rated green, amber or red. Computed from a month's report
  * (systems/finance.ts), so the current month counts the days filed so far.
@@ -115,7 +115,7 @@ export const KPIS: Kpi[] = [
     label: "Waiting under 18 weeks",
     standard: "92%",
     title:
-      "NHS patients waiting for treatment less than 18 weeks since their GP referral, at the month's end",
+      "PHS patients waiting for treatment less than 18 weeks since their GP referral, at the month's end",
     value: (m) => share(m.end.rttWithin18w, m.end.rttWaiting),
     format: pct,
     rate: atLeast(0.92, 0.8),
@@ -299,7 +299,7 @@ export const KPIS: Kpi[] = [
     section: "Workforce",
     label: "Agency share of pay",
     standard: "Under 3.2%",
-    title: "Agency staff costs as a share of the whole pay bill (the NHS limit)",
+    title: "Agency staff costs as a share of the whole pay bill (the PHS limit)",
     value: (m) => share(m.ledger.agency, m.ledger.salaries + m.ledger.bank + m.ledger.agency),
     format: pct1,
     rate: atMost(0.032, 0.06),

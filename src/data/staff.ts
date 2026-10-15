@@ -1,8 +1,8 @@
 /**
  * Staff roles that can be hired. Each belongs to a group (medical, nursing,
  * support services, administrative), which decides where it's listed in the
- * Staff screen; within a group, roles keep this order. Costs are rough 2025/26 NHS pay (Agenda for
- * Change bands, resident doctor scale) plus about 28% employer on-costs
+ * Staff screen; within a group, roles keep this order. Costs are rough 2025/26 UK hospital pay (national
+ * pay bands, resident doctor scale) plus about 28% employer on-costs
  * (National Insurance and pension).
  *
  * Each person works a full-time contract of 37.5 hours a week (see SHIFTS),
@@ -29,7 +29,7 @@ export const ON_CALL = {
 };
 
 /**
- * Shifts (GAME_DESIGN §6.3): NHS long days and nights of 12.5 hours, with
+ * Shifts (GAME_DESIGN §6.3): UK hospital long days and nights of 12.5 hours, with
  * half an hour's handover where they overlap. A full-time contract is three
  * a week. Consultants, and registrars with clinics or theatre lists in their
  * job plan, work weekdays instead, and consultants take turns on call from
@@ -50,7 +50,7 @@ export const SHIFTS = {
 };
 
 /**
- * Unsocial hours pay (Agenda for Change, bands 3 and up): extra on top of
+ * Unsocial hours pay (bands 3 and up): extra on top of
  * basic pay for hours worked between 20:00 and 06:00 or on a Saturday, and
  * more on a Sunday. Resident doctors' night enhancement is similar.
  */
@@ -65,7 +65,7 @@ export const UNSOCIAL = {
 };
 
 /**
- * Nurse bands (Agenda for Change, GAME_DESIGN §6.1). Band 5 staff nurses do
+ * Nurse bands (national pay bands, GAME_DESIGN §6.1). Band 5 staff nurses do
  * most of the nursing; Band 6 senior staff nurses are more experienced; a
  * Band 7 sister or charge nurse on a shift is its nurse in charge, who
  * keeps the department moving (NURSE_IN_CHARGE). Pay with on-costs, like
@@ -138,7 +138,7 @@ export const MORALE = {
 
 /**
  * Sickness absence: the chance someone rostered calls in sick for a shift
- * (the NHS rate is about 5%), rising as morale falls below `fromMorale`
+ * (the UK hospital rate is about 5%), rising as morale falls below `fromMorale`
  * and when they're tired.
  */
 export const SICKNESS = {

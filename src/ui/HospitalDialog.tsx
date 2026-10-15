@@ -256,7 +256,7 @@ function Policies({ game, data }: { game: Game; data: HospitalData }) {
           ))}
         </div>
       </PolicyCard>
-      {p.funding !== "nhs" && (
+      {p.funding !== "phs" && (
         <PolicyCard
           title="Self-pay prices"
           note="Insurers pay their own rates; self-pay patients pay yours. Higher prices earn more from each but bring fewer."
@@ -283,17 +283,17 @@ function Policies({ game, data }: { game: Game; data: HospitalData }) {
       )}
       {p.funding === "private" && (
         <PolicyCard
-          title="NHS referrals"
-          note="NHS patients can choose an independent hospital for planned care, paid at NHS tariff and counted against the 18-week standard. Take them for:"
+          title="PHS referrals"
+          note="PHS patients can choose an independent hospital for planned care, paid at PHS tariff and counted against the 18-week standard. Take them for:"
         >
-          <div class="nhs-referrals">
-            {p.nhsReferrals.map((sp) => (
+          <div class="phs-referrals">
+            {p.phsReferrals.map((sp) => (
               <label key={sp.id} class="setting-choice">
                 <input
                   type="checkbox"
                   checked={sp.on}
                   onChange={(e) =>
-                    game.setNhsReferrals(sp.id, (e.currentTarget as HTMLInputElement).checked)
+                    game.setPhsReferrals(sp.id, (e.currentTarget as HTMLInputElement).checked)
                   }
                 />
                 <span>{sp.name}</span>
@@ -537,15 +537,15 @@ const RATING_LABEL = {
 };
 
 function RatingBadge({ rating }: { rating: keyof typeof RATING_LABEL }) {
-  return <span class={`cqc-badge ${rating}`}>{RATING_LABEL[rating]}</span>;
+  return <span class={`csi-badge ${rating}`}>{RATING_LABEL[rating]}</span>;
 }
 
-/** CQC ratings: the latest report by key question, with its evidence, and what's next. */
+/** CSI ratings: the latest report by key question, with its evidence, and what's next. */
 function Inspections({ data }: { data: HospitalData["inspections"] }) {
   return (
     <>
-      <div class="dept-head cqc-head">
-        <strong>Care Quality Commission rating</strong>
+      <div class="dept-head csi-head">
+        <strong>Care Standards Inspectorate rating</strong>
         {data.overall ? (
           <RatingBadge rating={data.overall} />
         ) : (
@@ -554,7 +554,7 @@ function Inspections({ data }: { data: HospitalData["inspections"] }) {
       </div>
       {data.specialMeasures && (
         <p class="warn-text small-note">
-          In special measures after an Inadequate rating: NHS oversight segment 4, with no agency
+          In special measures after an Inadequate rating: PHS oversight segment 4, with no agency
           staff and building capped, until the next inspection rates it better.
         </p>
       )}
@@ -594,7 +594,7 @@ function Inspections({ data }: { data: HospitalData["inspections"] }) {
           ))}
           <p class="dim small-note">
             Each key question is scored from the last three months' data (about two thirds) and what
-            the inspectors saw on the day. The overall rating follows CQC's rules: Inadequate with
+            the inspectors saw on the day. The overall rating follows CSI's rules: Inadequate with
             two key questions Inadequate; Requires Improvement with one Inadequate or two Requires
             Improvement; Outstanding with two Outstanding and the rest Good.
           </p>

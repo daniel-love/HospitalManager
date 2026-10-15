@@ -4,6 +4,7 @@ import { tick } from "@sim/sim";
 import { nextU32 } from "@sim/rng";
 import { createSimState, SIM_STATE_VERSION, type SimState } from "@sim/state";
 import { TICKS_PER_DAY } from "@sim/time";
+import { refer } from "@sim/systems/referrals";
 import { applyStaffCommand } from "@sim/systems/staffing";
 import { setRoomSpecialty } from "@sim/world/rooms";
 import { buildMajorsAE, MAJORS_TEAM, staffedMajorsAE } from "../fixtures/majorsAE";
@@ -640,5 +641,26 @@ describe("the hospital's name in saves", () => {
     expect(decodeSave(save).state.name).toBe("St Mary's");
     save.meta.name = "";
     expect(decodeSave(save).state.name).toBe("My hospital");
+  });
+});
+
+describe("the health service's name in saves", () => {
+  it("upgrades a version-47 save's old health service and inspectorate names", () => {
+    const state = buildSmallAE();
+    state.policies.phsReferrals.cardiology = true;
+    const { id } = refer(state, "cardiology");
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "old")));
+    save.version = 47;
+    save.state.funding = "nhs";
+    save.state.policies.nhsReferrals = save.state.policies.phsReferrals;
+    delete save.state.policies.phsReferrals;
+    save.state.cqc = save.state.csi;
+    delete save.state.csi;
+    save.state.referrals[0].payer = "nhs";
+    const migrated = decodeSave(save).state;
+    expect(migrated.funding).toBe("phs");
+    expect(migrated.policies.phsReferrals).toEqual({ cardiology: true });
+    expect(migrated.csi).toEqual(state.csi);
+    expect(migrated.referrals[id]?.payer).toBe("phs");
   });
 });

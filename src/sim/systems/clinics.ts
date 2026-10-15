@@ -5,10 +5,10 @@
  * they fall on, and which clinic room each clinic gets. (Theatre lists get
  * their theatre and anaesthetist in systems/theatres.ts.)
  *
- * Sessions are private or NHS. In a Private Hospital every session is
- * private (taking NHS-funded patients too, where it accepts them); in a
- * Hybrid trust, consultants' private sessions come on top of their NHS job
- * plan and need Private Patient Unit rooms, while NHS sessions need rooms
+ * Sessions are private or PHS. In a Private Hospital every session is
+ * private (taking PHS-funded patients too, where it accepts them); in a
+ * Hybrid trust, consultants' private sessions come on top of their PHS job
+ * plan and need Private Patient Unit rooms, while PHS sessions need rooms
  * outside it.
  */
 import { consultantsOnStrikeOn } from "./strikes";
@@ -30,7 +30,7 @@ export interface SessionSlot {
 const surgeonLists = (s: Staff, n: number) =>
   operates(s) && s.specialty !== "anaesthetics" ? n : 0;
 
-/** Weekly sessions someone has on fixed half-days, in order: NHS clinics, NHS lists, private clinics, private lists. */
+/** Weekly sessions someone has on fixed half-days, in order: PHS clinics, PHS lists, private clinics, private lists. */
 function sessionKinds(s: Staff): { kind: "clinic" | "theatre"; private: boolean; n: number }[] {
   const clinics = runsClinics(s);
   return [
@@ -142,7 +142,7 @@ function findSessions(state: SimState, day: number, weekday: number, half: Sessi
     if (slot) sessions.push({ day, half, staff: s, private: slot.private, roomId: null });
   }
   const free = state.rooms.filter((r) => r.valid && r.typeId === "outpatient_clinic");
-  // In a Hybrid trust, private clinics are held in the Private Patient Unit and NHS ones outside it.
+  // In a Hybrid trust, private clinics are held in the Private Patient Unit and PHS ones outside it.
   const fits = (session: Session, r: (typeof free)[number]) =>
     state.funding !== "hybrid" || r.private === session.private;
   const take = (session: Session, test: (r: (typeof free)[number]) => boolean) => {

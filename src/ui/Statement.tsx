@@ -12,7 +12,7 @@ export const INCOME_LINES: { key: keyof Ledger; kind: string; label: string; tit
   {
     key: "block",
     kind: "block",
-    label: "NHS block contract",
+    label: "PHS block contract",
     title:
       "A fixed share of the expected value of the emergency care you're equipped to provide for your catchment, paid daily at midnight",
   },

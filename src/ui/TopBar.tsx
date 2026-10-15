@@ -44,7 +44,7 @@ function censusTitle(c: Census): string {
 }
 
 export function TopBar({ game }: { game: Game }) {
-  const { name, clock, speed, money, census, fourHour, events, cqc } = hud.value;
+  const { name, clock, speed, money, census, fourHour, events, csi } = hud.value;
   useEffect(() => {
     document.title = name ? `${name} · Hospital Manager` : "Hospital Manager";
   }, [name]);
@@ -102,17 +102,17 @@ export function TopBar({ game }: { game: Game }) {
       >
         4-hr {fourHour === null ? "—" : `${Math.round(fourHour * 100)}%`}
       </span>
-      {(cqc.label || cqc.underWay) && (
+      {(csi.label || csi.underWay) && (
         <button
-          class="cqc-chip"
-          title="Care Quality Commission rating: click for the report"
+          class="csi-chip"
+          title="Care Standards Inspectorate rating: click for the report"
           onMouseDown={noFocus}
           onClick={() => game.openHospital("inspections")}
         >
-          {cqc.underWay ? (
-            <span class="event-chip">CQC inspecting</span>
+          {csi.underWay ? (
+            <span class="event-chip">CSI inspecting</span>
           ) : (
-            <span class={`cqc-badge ${cqc.rating}`}>CQC {cqc.label}</span>
+            <span class={`csi-badge ${csi.rating}`}>CSI {csi.label}</span>
           )}
         </button>
       )}

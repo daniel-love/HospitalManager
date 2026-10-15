@@ -13,7 +13,7 @@
  * Every A&E walk-in books in at reception and is triaged by a nurse first;
  * `pathway` lists what happens after triage. A patient who needs admitting
  * is then referred to the condition's `specialty`, whose team reviews them
- * in A&E and decides to admit (systems/admissions.ts). Tariffs are rough NHS prices
+ * in A&E and decides to admit (systems/admissions.ts). Tariffs are rough UK prices
  * for a Type 1 A&E attendance at that level of investigation and treatment.
  */
 import { CT_MINS, XRAY_MINS } from "./diagnostics";
@@ -38,7 +38,7 @@ function scan(imaging: "xray" | "ct", name: string, chance = 1): ConditionInput[
 }
 
 // Minor injuries can be seen and treated start to finish by an Emergency
-// Nurse Practitioner instead of a doctor (the NHS "see and treat" model).
+// Nurse Practitioner instead of a doctor (the UK "see and treat" model).
 // Roles are listed in order of preference: injuries go to a nurse
 // practitioner first, keeping doctors free for illnesses, while nursing steps
 // go to staff nurses first, keeping nurse practitioners free to assess.
@@ -129,7 +129,7 @@ export const conditions: ConditionInput[] = [
     admission: { chance: 0.05, stayHours: [12, 24], tariff: 1100 },
     pathway: [
       { name: "Injury assessment", roles: [...INJURY_ASSESSOR], room: MINORS, mins: [20, 30] },
-      // NICE: a CT head within an hour for those with risk factors.
+      // NCG: a CT head within an hour for those with risk factors.
       scan("ct", "CT head", 0.25),
       {
         name: "Neurological observations",
@@ -141,7 +141,7 @@ export const conditions: ConditionInput[] = [
       },
     ],
     description:
-      "A knock to the head. Assessed against NICE head injury rules: about a quarter need a CT head within an hour.",
+      "A knock to the head. Assessed against NCG head injury rules: about a quarter need a CT head within an hour.",
   },
   {
     id: "abdominal_pain",
@@ -299,7 +299,7 @@ export const conditions: ConditionInput[] = [
         retriageTo: 3,
         sample: true,
       },
-      // Looking for a chest source (NICE NG51).
+      // Looking for a chest source (UK sepsis guidance).
       scan("xray", "Chest X-ray", 0.6),
       {
         name: "Doctor review with results",
@@ -326,7 +326,7 @@ export const conditions: ConditionInput[] = [
       stayHours: [72, 192],
       tariff: 3400,
       endOfLife: 0.05,
-      // A broken hip: NICE says operate on the day of admission or the next (36 hours).
+      // A broken hip: NCG says operate on the day of admission or the next (36 hours).
       operation: {
         chance: 0.3,
         specialty: "trauma_orthopaedics",
@@ -344,7 +344,7 @@ export const conditions: ConditionInput[] = [
         mins: [25, 40],
         stabilises: true,
       },
-      // NICE: a CT head for anyone on blood thinners who hits their head.
+      // NCG: a CT head for anyone on blood thinners who hits their head.
       scan("ct", "CT head", 0.3),
       {
         name: "Bloods, pressure care and mobility check",
@@ -385,7 +385,7 @@ export const conditions: ConditionInput[] = [
         stabilises: true,
         retriageTo: 3, // Stable; watched in Majors.
       },
-      // NICE: watch for a second reaction before going home. They move to
+      // NCG: watch for a second reaction before going home. They move to
       // Majors once a bay is free, freeing Resus.
       {
         name: "Observation after anaphylaxis",

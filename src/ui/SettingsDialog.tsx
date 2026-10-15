@@ -77,7 +77,7 @@ function SettingsBody({ game }: { game: Game }) {
           ))}
           <p class="dim">
             {game.state.funding === "private"
-              ? "A private hospital has no A&E: the catchment sets how many people might come for private care, and NHS patients who choose you."
+              ? "A private hospital has no A&E: the catchment sets how many people might come for private care, and PHS patients who choose you."
               : `With what you've built, about ${walkIns} walk-ins and ${ambulances} ambulances a day come here.`}
           </p>
         </fieldset>
@@ -247,7 +247,7 @@ function RecruitmentSetting({ game }: { game: Game }) {
       <legend>Recruitment</legend>
       <p class="dim">
         Hiring from applicants, who come in over time: more of them, and more skilled, with a good
-        reputation and CQC rating. Hard-to-fill posts such as consultants come slowly. Saved with
+        reputation and CSI rating. Hard-to-fill posts such as consultants come slowly. Saved with
         this game.
       </p>
       <label class="setting-choice">

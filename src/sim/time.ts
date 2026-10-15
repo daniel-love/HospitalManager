@@ -53,7 +53,7 @@ export function tickAt(day: number, hour: number, minute = 0): number {
 }
 
 /**
- * The calendar: day 1 is Monday 1 April, the first day of the NHS financial
+ * The calendar: day 1 is Monday 1 April, the first day of the PHS financial
  * year (year 1). Months run April to March; no leap years.
  */
 export const MONTHS = [

@@ -196,7 +196,7 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
 
 /**
  * Clinic sessions a week in a new consultant's or registrar's job plan: a
- * typical NHS consultant runs about three clinics a week, a registrar two.
+ * typical UK consultant runs about three clinics a week, a registrar two.
  */
 const DEFAULT_CLINIC_SESSIONS: Partial<Record<StaffRoleId, number>> = {
   consultant: 3,
@@ -206,7 +206,7 @@ const DEFAULT_CLINIC_SESSIONS: Partial<Record<StaffRoleId, number>> = {
 /** Half-day sessions in a working week: Monday to Friday, mornings and afternoons. */
 export const MAX_WEEK_SESSIONS = 10;
 
-/** NHS clinic sessions and theatre lists in someone's job plan. */
+/** PHS clinic sessions and theatre lists in someone's job plan. */
 function fixedSessionsOf(s: Staff): number {
   return (runsClinics(s) ? s.clinicSessions : 0) + (operates(s) ? s.theatreSessions : 0);
 }
@@ -220,12 +220,12 @@ function cantHire(
     return "Only consultants have practising privileges";
   }
   if (cmd.privileges && cmd.onCall) return "Practising privileges aren't an on-call contract";
-  if (state.funding === "nhs" && cmd.privileges) {
-    return "An NHS trust employs its consultants (practising privileges are for private care)";
+  if (state.funding === "phs" && cmd.privileges) {
+    return "A PHS trust employs its consultants (practising privileges are for private care)";
   }
   if (state.funding === "private") {
     if (cmd.role === "registrar") {
-      return "Specialty registrars are NHS training posts: a private hospital's resident doctors (junior doctors) cover its wards";
+      return "Specialty registrars are PHS training posts: a private hospital's resident doctors (junior doctors) cover its wards";
     }
     if (cmd.role === "consultant" && !cmd.privileges) {
       return "A private hospital's consultants work with practising privileges rather than as employees";

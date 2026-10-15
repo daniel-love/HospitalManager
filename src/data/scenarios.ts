@@ -4,7 +4,7 @@
  * rooms or equipment until something's achieved. systems/scenarios.ts runs
  * them. Days are game days (1 = Monday 1 April, Year 1).
  */
-import type { CqcRating } from "./cqc";
+import type { CsiRating } from "./csi";
 import type { EventFrequency, PressureEventId } from "./pressure";
 
 export type ScenarioId = "tutorial" | "ae_before_winter" | "major_incident" | "private_that_pays";
@@ -76,8 +76,8 @@ export interface LockDef {
   items: string[];
   /** Why, and how to unlock, for the build menu. */
   reason: string;
-  /** Unlocked when an objective is met, or with a CQC rating at least this good. */
-  unlock: { objective: string } | { cqcAtLeast: CqcRating };
+  /** Unlocked when an objective is met, or with a CSI rating at least this good. */
+  unlock: { objective: string } | { csiAtLeast: CsiRating };
 }
 
 export interface ScenarioDef {
@@ -87,7 +87,7 @@ export interface ScenarioDef {
   summary: string;
   /** The briefing, a paragraph each. */
   briefing: string[];
-  funding: "nhs" | "private" | "hybrid";
+  funding: "phs" | "private" | "hybrid";
   money: number;
   catchment: number;
   /** The day it begins. */
@@ -140,7 +140,7 @@ export const SCENARIOS: ScenarioDef[] = [
       "Each step is in the card at the top left, and the button you need lights up. Take your time: the game is paused until you press play, and nothing goes wrong while you build.",
       "Move the map by dragging with the right mouse button (or the arrow keys) and zoom with the scroll wheel. Hover over anything in the build menus to learn what it's for.",
     ],
-    funding: "nhs",
+    funding: "phs",
     money: 1_500_000,
     catchment: 40_000,
     startDay: 1,
@@ -229,7 +229,7 @@ export const SCENARIOS: ScenarioDef[] = [
       "Open it by 1 October: Minors, Majors, Resus and an Ambulance Bay, with at least 100 patients through it in a week. The CT Room is held back until then.",
       "Then get through winter. From 1 December to the end of February, at least 78% of patients must leave A&E within 4 hours. Flu is expected from December, social care will struggle over Christmas, and the Health Secretary plans a visit in January.",
     ],
-    funding: "nhs",
+    funding: "phs",
     money: 3_500_000,
     catchment: 80_000,
     startDay: D.aug1,
@@ -279,7 +279,7 @@ export const SCENARIOS: ScenarioDef[] = [
       "Intelligence suggests trouble: be ready for a major incident during the strike. When it comes, decide whether to declare one (Hospital → Events).",
       "To win: no critically or seriously injured casualty dies, every critically injured one is on their way to the major trauma centre within 4 hours of arriving, and A&E gets back to 60% within 4 hours over the following week. Resus space, CT and porters will matter: you have a week to prepare.",
     ],
-    funding: "nhs",
+    funding: "phs",
     money: 1_500_000,
     catchment: 40_000,
     startDay: 1,
@@ -323,7 +323,7 @@ export const SCENARIOS: ScenarioDef[] = [
     briefing: [
       "A healthcare group has bought a site and given you £3.5M to build a private hospital: clinics, day surgery and operations, no A&E. Consultants work under practising privileges, bringing their own patients.",
       "Within 18 months, by the end of September next year, file a month with a surplus of £75,000 or more, and build a reputation of 75.",
-      "The CT Room is held back until a CQC inspection rates you Good. Go into administration and it's over.",
+      "The CT Room is held back until a CSI inspection rates you Good. Go into administration and it's over.",
     ],
     funding: "private",
     money: 3_500_000,
@@ -352,8 +352,8 @@ export const SCENARIOS: ScenarioDef[] = [
       {
         id: "ct",
         items: ["ct_room", "ct_scanner"],
-        reason: "Investors fund a CT scanner once CQC rates you Good",
-        unlock: { cqcAtLeast: "good" },
+        reason: "Investors fund a CT scanner once CSI rates you Good",
+        unlock: { csiAtLeast: "good" },
       },
     ],
     endDay: 549,
@@ -364,8 +364,8 @@ export const scenarioById = new Map(SCENARIOS.map((s) => [s.id, s]));
 
 /** Ways a sandbox game (with fail states on) or a scenario can be lost. */
 export const FAIL = {
-  /** An NHS trust this many days in oversight segment 4 (financial special measures). */
+  /** A PHS trust this many days in oversight segment 4 (financial special measures). */
   segment4Days: 90,
-  /** Two Inadequate CQC ratings in a row. */
+  /** Two Inadequate CSI ratings in a row. */
   inadequateInARow: 2,
 };

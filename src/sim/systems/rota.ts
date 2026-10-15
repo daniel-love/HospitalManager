@@ -1,5 +1,5 @@
 /**
- * Shifts and rotas (GAME_DESIGN §6.3). Most staff work NHS long days
+ * Shifts and rotas (GAME_DESIGN §6.3). Most staff work UK hospital long days
  * (07:30–20:00) and nights (19:30–08:00), three a week. The player sets
  * cover levels, how many of each rota group they want on each day and night
  * shift, and everyone hired is rostered onto a weekly rota that meets them as

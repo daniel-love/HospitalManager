@@ -17,7 +17,7 @@ const FOUR_HOUR_INTERIM = 0.78;
 /** Ambulance handover and arrival-to-triage targets, in minutes. */
 const HANDOVER_TARGET = 15;
 const TRIAGE_TARGET = 15;
-/** NHS standard: 92% of patients waiting under 18 weeks from referral. */
+/** PHS standard: 92% of patients waiting under 18 weeks from referral. */
 const RTT_TARGET = 0.92;
 const TREND_DAYS = 14;
 const TABLE_DAYS = 14;
@@ -93,7 +93,7 @@ export function ReportsPanel({ onShow }: { onShow: (at: { x: number; y: number }
         {data.waitingLists.length > 0 && (
           <>
             <h3>Waiting lists</h3>
-            <WaitingLists lists={data.waitingLists} showPrivate={data.funding !== "nhs"} />
+            <WaitingLists lists={data.waitingLists} showPrivate={data.funding !== "phs"} />
           </>
         )}
 
@@ -179,12 +179,12 @@ function Headlines({ data }: { data: ReportData }) {
         value={String(Math.round(data.reputation))}
         status={data.reputation >= 70 ? "ok" : data.reputation >= 45 ? "warn" : "bad"}
         note={
-          data.funding === "nhs"
+          data.funding === "phs"
             ? "of 100"
             : `of 100 · private demand ×${data.reputationFactor.toFixed(2)}`
         }
       />
-      {data.funding !== "nhs" && (
+      {data.funding !== "phs" && (
         <Tile
           label="Private care"
           title="Private patients today: referrals, appointments and operations"
@@ -231,7 +231,7 @@ function RttTile({ lists }: { lists: ReportData["waitingLists"] }) {
   return (
     <Tile
       label="18 weeks (RTT)"
-      title="Share of patients on an outpatient or surgical waiting list who have waited under 18 weeks since their GP referred them. NHS standard 92%."
+      title="Share of patients on an outpatient or surgical waiting list who have waited under 18 weeks since their GP referred them. PHS standard 92%."
       value={s === null ? "—" : `${Math.round(s * 100)}%`}
       status={status}
       note={
@@ -271,7 +271,7 @@ function WaitingLists({
           )}
           <th
             class="num"
-            title="NHS patients waiting under 18 weeks since referral (NHS standard 92%)"
+            title="PHS patients waiting under 18 weeks since referral (PHS standard 92%)"
           >
             Under 18 wk
           </th>
@@ -532,7 +532,7 @@ function FlowSections({ stats: s, ae }: { stats: FlowStats; ae: boolean }) {
                 />
                 <Row
                   label="CT within an hour of request"
-                  title="NICE: a CT head within an hour for head injuries that need one"
+                  title="NCG: a CT head within an hour for head injuries that need one"
                   value={`${Math.round((100 * s.ctWithinTarget) / s.ctScans)}%`}
                   bad={s.ctWithinTarget < s.ctScans}
                 />
@@ -564,7 +564,7 @@ function FlowSections({ stats: s, ae }: { stats: FlowStats; ae: boolean }) {
               />
               <Row
                 label="Did not attend"
-                title="Booked patients who didn't come (NHS about 7%)"
+                title="Booked patients who didn't come (PHS about 7%)"
                 value={s.dnas}
               />
               {s.clinicCancellations > 0 && (
@@ -620,7 +620,7 @@ function FlowSections({ stats: s, ae }: { stats: FlowStats; ae: boolean }) {
               {s.emergencyOps > 0 && (
                 <Row
                   label="Emergencies on time"
-                  title="Started within their target: 24 hours for appendicitis, 36 for a broken hip (NICE), 48 for an ankle fracture"
+                  title="Started within their target: 24 hours for appendicitis, 36 for a broken hip (NCG), 48 for an ankle fracture"
                   value={pct(s.emergencyOnTime, s.emergencyOps)}
                   bad={s.emergencyOnTime < s.emergencyOps}
                 />

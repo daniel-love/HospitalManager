@@ -6,7 +6,7 @@
 import { useState } from "preact/hooks";
 import { scenarioById } from "@data/scenarios";
 import type { Game } from "@game/game";
-import { goals, newGameOpen, scenarioBriefing } from "./store";
+import { goals, inspector, newGameOpen, scenarioBriefing } from "./store";
 
 const MARK = { met: "✓", failed: "✗", pending: "○" } as const;
 
@@ -16,10 +16,13 @@ export function ScenarioPanel({ game }: { game: Game }) {
   if (!g) return null;
   const def = game.state.goals.scenario ? scenarioById.get(game.state.goals.scenario) : undefined;
   const t = g.tutorial;
+  // The card sits top right, clear of the build palette and the middle of
+  // the map; the inspector opens in the same corner, so step left of it.
+  const aside = inspector.value ? " beside-inspector" : "";
   return (
     <>
       {t ? (
-        <div class="panel scenario-card tutorial-card">
+        <div class={`panel scenario-card tutorial-card${aside}`}>
           <span class="dim small-note">
             Step {t.step} of {t.of}
           </span>
@@ -38,7 +41,7 @@ export function ScenarioPanel({ game }: { game: Game }) {
         </div>
       ) : (
         <button
-          class="panel scenario-card"
+          class={`panel scenario-card${aside}`}
           title="Show the briefing"
           onClick={() => (scenarioBriefing.value = true)}
         >

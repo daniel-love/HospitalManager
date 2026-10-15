@@ -1,16 +1,16 @@
 /**
- * CQC inspections and ratings (GAME_DESIGN §10), and VIP visits.
+ * CSI inspections and ratings (GAME_DESIGN §10), and VIP visits.
  *
  * Inspections are unannounced. The first comes in the hospital's first few
- * months; after that, sooner the worse it's rated (CQC.nextAfterDays), and
+ * months; after that, sooner the worse it's rated (CSI.nextAfterDays), and
  * early if concerns pile up (unexpected deaths, complaints, incidents). On
  * the day, a team walks round from 09:00 to 17:00, seeing patient areas and
  * noting what's good and what isn't: cleanliness, broken kit, crowding and
- * corridor care, patients' mood, isolation, the heat. Each of CQC's five key
+ * corridor care, patients' mood, isolation, the heat. Each of CSI's five key
  * questions gets a score from the last three months' data blended with what
- * they saw, and a rating; the overall rating follows CQC's aggregation
+ * they saw, and a rating; the overall rating follows CSI's aggregation
  * rules. The report is published a week later: reputation moves, and an
- * Inadequate overall rating puts an NHS trust in special measures (NHS
+ * Inadequate overall rating puts a PHS trust in special measures (PHS
  * oversight segment 4: no agency staff, building capped) until it's
  * re-rated better.
  *
@@ -19,20 +19,20 @@
  */
 import { roomById } from "@data/catalogue";
 import {
-  CQC,
+  CSI,
   KEY_QUESTIONS,
   RATINGS,
   RATING_NAMES,
   VIP,
-  type CqcRating,
+  type CsiRating,
   type KeyQuestion,
-} from "@data/cqc";
+} from "@data/csi";
 import { pressureEventById } from "@data/pressure";
 import { addInto, emptyStats, type FlowStats, type TourAgent } from "../agents";
 import { emit } from "../events";
 import { fallbackEntrance, siteEntrance } from "../places";
 import { nextFloat, nextInt, pick } from "../rng";
-import type { CqcFinding, CqcReport, Room, SimState } from "../state";
+import type { CsiFinding, CsiReport, Room, SimState } from "../state";
 import { clockFromTick, formatDate, TICKS_PER_DAY, TICKS_PER_MINUTE, tickAt } from "../time";
 import { isStandable } from "../world/objects";
 import { roomAt } from "../world/rooms";
@@ -90,7 +90,7 @@ function standIn(state: SimState, room: Room): { x: number; y: number } | null {
 // ---------- What they see ----------
 
 /** What an inspector or VIP notices in a room. */
-function observe(state: SimState, room: Room, found: CqcFinding[]): void {
+function observe(state: SimState, room: Room, found: CsiFinding[]): void {
   const name = roomName(room);
   // "an Outpatient Clinic Room", "an X-ray Room", "a Ward".
   const a = /^([AEIOU]|X-ray)/.test(name) ? "an" : "a";
@@ -148,7 +148,7 @@ function observe(state: SimState, room: Room, found: CqcFinding[]): void {
 }
 
 /** What they notice about the hospital as a whole, on arrival. */
-function observeHospital(state: SimState, found: CqcFinding[]): void {
+function observeHospital(state: SimState, found: CsiFinding[]): void {
   const add = (question: KeyQuestion, good: boolean, text: string) =>
     found.push({ question, good, text });
   if (patientsInEscalation(state) > 0) {
@@ -353,7 +353,7 @@ function measures(state: SimState): Record<KeyQuestion, Measure[]> {
     let waiting = 0;
     let within = 0;
     for (const r of Object.values(state.referrals)) {
-      if (r.clockStart === null || r.payer !== "nhs") continue;
+      if (r.clockStart === null || r.payer !== "phs") continue;
       waiting++;
       if (state.tick - r.clockStart < 126 * TICKS_PER_DAY) within++;
     }
@@ -367,7 +367,7 @@ function measures(state: SimState): Record<KeyQuestion, Measure[]> {
     state.funding === "private" ? null : state.rating.segment,
     4,
     1,
-    (v) => `NHS oversight segment ${v}`,
+    (v) => `PHS oversight segment ${v}`,
   );
   const own = Object.values(state.staff).filter(
     (st) => st.contract !== "bank" && st.contract !== "agency" && st.contract !== "privileges",
@@ -391,8 +391,8 @@ function measures(state: SimState): Record<KeyQuestion, Measure[]> {
   return out;
 }
 
-function ratingFor(score: number): CqcRating {
-  const t = CQC.thresholds;
+function ratingFor(score: number): CsiRating {
+  const t = CSI.thresholds;
   return score >= t.outstanding
     ? "outstanding"
     : score >= t.good
@@ -403,13 +403,13 @@ function ratingFor(score: number): CqcRating {
 }
 
 /**
- * CQC's aggregation: Inadequate overall with two or more Inadequate key
+ * CSI's aggregation: Inadequate overall with two or more Inadequate key
  * questions; Requires Improvement with one Inadequate or two or more
  * Requires Improvement; Outstanding with two or more Outstanding and the
  * rest Good; otherwise Good.
  */
-export function aggregate(ratings: CqcRating[]): CqcRating {
-  const count = (r: CqcRating) => ratings.filter((x) => x === r).length;
+export function aggregate(ratings: CsiRating[]): CsiRating {
+  const count = (r: CsiRating) => ratings.filter((x) => x === r).length;
   if (count("inadequate") >= 2) return "inadequate";
   if (count("inadequate") === 1 || count("requires_improvement") >= 2)
     return "requires_improvement";
@@ -418,9 +418,9 @@ export function aggregate(ratings: CqcRating[]): CqcRating {
 }
 
 /** Scores and rates the five key questions from the data and what they saw. */
-export function assess(state: SimState, found: CqcFinding[], visited: number): CqcReport {
+export function assess(state: SimState, found: CsiFinding[], visited: number): CsiReport {
   const data = measures(state);
-  const questions = {} as CqcReport["questions"];
+  const questions = {} as CsiReport["questions"];
   for (const q of KEY_QUESTIONS) {
     const ms = data[q];
     const dataScore = ms.length === 0 ? 60 : ms.reduce((n, x) => n + x.score, 0) / ms.length;
@@ -432,7 +432,7 @@ export function assess(state: SimState, found: CqcFinding[], visited: number): C
         75 - 10 * seen.filter((f) => !f.good).length + 5 * seen.filter((f) => f.good).length,
       ),
     );
-    const score = Math.round(CQC.dataWeight * dataScore + (1 - CQC.dataWeight) * seenScore);
+    const score = Math.round(CSI.dataWeight * dataScore + (1 - CSI.dataWeight) * seenScore);
     const sorted = [...ms].sort((a, b) => a.score - b.score);
     const evidence = [
       ...sorted
@@ -450,7 +450,7 @@ export function assess(state: SimState, found: CqcFinding[], visited: number): C
   const overall = aggregate(KEY_QUESTIONS.map((q) => questions[q].rating));
   return {
     visited,
-    published: visited + CQC.reportDays * TICKS_PER_DAY,
+    published: visited + CSI.reportDays * TICKS_PER_DAY,
     overall,
     questions,
     findings: found,
@@ -463,7 +463,7 @@ export function assess(state: SimState, found: CqcFinding[], visited: number): C
 function nextWeekdayMorning(from: number): number {
   let day = clockFromTick(from).day;
   for (;;) {
-    const at = tickAt(day, CQC.fromHour);
+    const at = tickAt(day, CSI.fromHour);
     if (at >= from && (day - 1) % 7 < 5) return at;
     day++;
   }
@@ -487,7 +487,7 @@ function startTour(
         : keys.slice(0, each);
     const a: TourAgent = {
       id: state.nextAgentId++,
-      name: kind === "inspector" ? "CQC inspector" : "VIP visitor",
+      name: kind === "inspector" ? "CSI inspector" : "VIP visitor",
       x: at.x,
       y: at.y,
       prevX: at.x,
@@ -518,13 +518,13 @@ function startInspection(state: SimState): void {
     state,
     state.rooms.filter((r) => PATIENT_AREAS.has(r.typeId)),
   );
-  const findings: CqcFinding[] = [];
+  const findings: CsiFinding[] = [];
   observeHospital(state, findings);
-  state.cqc.visit = { started: state.tick, findings };
-  startTour(state, "inspector", rooms, CQC.team, CQC.roomsEach);
+  state.csi.visit = { started: state.tick, findings };
+  startTour(state, "inspector", rooms, CSI.team, CSI.roomsEach);
   emit(
     state,
-    "CQC inspectors have arrived, unannounced. They'll spend the day walking round patient areas and looking at your data (Hospital → Inspections).",
+    "CSI inspectors have arrived, unannounced. They'll spend the day walking round patient areas and looking at your data (Hospital → Inspections).",
     "warn",
     undefined,
     undefined,
@@ -535,13 +535,13 @@ function startInspection(state: SimState): void {
 
 /** At the end of the day: they leave, and the report is written. */
 function endInspection(state: SimState): void {
-  const visit = state.cqc.visit!;
-  state.cqc.visit = null;
+  const visit = state.csi.visit!;
+  state.csi.visit = null;
   for (const a of Object.values(state.tours)) if (a.kind === "inspector") a.stage = "leaving";
-  state.cqc.pending = assess(state, visit.findings, visit.started);
+  state.csi.pending = assess(state, visit.findings, visit.started);
   emit(
     state,
-    `The CQC inspectors have left. Their report will be published on ${formatDate(clockFromTick(state.cqc.pending.published).day)}.`,
+    `The CSI inspectors have left. Their report will be published on ${formatDate(clockFromTick(state.csi.pending.published).day)}.`,
     "info",
     undefined,
     undefined,
@@ -551,17 +551,17 @@ function endInspection(state: SimState): void {
 }
 
 /** The report is out: ratings change, reputation moves, special measures start or end. */
-function publish(state: SimState, report: CqcReport): void {
-  const c = state.cqc;
+function publish(state: SimState, report: CsiReport): void {
+  const c = state.csi;
   c.pending = null;
   c.reports.push(report);
   if (c.reports.length > 10) c.reports.shift();
   c.overall = report.overall;
   c.questions = Object.fromEntries(
     KEY_QUESTIONS.map((q) => [q, report.questions[q].rating]),
-  ) as Record<KeyQuestion, CqcRating>;
-  c.next = report.published + CQC.nextAfterDays[report.overall] * TICKS_PER_DAY;
-  state.reputation = Math.max(0, Math.min(100, state.reputation + CQC.reputation[report.overall]));
+  ) as Record<KeyQuestion, CsiRating>;
+  c.next = report.published + CSI.nextAfterDays[report.overall] * TICKS_PER_DAY;
+  state.reputation = Math.max(0, Math.min(100, state.reputation + CSI.reputation[report.overall]));
   const wasIn = c.specialMeasures;
   const inadequate =
     report.overall === "inadequate" || report.questions.well_led.rating === "inadequate";
@@ -572,9 +572,9 @@ function publish(state: SimState, report: CqcReport): void {
   }
   emit(
     state,
-    `CQC report published: ${RATING_NAMES[report.overall]} overall.` +
+    `CSI report published: ${RATING_NAMES[report.overall]} overall.` +
       (c.specialMeasures && !wasIn
-        ? " The trust is placed in special measures: NHS oversight segment 4, with no agency staff and building capped, until it's re-inspected and rated better."
+        ? " The trust is placed in special measures: PHS oversight segment 4, with no agency staff and building capped, until it's re-inspected and rated better."
         : wasIn && !c.specialMeasures
           ? " The trust comes out of special measures."
           : ""),
@@ -588,12 +588,12 @@ function publish(state: SimState, report: CqcReport): void {
 
 /** Concerns pile up: inspectors come early. */
 function checkConcerns(state: SimState): void {
-  const c = state.cqc;
+  const c = state.csi;
   if (c.visit || c.pending) return;
   if (c.concernsAt !== null && state.tick - c.concernsAt < 60 * TICKS_PER_DAY) return;
   const days = state.history.slice(-30);
   const sum = (k: keyof FlowStats) => days.reduce((n, d) => n + d.stats[k], 0);
-  const t = CQC.concerns;
+  const t = CSI.concerns;
   if (
     sum("unexpectedDeaths") < t.unexpectedDeaths &&
     sum("complaints") < t.complaints &&
@@ -602,7 +602,7 @@ function checkConcerns(state: SimState): void {
     return;
   }
   const soon =
-    state.tick + nextInt(state.rng, CQC.responsiveDays[0], CQC.responsiveDays[1]) * TICKS_PER_DAY;
+    state.tick + nextInt(state.rng, CSI.responsiveDays[0], CSI.responsiveDays[1]) * TICKS_PER_DAY;
   if (soon < c.next) {
     c.next = soon;
     c.concernsAt = state.tick;
@@ -611,7 +611,7 @@ function checkConcerns(state: SimState): void {
 
 /** Each tick: inspections and VIP visits start and end, tours move, reports are published. */
 export function updateInspections(state: SimState): void {
-  const c = state.cqc;
+  const c = state.csi;
   if (c.pending && state.tick >= c.pending.published) publish(state, c.pending);
   const clock = clockFromTick(state.tick);
   // Inspections only in a game with events (not test fixtures).
@@ -627,7 +627,7 @@ export function updateInspections(state: SimState): void {
     if (clock.hour === 0 && clock.minute === 0 && state.tick % TICKS_PER_MINUTE === 0)
       checkConcerns(state);
   }
-  if (c.visit && clock.hour >= CQC.toHour) endInspection(state);
+  if (c.visit && clock.hour >= CSI.toHour) endInspection(state);
   updateVip(state);
   for (const a of Object.values(state.tours)) moveTour(state, a);
 }
@@ -659,9 +659,9 @@ function moveTour(state: SimState, a: TourAgent): void {
     return;
   }
   if (arrival !== "arrived") return;
-  const [lo, hi] = a.kind === "inspector" ? CQC.dwellMins : VIP.dwellMins;
+  const [lo, hi] = a.kind === "inspector" ? CSI.dwellMins : VIP.dwellMins;
   a.until = state.tick + nextInt(state.rng, lo, hi) * TICKS_PER_MINUTE;
-  const found = a.kind === "inspector" ? state.cqc.visit?.findings : state.cqc.vip?.findings;
+  const found = a.kind === "inspector" ? state.csi.visit?.findings : state.csi.vip?.findings;
   if (found) observe(state, room, found);
 }
 
@@ -669,7 +669,7 @@ function moveTour(state: SimState, a: TourAgent): void {
 
 /** A VIP visit starts with its event; at its end, what they saw moves reputation. */
 function updateVip(state: SimState): void {
-  const c = state.cqc;
+  const c = state.csi;
   for (const e of state.pressure.active) {
     if (!pressureEventById.get(e.defId)!.vip || c.vip || state.tick < e.start) continue;
     // One department: A&E if there is one, else the wards, else wherever patients are.

@@ -409,7 +409,7 @@ export const HEAT = {
 /**
  * Staff flu vaccination (a policy): each autumn's campaign costs this much a
  * head (vaccine, occupational health time), and cuts the extra sickness a
- * flu season brings by `protection`. NHS staff uptake is around half.
+ * flu season brings by `protection`. UK hospital staff uptake is around half.
  */
 export const FLU_VACCINATION = {
   costPerHead: 15,

@@ -11,7 +11,7 @@ export const CLINIC_SESSIONS = {
 export type SessionHalf = keyof typeof CLINIC_SESSIONS;
 
 /**
- * Most clinic sessions a week in a job plan. A full-time NHS consultant's
+ * Most clinic sessions a week in a job plan. A full-time UK consultant's
  * job plan is ten sessions, some of them ward rounds, theatre lists, on-call
  * and admin, so six clinics is a heavy outpatient week.
  */

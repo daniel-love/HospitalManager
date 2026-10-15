@@ -13,14 +13,14 @@
 export const STARTING_CASH = 3_500_000;
 
 /**
- * NHS funding (GAME_DESIGN §2.2), modelled on the NHS payment scheme's
+ * PHS funding (GAME_DESIGN §2.2), modelled on the UK payment scheme's
  * aligned payment and incentive: urgent and emergency care is mostly paid
  * by a fixed block contract, sized to the emergency care the hospital is
  * equipped to provide for its catchment, with each emergency patient
  * earning a share of the tariff on top (the marginal rate); planned care
  * (outpatients, elective operations) is paid in full per patient.
  */
-export const NHS_FUNDING = {
+export const PHS_FUNDING = {
   /** Share of the expected value of emergency care paid as the block. */
   blockShare: 0.7,
   /**
@@ -47,42 +47,42 @@ export const NHS_FUNDING = {
  * Private care (GAME_DESIGN §2.2), in a Private Hospital or a Hybrid trust's
  * Private Patient Unit. Consultants bill their own professional fees; the
  * hospital earns the facility fee (theatre, bed, nursing, tests), here a
- * multiple of the NHS tariff for the same care: insurers pay negotiated
+ * multiple of the PHS tariff for the same care: insurers pay negotiated
  * rates, self-pay patients the hospital's package prices.
  */
 export const PRIVATE = {
   /**
-   * Private demand, as shares of the NHS GP referral rate for the catchment:
+   * Private demand, as shares of the PHS GP referral rate for the catchment:
    * about one in nine people in the UK have private medical insurance, and
-   * more pay for themselves while NHS waits are long…
+   * more pay for themselves while PHS waits are long…
    */
   insuredShare: 0.12,
   selfPayShare: 0.05,
   /**
-   * …and a private hospital draws them from a much wider area than one NHS
+   * …and a private hospital draws them from a much wider area than one PHS
    * trust's catchment (several trusts' worth), so private demand is this
    * many times the local catchment's. Calibrated so private spending comes
    * to about the UK's £120 a head a year (`npm run balance`).
    */
   catchmentFactor: 6,
   /**
-   * In a Private Hospital accepting NHS referrals for a specialty: the share
-   * of the catchment's NHS GP referrals that choose it (NHS patients may
+   * In a Private Hospital accepting PHS referrals for a specialty: the share
+   * of the catchment's PHS GP referrals that choose it (PHS patients may
    * choose an independent-sector hospital for planned care), paid at tariff.
    */
-  nhsChoiceShare: 0.1,
-  /** Facility fees, as multiples of the NHS tariff: insurers' rates… */
+  phsChoiceShare: 0.1,
+  /** Facility fees, as multiples of the PHS tariff: insurers' rates… */
   insurerFactor: 1.25,
   /** …and self-pay package prices at the standard price level. */
   selfPayFactor: 1.6,
-  /** An outpatient consultation's facility fee is a share of the NHS clinic tariff (the consultant bills the rest). */
+  /** An outpatient consultation's facility fee is a share of the PHS clinic tariff (the consultant bills the rest). */
   outpatientFacilityShare: 0.4,
   /** The self-pay price level the player can set, as a multiple of the standard price. */
   priceLevels: [0.8, 1.5] as const,
   /** Self-pay demand falls with price: demand ∝ price level ^ −elasticity. */
   priceElasticity: 1.5,
   /**
-   * Hybrid trusts: an NHS foundation trust's principal purpose is the NHS,
+   * Hybrid trusts: a public foundation trust's principal purpose is public care,
    * so private income must stay under this share of all income (the 49% rule);
    * measured over the last `capDays` days. Over it, the Private Patient Unit
    * takes no new referrals.
@@ -123,19 +123,19 @@ export const REPUTATION = {
 
 /**
  * Running costs beyond pay and equipment upkeep, which make up about a
- * third of an NHS trust's spending.
+ * third of a UK trust's spending.
  */
 export const RUNNING_COSTS = {
   /**
    * Drugs and clinical supplies, as a share of each treated episode's full
-   * tariff (about a fifth of NHS acute spending).
+   * tariff (about a fifth of UK acute spending).
    */
   suppliesShare: 0.18,
   /** Outpatient appointments use far fewer. */
   outpatientSuppliesShare: 0.05,
   /**
    * Estates and utilities a year for each tile of floor built: maintenance,
-   * energy, water and business rates at about £200 per m² (NHS ERIC
+   * energy, water and business rates at about £200 per m² (UK estates
    * returns, leaving out the cleaning and portering you staff yourself),
    * with a tile about 1.33 m² (a 16 m² consulting room is 3 × 4 tiles).
    */

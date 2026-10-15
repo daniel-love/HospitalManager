@@ -243,7 +243,7 @@ export const rooms: RoomInput[] = [
     shielded: true,
     required: [{ label: "CT scanner", anyOf: ["ct_scanner"] }],
     description:
-      "CT scans, such as of the head after an injury (NICE: within an hour for those who need one). A radiographer does the scan; a radiologist reports it. Must be enclosed by lead-lined walls; best close to A&E.",
+      "CT scans, such as of the head after an injury (NCG: within an hour for those who need one). A radiographer does the scan; a radiologist reports it. Must be enclosed by lead-lined walls; best close to A&E.",
   },
   {
     id: "lab",
@@ -337,7 +337,7 @@ export const rooms: RoomInput[] = [
     name: "Outpatient Clinic Room",
     department: "Outpatients",
     colour: 0x8fcfb8,
-    // A consulting and examination room is about 16 m² (NHS HBN 00-03).
+    // A consulting and examination room is about 16 m² (UK health building guidance).
     minSize: [3, 4],
     enclosed: true,
     specialty: true,
@@ -355,7 +355,7 @@ export const rooms: RoomInput[] = [
     name: "Operating Theatre",
     department: "Theatres",
     colour: 0x7cc3d6,
-    // An NHS operating theatre is about 55 m² (HBN 26).
+    // A UK operating theatre is about 55 m².
     minSize: [6, 6],
     enclosed: true,
     specialty: true,

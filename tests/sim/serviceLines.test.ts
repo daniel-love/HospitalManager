@@ -36,8 +36,8 @@ describe("service lines", () => {
 
   it("splits a planned inpatient's tariff between Theatres and Wards", () => {
     const state = createSimState({ seed: 1 });
-    earnPlanned(state, 1000, "nhs", false);
-    earnPlanned(state, 500, "nhs", true);
+    earnPlanned(state, 1000, "phs", false);
+    earnPlanned(state, 500, "phs", true);
     const s = state.today.services;
     expect(s.wards.elective).toBeCloseTo(1000 * SERVICE_SPLIT.plannedStayShare);
     expect(s.theatres.elective).toBeCloseTo(500 + 1000 * (1 - SERVICE_SPLIT.plannedStayShare));

@@ -5,7 +5,7 @@
  * flow are filed as a daily report (the P&L).
  */
 import { equipmentById, staffRoleById } from "@data/catalogue";
-import { DAYS_PER_MONTH, NHS_FUNDING, PRIVATE, RUNNING_COSTS } from "@data/economy";
+import { DAYS_PER_MONTH, PHS_FUNDING, PRIVATE, RUNNING_COSTS } from "@data/economy";
 import { MAJOR_INCIDENT } from "@data/pressure";
 import { AGENCY, BANK, NURSE_BANDS, ON_CALL, UNSOCIAL } from "@data/staff";
 import { RTT_TARGET_DAYS } from "@data/outpatients";
@@ -64,8 +64,8 @@ export const HISTORY_DAYS = 60;
  * or operation): paid at the marginal rate on top of the block contract.
  */
 export function earnEmergency(state: SimState, tariff: number, where: Where): void {
-  book(state, "tariff", tariff * (1 - NHS_FUNDING.blockShare), where);
-  state.money += tariff * (1 - NHS_FUNDING.blockShare);
+  book(state, "tariff", tariff * (1 - PHS_FUNDING.blockShare), where);
+  state.money += tariff * (1 - PHS_FUNDING.blockShare);
   useSupplies(state, tariff * RUNNING_COSTS.suppliesShare, where);
 }
 
@@ -78,24 +78,24 @@ export function earnElective(state: SimState, tariff: number, where: Where): voi
 
 /**
  * A private patient's facility fee (the consultant bills their own fee):
- * a multiple of the NHS tariff for the same care, at insurers' rates or the
- * hospital's self-pay prices. Supplies are as for the NHS care.
+ * a multiple of the PHS tariff for the same care, at insurers' rates or the
+ * hospital's self-pay prices. Supplies are as for the PHS care.
  */
 export function earnPrivate(
   state: SimState,
-  nhsTariff: number,
-  payer: Exclude<Payer, "nhs">,
+  phsTariff: number,
+  payer: Exclude<Payer, "phs">,
   where: Where,
   outpatient = false,
 ): void {
   const factor =
     payer === "insured" ? PRIVATE.insurerFactor : PRIVATE.selfPayFactor * state.policies.priceLevel;
-  const fee = nhsTariff * factor * (outpatient ? PRIVATE.outpatientFacilityShare : 1);
+  const fee = phsTariff * factor * (outpatient ? PRIVATE.outpatientFacilityShare : 1);
   state.money += fee;
   book(state, "private", fee, where);
   useSupplies(
     state,
-    nhsTariff * (outpatient ? RUNNING_COSTS.outpatientSuppliesShare : RUNNING_COSTS.suppliesShare),
+    phsTariff * (outpatient ? RUNNING_COSTS.outpatientSuppliesShare : RUNNING_COSTS.suppliesShare),
     where,
   );
 }
@@ -108,13 +108,13 @@ export function earnOutpatient(state: SimState, tariff: number): void {
 }
 
 /**
- * A planned operation's income: tariff for the NHS, a facility fee for a
+ * A planned operation's income: tariff for the PHS, a facility fee for a
  * private patient. A day case's is all Theatres'; an inpatient's is shared
  * with Wards for their stay.
  */
 export function earnPlanned(state: SimState, tariff: number, payer: Payer, dayCase: boolean): void {
   const where = plannedWhere(dayCase);
-  if (payer === "nhs") earnElective(state, tariff, where);
+  if (payer === "phs") earnElective(state, tariff, where);
   else earnPrivate(state, tariff, payer, where);
 }
 
@@ -280,7 +280,7 @@ function closeDay(state: SimState): void {
   if (overPrivateCap(state)) {
     emit(
       state,
-      `Private income is over ${Math.round(PRIVATE.incomeCap * 100)}% of all income: the regulator won't let an NHS trust's private work outgrow its NHS work, so the Private Patient Unit takes no new referrals until it's back under`,
+      `Private income is over ${Math.round(PRIVATE.incomeCap * 100)}% of all income: the regulator won't let a PHS trust's private work outgrow its PHS work, so the Private Patient Unit takes no new referrals until it's back under`,
       "warn",
     );
   }
@@ -326,7 +326,7 @@ export function monthEnd(state: SimState): MonthEnd {
   let rttWaiting = 0;
   let rttWithin18w = 0;
   for (const r of Object.values(state.referrals)) {
-    if (r.clockStart === null || r.payer !== "nhs") continue;
+    if (r.clockStart === null || r.payer !== "phs") continue;
     rttWaiting++;
     if (state.tick - r.clockStart < RTT_TARGET_DAYS * TICKS_PER_DAY) rttWithin18w++;
   }
