@@ -30,6 +30,7 @@ import { tileIndex, type FloorGrid } from "../world/grid";
 import { isStandable, objectRect } from "../world/objects";
 import { roomOfObject } from "../world/rooms";
 import { isBedPassable, isWalkable } from "../world/pathfinding";
+import { walkRouteExists } from "../world/walkRegions";
 import { earnEmergency } from "./finance";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo } from "./movement";
@@ -290,7 +291,10 @@ export function claimWardBed(state: SimState, job: Job): Point | null {
   if (jobsForPatient(state, p.id).some((j) => j.state === "working")) return null;
   const from = tileOf(p);
   const wheeled = onTrolley(state, p);
-  const reachable = (b: PlacedObject) => !wheeled || trolleyStop(state, from, b) !== null;
+  const reachable = (b: PlacedObject) =>
+    wheeled
+      ? trolleyStop(state, from, b) !== null
+      : walkRouteExists(state, from, bedside(state, b));
   const isPrivate = !!p.elective && p.elective.payer !== "nhs";
   // At the end of life, a side room for privacy if one's free.
   const bed =
@@ -375,6 +379,19 @@ export function runTransfer(state: SimState, job: Job, porter: Staff, p: Patient
       tileOf(p),
     );
     arrival = headTo(state, p, restPoint(wardBed), bedside(state, wardBed));
+  }
+  if (arrival === "no_route" && !walkRouteExists(state, tileOf(p), bedside(state, wardBed))) {
+    // Walled off from the bed altogether (rebuilt mid-way): find another.
+    release(state, wardBed.id, 0, p.id);
+    p.bed = null;
+    p.path = [];
+    p.dest = null;
+    porter.jobId = null;
+    job.staffId = null;
+    job.state = "open";
+    job.objectId = null;
+    p.stage = "awaiting_bed";
+    return;
   }
   // The porter pushes the bed.
   porter.prevX = porter.x;

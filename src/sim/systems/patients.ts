@@ -78,7 +78,7 @@ import {
 import { type Arrival, headTo, stop } from "./movement";
 import { leaveScanner } from "./diagnostics";
 import { isEscorted } from "./escorts";
-import { trolleyStop } from "./admissions";
+import { bedRouteExists, trolleyStop } from "./admissions";
 import { withAmbulanceCrew } from "./ambulances";
 import { hasTeam } from "./staffing";
 import { onEscalationBed } from "./escalation";
@@ -334,7 +334,10 @@ function wheelInFromAmbulance(state: SimState, p: Patient, bed: PlacedObject): A
     planned.blocked < 0 &&
     (planned.ax !== side.x || planned.ay !== side.y);
   const grid = state.floors[0]!;
+  // Ruling out stops with no stretcher-width way to them at all first saves
+  // searching the whole site for each.
   const crewRoute = (at: Point) =>
+    bedRouteExists(state, from, at) &&
     findPath(grid, from.x, from.y, at.x, at.y, { bed: true, patient: crewAccess(state) }) !== null;
   const at = onTheWay
     ? { x: planned.ax, y: planned.ay }

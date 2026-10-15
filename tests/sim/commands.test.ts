@@ -6,6 +6,8 @@ import { applyCommand, planCommand } from "@sim/commands";
 import { createSimState } from "@sim/state";
 import { FloorType, tileIndex, WallType } from "@sim/world/grid";
 import { isStandable } from "@sim/world/objects";
+import { walkRouteExists } from "@sim/world/walkRegions";
+import { bedside } from "@sim/places";
 import { applyAll } from "../fixtures/smallAE";
 
 const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
@@ -420,6 +422,23 @@ describe("bedside access", () => {
       ({ type: "place_object", floor: 0, defId: "plant", x, y, rotation: 0 }) as const;
     applyAll(state, [plant(4, 2)]); // Left side now partly blocked; right is clear.
     expect(planCommand(state, plant(6, 3)).error).toBe("Would block access to Hospital bed");
+  });
+
+  it("works from the side that can be got to, not one boxed in against a wall", () => {
+    const state = floored();
+    applyAll(state, [
+      { type: "build_walls", floor: 0, rect: rect(0, 0, 1, 12), wall: WallType.Standard },
+      bed(2, 2),
+    ]);
+    const hospitalBed = state.objects[1]!;
+    expect(bedside(state, hospitalBed)).toEqual({ x: 1, y: 2 });
+    // Plants at either end of the gap between the wall and the bed seal it off.
+    const plant = (x: number, y: number) =>
+      ({ type: "place_object", floor: 0, defId: "plant", x, y, rotation: 0 }) as const;
+    applyAll(state, [plant(1, 1), plant(1, 4)]);
+    expect(isStandable(state.floors[0]!, 1, 2)).toBe(true);
+    expect(walkRouteExists(state, { x: 8, y: 8 }, { x: 1, y: 2 })).toBe(false);
+    expect(bedside(state, hospitalBed)).toEqual({ x: 3, y: 2 });
   });
 });
 

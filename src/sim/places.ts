@@ -21,6 +21,7 @@ import { nearestEdgeTile, nearestTile } from "./world/pathfinding";
 import { rectTiles } from "./world/rect";
 import { capabilitiesOf, roomOfObject } from "./world/rooms";
 import { isMobile, kitReach, sharedKitIds } from "./world/sharedKit";
+import { walkableArea } from "./world/walkRegions";
 
 export type Slot = number | "staff";
 
@@ -264,11 +265,26 @@ export function restPoint(obj: PlacedObject): Point {
   return { x: r.x + (r.w - 1) / 2, y: r.y + (r.h - 1) / 2 };
 }
 
-/** A clear tile beside a couch: where staff work, and where a patient climbs on. */
+/**
+ * A clear tile beside a couch: where staff work, and where a patient climbs
+ * on. A side that's clear but boxed in (against a wall, say, with furniture
+ * closing off the gap) can't be got to, so the side opening onto the most
+ * floor wins.
+ */
 export function bedside(state: SimState, obj: PlacedObject): Point {
   const grid = state.floors[obj.floor]!;
   const sides = sideTiles(objectRect(obj), obj.rotation, "sides");
-  return sides.find((t) => isStandable(grid, t.x, t.y)) ?? sides[0]!;
+  let best: Point | undefined;
+  let bestArea = -1;
+  for (const t of sides) {
+    if (!isStandable(grid, t.x, t.y)) continue;
+    const area = walkableArea(state, t.x, t.y);
+    if (area > bestArea) {
+      best = t;
+      bestArea = area;
+    }
+  }
+  return best ?? sides[0]!;
 }
 
 export const MAX_COUCH_DIRT = 0;

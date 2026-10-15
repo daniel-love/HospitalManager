@@ -10,6 +10,7 @@ import type { SimState } from "../state";
 import { FloorType, tileIndex } from "../world/grid";
 import { crewAccess, patientAccess } from "../world/access";
 import { findPath } from "../world/pathfinding";
+import { walkRouteExists } from "../world/walkRegions";
 
 /** Ticks to wait before retrying a route that couldn't be found. */
 const RETRY_TICKS = 60;
@@ -87,6 +88,13 @@ function plan(
   // Patients on foot keep to public routes, and the ambulance crew mostly
   // do; staff, and beds, go anywhere.
   const onFoot = !bed && !withCrew && !("role" in agent);
+  // Nowhere joins them up: say so without searching the whole site first.
+  const there = sx === approach.x && sy === approach.y;
+  if (!bed && !there && !walkRouteExists(state, { x: sx, y: sy }, approach)) {
+    dest.blocked = state.tick;
+    agent.path = [];
+    return "no_route";
+  }
   const access = withCrew ? crewAccess(state) : onFoot ? patientAccess(state) : undefined;
   let tiles = findPath(grid, sx, sy, approach.x, approach.y, {
     bed,
