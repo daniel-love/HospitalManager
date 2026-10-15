@@ -676,6 +676,7 @@ const saveSchema = z.object({
     privateRooms: z.record(z.string().regex(/^\d+:\d+$/), z.literal(true)),
     essentialRooms: z.record(z.string().regex(/^\d+:\d+$/), z.boolean()),
     waitingAreas: z.record(z.string().regex(/^\d+:\d+$/), z.enum(WAITING_FOR)),
+    inheritedLists: z.array(z.enum(specialtyIds)),
     maintenance: z.record(z.string(), z.object({ wear: num.min(0).max(100), broken: nullableInt })),
     closedRooms: z.record(
       z.string().regex(/^\d+:\d+$/),
@@ -854,6 +855,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       closedRooms: state.closedRooms,
       essentialRooms: state.essentialRooms,
       waitingAreas: state.waitingAreas,
+      inheritedLists: state.inheritedLists,
       maintenance: state.maintenance,
       name: state.name,
       funding: state.funding,
@@ -942,6 +944,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     closedRooms: { ...s.closedRooms },
     essentialRooms: { ...s.essentialRooms },
     waitingAreas: { ...s.waitingAreas },
+    inheritedLists: [...s.inheritedLists],
     maintenance: Object.fromEntries(
       Object.entries(s.maintenance).map(([k, v]) => [Number(k), { ...v }]),
     ),

@@ -96,7 +96,7 @@ export function staffedHospital(seed = 1, team = HOSPITAL_TEAM): SimState {
     const r = applyStaffCommand(state, { type: "hire_staff", role: "consultant", specialty });
     if (!r.ok) throw new Error(r.error);
     const id = r.staff.id;
-    if (clinics) applyStaffCommand(state, { type: "set_clinic_sessions", id, sessions: clinics });
+    applyStaffCommand(state, { type: "set_clinic_sessions", id, sessions: clinics });
     if (lists) applyStaffCommand(state, { type: "set_theatre_sessions", id, sessions: lists });
   };
   consultant("cardiology", 4, 0);

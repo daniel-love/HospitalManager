@@ -74,6 +74,36 @@ describe("GP referrals", () => {
     // Nothing is booked for the day of referral.
     expect(clockFromTick(at(urgent)).day).toBeGreaterThan(1);
   });
+
+  it("a new consultant or registrar starts with a typical number of clinic sessions", () => {
+    const state = buildOutpatients(1, []);
+    const hire = (role: "consultant" | "registrar") => {
+      const r = applyStaffCommand(state, { type: "hire_staff", role, specialty: "dermatology" });
+      if (!r.ok) throw new Error(r.error);
+      return r.staff.clinicSessions;
+    };
+    expect(hire("consultant")).toBe(3);
+    expect(hire("registrar")).toBe(2);
+  });
+
+  it("a specialty's clinics inherit a small waiting list when they first open", () => {
+    const state = buildOutpatients(1);
+    // Weeks into the game, so inherited referrals can have waited a while.
+    state.tick = tickAt(60, 7);
+    while (!state.inheritedLists.includes("cardiology")) tick(state);
+    const list = Object.values(state.referrals);
+    // About a week of cardiology's referrals (2.1 a day at 80,000 people).
+    expect(list.length).toBeGreaterThanOrEqual(13);
+    expect(list.length).toBeLessThanOrEqual(17);
+    const waits = list.map((r) => (state.tick - r.clockStart!) / TICKS_PER_DAY);
+    expect(Math.max(...waits)).toBeLessThanOrEqual(42);
+    expect(Math.max(...waits)).toBeGreaterThan(7);
+    // Not counted as today's GP referrals, and only inherited once.
+    expect(state.today.stats.gpReferrals).toBeLessThanOrEqual(1);
+    const n = list.length;
+    runDays(state, 1);
+    expect(Object.keys(state.referrals).length).toBeLessThan(n + 8);
+  });
 });
 
 describe("a clinic day", () => {

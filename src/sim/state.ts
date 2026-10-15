@@ -43,7 +43,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 45;
+export const SIM_STATE_VERSION = 46;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -143,6 +143,11 @@ export interface SimState {
    */
   referrals: Record<number, Referral>;
   nextReferralId: number;
+  /**
+   * Specialties whose clinics have opened and been given the waiting list
+   * they inherit (systems/referrals.ts seedWaitingList).
+   */
+  inheritedLists: SpecialtyId[];
   /** People in for an outpatient appointment today, keyed by id (agent ids). */
   outpatients: Record<number, Outpatient>;
   /** Relatives and friends visiting ward patients, keyed by id (agent ids). */
@@ -517,6 +522,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     collections: {},
     referrals: {},
     nextReferralId: 1,
+    inheritedLists: [],
     outpatients: {},
     visitors: {},
     operations: {},

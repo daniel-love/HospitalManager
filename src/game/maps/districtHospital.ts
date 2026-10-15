@@ -135,7 +135,7 @@ function staff(state: SimState): void {
     });
     if (!r.ok) return;
     const id = r.staff.id;
-    if (clinics) applyStaffCommand(state, { type: "set_clinic_sessions", id, sessions: clinics });
+    applyStaffCommand(state, { type: "set_clinic_sessions", id, sessions: clinics });
     if (lists) applyStaffCommand(state, { type: "set_theatre_sessions", id, sessions: lists });
   };
   consultant("general_medicine", 0, 0);

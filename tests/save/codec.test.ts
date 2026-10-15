@@ -498,6 +498,8 @@ describe("the Medical Examiner in saves", () => {
     });
     if (!r.ok) throw new Error(r.error);
     applyStaffCommand(state, { type: "set_me_duty", id: r.staff.id, on: true });
+    // A dedicated Medical Examiner ran no clinics.
+    applyStaffCommand(state, { type: "set_clinic_sessions", id: r.staff.id, sessions: 0 });
     const save = JSON.parse(JSON.stringify(encodeSave(state, state.name)));
     save.version = 13;
     for (const p of save.state.patients) delete p.consultants;

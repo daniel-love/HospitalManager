@@ -120,6 +120,8 @@ export function buildTheatres(
   const consultant = (specialty: SpecialtyId) => {
     const r = applyStaffCommand(state, { type: "hire_staff", role: "consultant", specialty });
     if (!r.ok) throw new Error(r.error);
+    // Theatre lists only: no clinics in this map.
+    applyStaffCommand(state, { type: "set_clinic_sessions", id: r.staff.id, sessions: 0 });
     return r.staff;
   };
   let lists = 0;

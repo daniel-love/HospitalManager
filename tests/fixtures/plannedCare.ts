@@ -103,8 +103,7 @@ export function grantPrivileges(
     });
     if (!r.ok) throw new Error(r.error);
     const id = r.staff.id;
-    if (c.clinics)
-      applyStaffCommand(state, { type: "set_clinic_sessions", id, sessions: c.clinics });
+    applyStaffCommand(state, { type: "set_clinic_sessions", id, sessions: c.clinics });
     if (c.lists) applyStaffCommand(state, { type: "set_theatre_sessions", id, sessions: c.lists });
   }
 }

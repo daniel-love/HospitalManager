@@ -28,7 +28,12 @@
  */
 import { content, specialtyById } from "@data/catalogue";
 import { FIRST_NAMES, SURNAMES } from "@data/names";
-import { CLINIC_SESSIONS, RTT_TARGET_DAYS, type SessionHalf } from "@data/outpatients";
+import {
+  CLINIC_SESSIONS,
+  RTT_TARGET_DAYS,
+  URGENT_TARGET_DAYS,
+  type SessionHalf,
+} from "@data/outpatients";
 import type { OutpatientService, SpecialtyId } from "@data/schema";
 import { PRIVATE } from "@data/economy";
 import { income, type Payer, type Referral } from "../agents";
@@ -175,6 +180,10 @@ export function updateReferrals(state: SimState): void {
   for (const sp of content.specialties) {
     if (!sp.outpatients) continue;
     if (offersClinic(state, sp.id)) {
+      if (!state.inheritedLists.includes(sp.id)) {
+        seedWaitingList(state, sp.id);
+        added = true;
+      }
       const perMinute = (nhsReferralsPerDay(state, sp.id) * 7) / minutes;
       if (chance(state.rng, perMinute)) {
         const urgent = chance(state.rng, sp.outpatients.urgentShare);
@@ -199,6 +208,35 @@ export function updateReferrals(state: SimState): void {
   }
   if (added) bookAppointments(state);
 }
+
+/**
+ * When a specialty's clinics first open, they take on a small waiting list:
+ * patients in the catchment already waiting, transferred from neighbouring
+ * trusts' lists. About INHERITED_LIST_DAYS of referrals, waiting up to
+ * INHERITED_MAX_WAIT_DAYS, so the first clinics have someone to see.
+ */
+function seedWaitingList(state: SimState, specialty: SpecialtyId): void {
+  state.inheritedLists.push(specialty);
+  const service = serviceOf(specialty);
+  if (!service) return;
+  const mean = nhsReferralsPerDay(state, specialty) * INHERITED_LIST_DAYS;
+  const n = Math.floor(mean + nextFloat(state.rng));
+  for (let i = 0; i < n; i++) {
+    const urgent = chance(state.rng, service.urgentShare);
+    if (!urgent && state.departments.outpatients !== "open") continue;
+    // Urgent referrals are recent; routine ones have waited a while.
+    const maxWait = urgent ? URGENT_TARGET_DAYS / 2 : INHERITED_MAX_WAIT_DAYS;
+    const since = Math.round(nextFloat(state.rng) * maxWait * TICKS_PER_DAY);
+    const r = refer(state, specialty, urgent);
+    r.clockStart = r.added = Math.max(0, state.tick - since);
+    state.today.stats.gpReferrals--; // Referred before today, not by GPs today.
+  }
+}
+
+/** Days of referrals a specialty's clinics inherit when they open. */
+const INHERITED_LIST_DAYS = 7;
+/** The longest an inherited referral has waited, in days. */
+const INHERITED_MAX_WAIT_DAYS = 6 * 7;
 
 /** A GP referral: onto the list for a first appointment, with the RTT clock started. */
 export function refer(

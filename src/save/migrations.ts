@@ -990,6 +990,13 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
   },
   // v45: Waiting Areas can be kept for A&E or outpatients (all open to anyone so far).
   44: (save) => ({ ...save, state: { ...(save.state as object), waitingAreas: {} } }),
+  // v46: a specialty's clinics inherit a small waiting list when they open; those
+  // with patients on a list already have theirs.
+  45: (save) => {
+    const state = save.state as { referrals: Record<string, { specialty: string }> };
+    const inheritedLists = [...new Set(Object.values(state.referrals).map((r) => r.specialty))];
+    return { ...save, state: { ...state, inheritedLists } };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

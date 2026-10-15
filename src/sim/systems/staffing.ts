@@ -113,6 +113,8 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
       staff.skill = applicant.skill;
       takeApplicant(state, applicant);
     }
+    // A typical job plan's clinics; the player can change them in the inspector.
+    if (runsClinics(staff)) staff.clinicSessions = DEFAULT_CLINIC_SESSIONS[staff.role] ?? 0;
     const at = { x: staff.x, y: staff.y };
     startOnRota(state, staff);
     const first = onSite(staff) || staff.onCall ? null : nextShift(state, staff);
@@ -191,6 +193,15 @@ export function applyStaffCommand(state: SimState, cmd: StaffCommand): StaffResu
   removeStaff(state, staff);
   return { ok: true, staff };
 }
+
+/**
+ * Clinic sessions a week in a new consultant's or registrar's job plan: a
+ * typical NHS consultant runs about three clinics a week, a registrar two.
+ */
+const DEFAULT_CLINIC_SESSIONS: Partial<Record<StaffRoleId, number>> = {
+  consultant: 3,
+  registrar: 2,
+};
 
 /** Half-day sessions in a working week: Monday to Friday, mornings and afternoons. */
 export const MAX_WEEK_SESSIONS = 10;
