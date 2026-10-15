@@ -503,3 +503,6 @@ export const goals =
 
 /** The scenario briefing is open (it opens when a scenario starts). */
 export const scenarioBriefing = signal(false);
+
+/** The toolbar button a tutorial step points at: a build tab, "staff" or "speed". */
+export const tutorialHighlight = signal<string | null>(null);

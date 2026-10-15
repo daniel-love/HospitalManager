@@ -13,6 +13,7 @@ import { z } from "zod";
 import { conditionById, objectDef } from "@data/catalogue";
 import { PRIVATE } from "@data/economy";
 import { KEY_QUESTIONS, RATINGS, type KeyQuestion } from "@data/cqc";
+import { SCENARIOS, type ScenarioId } from "@data/scenarios";
 import { PRESSURE_EVENTS, type PressureEventId } from "@data/pressure";
 import { specialtyIds, staffRoleIds } from "@data/schema";
 import { SERVICE_LINES, type ServiceLine } from "@sim/agents";
@@ -615,7 +616,7 @@ const saveSchema = z.object({
     visitors: z.array(visitorSchema),
     tours: z.array(tourSchema),
     goals: z.object({
-      scenario: z.enum(["ae_before_winter", "major_incident", "private_that_pays"]).nullable(),
+      scenario: z.enum(SCENARIOS.map((s) => s.id) as [ScenarioId, ...ScenarioId[]]).nullable(),
       objectives: z.record(
         z.string(),
         z.object({ status: z.enum(["pending", "met", "failed"]), n: num, d: num }),

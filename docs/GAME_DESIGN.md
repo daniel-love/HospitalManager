@@ -477,7 +477,7 @@ Each event has a **trigger** (scheduled, seasonal, random, or conditional), an *
 
 **Input:** mouse drag to build, right-click to cancel, WASD/edge pan, wheel zoom, number keys for speed, space to pause, keyboard shortcuts for overlays.
 
-**Onboarding:** a short guided tutorial scenario: build a reception, triage room, minors cubicle and toilet; hire staff; treat your first patients.
+**Onboarding:** a short guided tutorial scenario: build a reception, triage room, minors cubicle and toilet; hire staff; treat your first patients. As built (M6 step 7): one step at a time in a card, the toolbar button to use glowing, each step ticking off as soon as it's done (even paused).
 
 ---
 

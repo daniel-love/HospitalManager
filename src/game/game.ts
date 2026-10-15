@@ -8,7 +8,7 @@
  */
 import { buildDistrictHospital, DISTRICT_MAP } from "./maps/districtHospital";
 import { scenarioById, type ScenarioId } from "@data/scenarios";
-import { describeGoals, lockReason, startScenario } from "@sim/systems/scenarios";
+import { advanceTutorial, describeGoals, lockReason, startScenario } from "@sim/systems/scenarios";
 import { openingCampaign } from "@sim/systems/recruitment";
 import { RATING_NAMES } from "@data/cqc";
 import { equipmentCondition, setEssentialRoom } from "@sim/systems/maintenance";
@@ -100,6 +100,7 @@ import {
   type InspectorData,
   goals,
   lockedItems,
+  tutorialHighlight,
   scenarioBriefing,
 } from "@ui/store";
 import { tileHelp } from "@ui/help";
@@ -249,6 +250,7 @@ export class Game {
       if (!planning.value && this.state.plan.length > 0) this.rebuildPreview();
       this.refreshPlanView();
       this.refreshCoverage();
+      advanceTutorial(this.state);
       this.publishInspector();
       this.publishHud();
     } else if (!quiet) {
@@ -267,6 +269,7 @@ export class Game {
       showToast(result.error, "error");
       return;
     }
+    advanceTutorial(this.state);
     if (cmd.type === "dismiss_staff") {
       showToast(`${result.staff.name} has left`);
       if (this.selectedAgent === cmd.id) this.select(null);
@@ -523,17 +526,17 @@ export class Game {
       // A pre-built hospital fits its own road in below it.
       site: !prebuilt,
       ...(prebuilt ? DISTRICT_MAP : {}),
-      rotas: true,
+      rotas: def.rotas ?? true,
       funding: def.funding,
       money: def.money,
       catchment: def.catchment,
       startDay: def.startDay,
       eventFrequency: def.eventFrequency,
-      recruitment: true,
+      recruitment: def.recruitment ?? true,
     });
     if (prebuilt) buildDistrictHospital(state);
     startScenario(state, def);
-    openingCampaign(state);
+    if (state.settings.recruitment) openingCampaign(state);
     this.loadState(state);
     if (state.site) this.focus(siteView(state.site));
     rememberLastSave(null);
@@ -879,6 +882,7 @@ export class Game {
     this.lastGoals = key;
     goals.value = g;
     lockedItems.value = locks;
+    tutorialHighlight.value = g?.tutorial?.highlight ?? null;
   }
 
   /** Refreshes whichever management panel is open. */

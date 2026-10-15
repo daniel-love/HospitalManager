@@ -10,11 +10,18 @@
  */
 import { RATINGS } from "@data/cqc";
 import { pressureEventById } from "@data/pressure";
-import { FAIL, scenarioById, type ObjectiveDef, type ScenarioDef } from "@data/scenarios";
+import {
+  FAIL,
+  scenarioById,
+  type ObjectiveDef,
+  type ScenarioDef,
+  type TutorialCheck,
+} from "@data/scenarios";
 import { emit } from "../events";
 import type { Goals, SimState } from "../state";
 import { clockFromTick, formatDate, TICKS_PER_DAY, TICKS_PER_MINUTE, tickAt } from "../time";
-import { hasRoomWith } from "../places";
+import { hasRoomWith, roomsPatientsCantReach, siteEntrance } from "../places";
+import { tilesByLine } from "./serviceLines";
 import { parkingSpaces } from "./ambulances";
 import { announce } from "./pressure";
 
@@ -157,6 +164,20 @@ function check(state: SimState, o: ObjectiveDef, midnight: boolean): void {
       else if (day > o.by) p.status = "failed";
       return;
     }
+    case "tutorial": {
+      // One step at a time: only once the steps before are done.
+      const def = scenarioOf(state)!;
+      const i = def.objectives.findIndex((x) => x.id === o.id);
+      if (def.objectives.slice(0, i).some((x) => state.goals.objectives[x.id]!.status !== "met")) {
+        return;
+      }
+      if (tutorialDone(state, o.step)) {
+        p.status = "met";
+        const next = def.objectives[i + 1];
+        emit(state, next ? `Done! Next: ${next.text.toLowerCase()}.` : "Done!", "info");
+      }
+      return;
+    }
     case "no_casualty_deaths": {
       // Counted as they die (casualtyDied).
       if (p.n > 0) p.status = "failed";
@@ -260,13 +281,33 @@ export function describeGoals(state: SimState): {
   outcome: Goals["outcome"];
   objectives: { text: string; status: string; progress: string | null }[];
   ends: string;
+  /** A tutorial: the step under way, its instructions, and the button to light up. */
+  tutorial: {
+    step: number;
+    of: number;
+    text: string;
+    hint: string;
+    highlight: string | null;
+  } | null;
 } | null {
   const def = scenarioOf(state);
   if (!def) return null;
+  const current = def.objectives.findIndex((o) => state.goals.objectives[o.id]!.status !== "met");
+  const step = current >= 0 ? def.objectives[current]! : null;
   return {
     name: def.name,
     outcome: state.goals.outcome,
     ends: formatDate(def.endDay),
+    tutorial:
+      def.tutorial && step && !state.goals.outcome
+        ? {
+            step: current + 1,
+            of: def.objectives.length,
+            text: step.text,
+            hint: step.hint ?? "",
+            highlight: step.highlight ?? null,
+          }
+        : null,
     objectives: def.objectives.map((o) => {
       const p = state.goals.objectives[o.id]!;
       let progress: string | null = null;
@@ -282,4 +323,46 @@ export function describeGoals(state: SimState): {
       return { text: o.text, status: p.status, progress };
     }),
   };
+}
+
+const validRoom = (state: SimState, type: string) =>
+  state.rooms.some((r) => r.valid && r.typeId === type);
+
+/** Whether a tutorial step's check passes. */
+export function tutorialDone(state: SimState, step: TutorialCheck): boolean {
+  switch (step) {
+    case "foundations":
+      return Object.values(tilesByLine(state)).reduce((n, t) => n + t, 0) >= 80;
+    case "reception":
+      return validRoom(state, "ae_reception") && validRoom(state, "waiting_area");
+    case "triage":
+      return validRoom(state, "triage_room");
+    case "cubicle":
+      return validRoom(state, "minors_cubicle");
+    case "toilets":
+      return validRoom(state, "toilets");
+    case "entrance":
+      return siteEntrance(state) !== null && roomsPatientsCantReach(state).length === 0;
+    case "staff": {
+      const roles = new Set(Object.values(state.staff).map((s) => s.role));
+      return ["receptionist", "nurse", "junior_doctor", "cleaner"].every((r) =>
+        roles.has(r as never),
+      );
+    }
+    case "patients": {
+      const discharged =
+        state.today.stats.discharged + state.history.reduce((n, d) => n + d.stats.discharged, 0);
+      return discharged >= 5;
+    }
+  }
+}
+
+/**
+ * A tutorial's steps, checked straight after the player builds or hires
+ * (the tutorial is played paused, so the hourly check isn't enough).
+ */
+export function advanceTutorial(state: SimState): void {
+  const def = scenarioOf(state);
+  if (!def?.tutorial || state.goals.outcome) return;
+  for (const o of def.objectives) check(state, o, false);
 }

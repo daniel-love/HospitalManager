@@ -2,7 +2,7 @@ import type { Game } from "@game/game";
 import { SPEEDS, type Speed } from "@game/loop";
 import { formatMoney } from "@game/tools";
 import { settingsOpen } from "./settings";
-import { hud, saveDialogOpen } from "./store";
+import { hud, saveDialogOpen, tutorialHighlight } from "./store";
 
 const LABELS: Record<Speed, string> = {
   0: "❚❚",
@@ -73,7 +73,11 @@ export function TopBar({ game }: { game: Game }) {
           {e.label} <span class="dim">{e.when}</span>
         </button>
       ))}
-      <div class="speeds" role="group" aria-label="Game speed">
+      <div
+        class={`speeds${tutorialHighlight.value === "speed" ? " tutorial-glow" : ""}`}
+        role="group"
+        aria-label="Game speed"
+      >
         {SPEEDS.map((s) => (
           <button
             key={s}

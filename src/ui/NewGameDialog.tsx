@@ -155,6 +155,19 @@ function NewGameBody({ game }: { game: Game }) {
               what it does and how it earns, and can't change later. Anything unsaved in the current
               game will be lost.
             </p>
+            <p class="small-note">
+              New to the game?{" "}
+              <button
+                class="link-button"
+                onClick={() => {
+                  setMode("scenario");
+                  setScenario("tutorial");
+                }}
+              >
+                Start with the tutorial
+              </button>
+              .
+            </p>
             <div class="funding-choices" role="radiogroup" aria-label="Funding model">
               {MODELS.map((m) => (
                 <button

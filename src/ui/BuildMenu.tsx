@@ -24,6 +24,7 @@ import {
   type BuildTab,
   type SidePanel,
   lockedItems,
+  tutorialHighlight,
 } from "./store";
 
 const TABS: { id: BuildTab; label: string }[] = [
@@ -119,7 +120,7 @@ export function BuildBar({
       {TABS.map((t) => (
         <button
           key={t.id}
-          class={open === t.id ? "active" : ""}
+          class={`${open === t.id ? "active" : ""}${tutorialHighlight.value === t.id ? " tutorial-glow" : ""}`}
           aria-pressed={open === t.id}
           onMouseDown={noFocus}
           onClick={() => {
@@ -147,7 +148,7 @@ export function BuildBar({
         return (
           <button
             key={p.kind === "side" ? p.id : p.kind}
-            class={active ? "active" : ""}
+            class={`${active ? "active" : ""}${tutorialHighlight.value === p.kind ? " tutorial-glow" : ""}`}
             aria-pressed={active}
             title={hint}
             onMouseDown={noFocus}

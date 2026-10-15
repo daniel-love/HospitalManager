@@ -7,7 +7,18 @@
 import type { CqcRating } from "./cqc";
 import type { EventFrequency, PressureEventId } from "./pressure";
 
-export type ScenarioId = "ae_before_winter" | "major_incident" | "private_that_pays";
+export type ScenarioId = "tutorial" | "ae_before_winter" | "major_incident" | "private_that_pays";
+
+/** What a tutorial step checks for (systems/scenarios.ts tutorialDone). */
+export type TutorialCheck =
+  | "foundations"
+  | "reception"
+  | "triage"
+  | "cubicle"
+  | "toilets"
+  | "entrance"
+  | "staff"
+  | "patients";
 
 /** What has to be done. Each has a deadline (or window) and is met, pending or failed. */
 export type ObjectiveDef =
@@ -35,6 +46,12 @@ export type ObjectiveDef =
       /** No major incident casualty (major trauma or serious injury) dies, up to this day. */
       kind: "no_casualty_deaths";
       to: number;
+    }
+  | {
+      id: string;
+      /** A tutorial step: done when its check passes, once the steps before it are done. */
+      kind: "tutorial";
+      step: TutorialCheck;
     }
   | {
       id: string;
@@ -80,10 +97,21 @@ export interface ScenarioDef {
   /** Random events on top of the script. */
   eventFrequency: EventFrequency;
   script: ScriptedEvent[];
-  objectives: (ObjectiveDef & { text: string })[];
+  /**
+   * What has to be done. A tutorial step also has instructions (`hint`)
+   * and the toolbar button to light up (`highlight`: a build tab, "staff",
+   * or "speed").
+   */
+  objectives: (ObjectiveDef & { text: string; hint?: string; highlight?: string })[];
   locks: LockDef[];
   /** The day it's over: won if every objective is met by then. */
   endDay: number;
+  /** Staff on shifts (default), or working around the clock as in the tutorial. */
+  rotas?: boolean;
+  /** Hiring from applicants (default), or instantly. */
+  recruitment?: boolean;
+  /** A guided tutorial: the panel shows one step at a time. */
+  tutorial?: boolean;
 }
 
 /** Day numbers for dates in Year 1 (1 April is day 1). */
@@ -102,6 +130,95 @@ const D = {
 };
 
 export const SCENARIOS: ScenarioDef[] = [
+  {
+    id: "tutorial",
+    name: "Tutorial: your first A&E",
+    summary:
+      "Learn the basics: build a small A&E with a reception, triage and a cubicle, hire a team, and treat your first patients.",
+    briefing: [
+      "Welcome. You're going to build a small A&E on an empty site beside the road, and see your first patients through it.",
+      "Each step is in the card at the top left, and the button you need lights up. Take your time: the game is paused until you press play, and nothing goes wrong while you build.",
+      "Move the map by dragging with the right mouse button (or the arrow keys) and zoom with the scroll wheel. Hover over anything in the build menus to learn what it's for.",
+    ],
+    funding: "nhs",
+    money: 1_500_000,
+    catchment: 40_000,
+    startDay: 1,
+    start: "blank",
+    eventFrequency: "off",
+    rotas: false,
+    recruitment: false,
+    tutorial: true,
+    script: [],
+    objectives: [
+      {
+        id: "foundations",
+        kind: "tutorial",
+        step: "foundations",
+        text: "Lay foundations",
+        highlight: "construction",
+        hint: "Open Construction and choose Foundations, then drag out a rectangle on the grass near the road, about 16 by 10 tiles. Buildings go on foundations; walls come next.",
+      },
+      {
+        id: "reception",
+        kind: "tutorial",
+        step: "reception",
+        text: "Build a reception and a waiting area",
+        highlight: "rooms",
+        hint: "In Rooms, zone an A&E Reception (at least 3 by 3) and a Waiting Area beside it, touching. Then in Equipment, put a Reception desk in the reception and six seats (chairs or benches) in the waiting area. A room's checklist in the inspector says what's missing.",
+      },
+      {
+        id: "triage",
+        kind: "tutorial",
+        step: "triage",
+        text: "Build a triage room",
+        highlight: "rooms",
+        hint: "Triage rooms are enclosed: build walls round a 3 by 3 space (Construction → Walls) with a door, zone it a Triage Room, and add an examination couch, an observations machine and a hand-wash sink. Every walk-in is triaged here first.",
+      },
+      {
+        id: "cubicle",
+        kind: "tutorial",
+        step: "cubicle",
+        text: "Build a Minors cubicle",
+        highlight: "rooms",
+        hint: "Zone a Minors Cubicle (2 by 3 is enough) and give it an examination couch, a privacy curtain and an observations machine. Doctors treat cuts, sprains and minor illnesses here.",
+      },
+      {
+        id: "toilets",
+        kind: "tutorial",
+        step: "toilets",
+        text: "Build toilets",
+        highlight: "rooms",
+        hint: "Patients waiting for hours need the toilet. Zone Toilets near the waiting area, with a toilet and a sink inside.",
+      },
+      {
+        id: "entrance",
+        kind: "tutorial",
+        step: "entrance",
+        text: "Make a way in from the road",
+        highlight: "construction",
+        hint: "Patients walk in from the pavement. Make sure the waiting area or reception has an outside door (Construction → Doors) and lay a footpath from the pavement to it, so walk-ins can reach the desk without crossing a clinical room.",
+      },
+      {
+        id: "staff",
+        kind: "tutorial",
+        step: "staff",
+        text: "Hire a team",
+        highlight: "staff",
+        hint: "Open Staff → Hire and take on a Receptionist (to book patients in), a Nurse (to triage), a Junior Doctor (to treat) and a Cleaner (to clean the couches between patients).",
+      },
+      {
+        id: "patients",
+        kind: "tutorial",
+        step: "patients",
+        text: "Treat your first five patients",
+        highlight: "speed",
+        hint: "Press play (1× or faster). Patients walk in, book in at reception, wait, are triaged, then treated in the cubicle and go home. Click anyone to see what they're doing and waiting for. Reports shows how the day's going, and Help has a checklist of what an A&E needs.",
+      },
+    ],
+    locks: [],
+    endDay: 9999,
+  },
   {
     id: "ae_before_winter",
     name: "Open an A&E before winter",
