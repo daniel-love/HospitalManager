@@ -445,6 +445,8 @@ Each event has a **trigger** (scheduled, seasonal, random, or conditional), an *
 
 **As built (M6 step 4):** equipment wears and breaks down, and broken kit is out of service until a clinical engineer repairs it; engineers also do planned maintenance. Power cuts stop powered kit beyond the standby generators' cover, essential rooms first.
 
+**As built (M6 step 6, part 1):** scenarios set the funding, budget, start date and scripted events, with objectives (deadlines and windows), fail states, and rooms or equipment locked until an objective or a rating is reached. Sandbox games have full settings, with fail states optional.
+
 **Scenario framework:** a scenario = starting map (blank or pre-built), funding model, budget, an event script and objectives (e.g. "Achieve 90% 4-hour for 4 consecutive weeks" or "Reach a Good rating within 2 years").
 
 ---

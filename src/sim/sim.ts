@@ -29,6 +29,7 @@ import { updateOutbreaks } from "./systems/outbreaks";
 import { updateMaintenance } from "./systems/maintenance";
 import { updateInspections } from "./systems/inspections";
 import { updateRecruitment } from "./systems/recruitment";
+import { updateScenarios } from "./systems/scenarios";
 
 export function tick(state: SimState): void {
   state.tick++;
@@ -50,6 +51,7 @@ export function tick(state: SimState): void {
   updateMaintenance(state);
   updateInspections(state);
   updateRecruitment(state);
+  updateScenarios(state);
   updateDeaths(state);
   updateCollections(state);
   postObservations(state);

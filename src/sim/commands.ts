@@ -7,6 +7,7 @@
  * the change takes effect immediately, even while paused. Removing things
  * refunds RESALE_FRACTION of what they cost.
  */
+import { lockReason } from "./systems/scenarios";
 import { objectDef, roomById, wallByType } from "@data/catalogue";
 import { RESALE_FRACTION } from "@data/economy";
 import { FOUNDATION_COST_PER_TILE, surfaceCost, surfaces, type SurfaceId } from "@data/structures";
@@ -138,10 +139,17 @@ function run(state: SimState, cmd: Command, commit: boolean): Outcome {
       return buildWalls(state, grid, cmd.floor, clip(grid, cmd.rect), cmd.wall, commit);
     case "demolish":
       return demolish(state, grid, cmd.floor, clip(grid, cmd.rect), commit);
-    case "zone":
+    case "zone": {
+      // A scenario may hold some rooms back.
+      const locked = cmd.roomType ? lockReason(state, cmd.roomType) : null;
+      if (locked) return { cost: 0, count: 0, changed: null, error: `Locked: ${locked}` };
       return zone(grid, clip(grid, cmd.rect), cmd.roomType, commit);
-    case "place_object":
+    }
+    case "place_object": {
+      const locked = lockReason(state, cmd.defId);
+      if (locked) return { cost: 0, count: 0, changed: null, error: `Locked: ${locked}` };
       return placeObject(state, grid, cmd, commit);
+    }
     case "remove_objects":
       return removeObjects(state, grid, cmd.floor, clip(grid, cmd.rect), commit);
     case "remove_object":

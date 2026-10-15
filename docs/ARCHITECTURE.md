@@ -85,6 +85,7 @@ src/
       maintenance.ts      # equipment wear, breakdowns, repairs and maintenance; noticing power cuts
       inspections.ts      # CQC inspections: the tour, ratings by key question, special measures; VIP visits
       recruitment.ts      # applicants for posts, by reputation and rating; hiring the best
+      scenarios.ts        # scenarios: scripted events, objectives, locks, winning and losing; sandbox fail states
       reputation.ts       # 0–100 reputation: a running average of each day's patient experience
       loans.ts            # DHSC and bank loans, repayments, oversight segments and credit ratings
       grants.ts           # grant offers, conditions, deadlines and clawback

@@ -1,4 +1,5 @@
 import type { Game } from "@game/game";
+import { ScenarioPanel } from "./ScenarioPanel";
 import { BuildBar, Palette } from "./BuildMenu";
 import { DebugOverlay } from "./DebugOverlay";
 import { MapHelp, PaletteHelp } from "./HelpCard";
@@ -71,6 +72,7 @@ export function App({ game }: { game: Game }) {
       <MapHelp />
       <PaletteHelp />
       <SaveDialog game={game} />
+      <ScenarioPanel game={game} />
       <NewGameDialog game={game} />
       <AdministrationDialog game={game} />
       <SettingsDialog game={game} />

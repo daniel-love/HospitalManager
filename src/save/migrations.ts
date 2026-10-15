@@ -952,6 +952,25 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v42: scenarios and fail states (old games are sandbox, with none).
+  41: (save) => {
+    const state = save.state as { settings: object; goals?: object };
+    return {
+      ...save,
+      state: {
+        ...state,
+        settings: { failStates: false, ...state.settings },
+        goals: state.goals ?? {
+          scenario: null,
+          objectives: {},
+          unlocked: [],
+          outcome: null,
+          segment4Since: null,
+          inadequateRun: 0,
+        },
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

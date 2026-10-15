@@ -23,6 +23,7 @@ import {
   tool,
   type BuildTab,
   type SidePanel,
+  lockedItems,
 } from "./store";
 
 const TABS: { id: BuildTab; label: string }[] = [
@@ -204,7 +205,14 @@ function Entry(props: {
   help: HelpContent | string;
 }) {
   const selected = sameTool(tool.value, props.t);
-  const help = typeof props.help === "string" ? simpleHelp(props.name, props.help) : props.help;
+  const id =
+    props.t.kind === "zone" ? props.t.roomType : props.t.kind === "object" ? props.t.defId : null;
+  const locked = id ? lockedItems.value[id] : undefined;
+  const help = locked
+    ? simpleHelp(props.name, `Locked: ${locked}.`)
+    : typeof props.help === "string"
+      ? simpleHelp(props.name, props.help)
+      : props.help;
   const show = (e: MouseEvent) => {
     const entry = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const palette = (e.currentTarget as HTMLElement).closest(".palette")!.getBoundingClientRect();
@@ -212,12 +220,15 @@ function Entry(props: {
   };
   return (
     <button
-      class={`entry${selected ? " selected" : ""}`}
+      class={`entry${selected ? " selected" : ""}${locked ? " locked" : ""}`}
       aria-pressed={selected}
+      aria-disabled={!!locked}
       onMouseEnter={show}
       onMouseLeave={() => (paletteHelp.value = null)}
       onMouseDown={noFocus}
-      onClick={() => (tool.value = selected ? null : props.t)}
+      onClick={() => {
+        if (!locked) tool.value = selected ? null : props.t;
+      }}
     >
       {props.swatch && (
         <span class="swatch" style={{ background: hex(props.swatch.colour) }}>
@@ -225,7 +236,9 @@ function Entry(props: {
         </span>
       )}
       <span class="entry-name">{props.name}</span>
-      {props.detail && <span class="entry-detail">{props.detail}</span>}
+      {(locked || props.detail) && (
+        <span class="entry-detail">{locked ? "Locked" : props.detail}</span>
+      )}
     </button>
   );
 }

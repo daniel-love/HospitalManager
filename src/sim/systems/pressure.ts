@@ -214,13 +214,23 @@ function canStart(state: SimState, def: PressureEventDef, monthIndex: number): b
  * `leadMins` (a major incident) happens at a random time in the next day,
  * with only that much notice.
  */
-export function announce(state: SimState, def: PressureEventDef, leadDays?: number): PressureEvent {
+export function announce(
+  state: SimState,
+  def: PressureEventDef,
+  leadDays?: number,
+  /** A scenario's script: when it starts (with a major incident's standby before that). */
+  startAt?: number,
+): PressureEvent {
   const length = def.hours
     ? nextInt(state.rng, def.hours[0] * 60, def.hours[1] * 60) * TICKS_PER_MINUTE
     : nextInt(state.rng, def.days[0], def.days[1]) * TICKS_PER_DAY;
   let announced = state.tick;
   let start: number;
-  if (leadDays === undefined && def.leadMins !== undefined) {
+  if (startAt !== undefined) {
+    start = startAt;
+    if (def.leadMins !== undefined)
+      announced = Math.max(state.tick, startAt - def.leadMins * TICKS_PER_MINUTE);
+  } else if (leadDays === undefined && def.leadMins !== undefined) {
     announced = state.tick + nextInt(state.rng, 0, MINUTES_PER_DAY - 1) * TICKS_PER_MINUTE;
     start = announced + def.leadMins * TICKS_PER_MINUTE;
   } else {

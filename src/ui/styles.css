@@ -2569,3 +2569,85 @@ body.planning #game::after {
   opacity: 0.45;
   cursor: not-allowed;
 }
+.entry.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- New hospital: sandbox settings and scenarios ---------- */
+
+.new-game .tabs {
+  margin-bottom: 8px;
+}
+.sandbox-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.sandbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sandbox-label {
+  min-width: 110px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.scenario-pick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+}
+.scenario-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.scenario-briefing p,
+.scenario-briefing li {
+  font-size: 13px;
+  line-height: 1.45;
+}
+@media (max-width: 700px) {
+  .scenario-pick {
+    grid-template-columns: 1fr;
+  }
+}
+.scenario-card {
+  position: absolute;
+  top: 64px;
+  left: 16px;
+  z-index: 4;
+  max-width: 320px;
+  padding: 8px 10px;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.scenario-card ul {
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+}
+.scenario-card li {
+  margin: 2px 0;
+}
+.scenario-card li.met {
+  color: var(--ok);
+}
+.scenario-card li.failed {
+  color: var(--bad);
+}
+.scenario-modal {
+  max-width: 560px;
+}
+.scenario-modal p,
+.scenario-modal li {
+  font-size: 13px;
+  line-height: 1.45;
+}

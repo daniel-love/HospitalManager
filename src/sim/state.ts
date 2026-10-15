@@ -8,6 +8,7 @@ import { REPUTATION, STARTING_CASH } from "@data/economy";
 import { GRANT_OFFERS, OVERSIGHT, START_CREDIT } from "@data/finance";
 import type { EventFrequency, PressureEventId } from "@data/pressure";
 import { CQC, type CqcRating, type KeyQuestion } from "@data/cqc";
+import type { ScenarioId } from "@data/scenarios";
 import type { SpecialtyId } from "@data/schema";
 import { DEFAULT_CATCHMENT } from "@data/patients";
 import {
@@ -37,12 +38,12 @@ import {
 } from "./agents";
 import type { PlanEntry } from "./plan";
 import { createRng, type RngState } from "./rng";
-import { TICKS_PER_DAY } from "./time";
+import { dateOf, TICKS_PER_DAY } from "./time";
 import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 41;
+export const SIM_STATE_VERSION = 42;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -213,6 +214,8 @@ export interface SimState {
     /** Finished grants, newest last: met (kept) or missed (clawed back). */
     done: { defId: string; tick: number; met: boolean }[];
   };
+  /** A scenario's objectives, or a sandbox game's fail states (systems/scenarios.ts). */
+  goals: Goals;
   /** CQC inspections and ratings, and VIP visits (systems/inspections.ts). */
   cqc: Cqc;
   /** Inspectors and VIPs touring the hospital, keyed by id (agent ids). */
@@ -260,6 +263,8 @@ export interface SimSettings {
   eventFrequency: EventFrequency;
   /** Hiring is from applicants (systems/recruitment.ts) rather than instant. Off for test fixtures. */
   recruitment: boolean;
+  /** A sandbox game can be lost: bankruptcy, or Inadequate twice running (systems/scenarios.ts). */
+  failStates: boolean;
 }
 
 /** Someone applying for a post (systems/recruitment.ts). */
@@ -307,6 +312,23 @@ export interface Cqc {
   concernsAt: number | null;
   /** A VIP visit under way: who, and what they've seen. */
   vip: { eventId: number; who: string; findings: CqcFinding[] } | null;
+}
+
+/**
+ * A scenario's progress, or (with no scenario) a sandbox game's fail states
+ * (systems/scenarios.ts).
+ */
+export interface Goals {
+  scenario: ScenarioId | null;
+  /** Each objective: met, pending or failed, and a running tally (n of d). */
+  objectives: Record<string, { status: "pending" | "met" | "failed"; n: number; d: number }>;
+  /** Locks lifted. */
+  unlocked: string[];
+  /** Won or lost, and why; null while it's still going. */
+  outcome: { won: boolean; text: string; tick: number } | null;
+  /** Since when an NHS trust has been in oversight segment 4. */
+  segment4Since: number | null;
+  inadequateRun: number;
 }
 
 /** A major incident under way (systems/majorIncident.ts). */
@@ -431,6 +453,11 @@ export interface NewGameOptions {
   eventFrequency?: EventFrequency;
   /** Hiring from applicants. Off for test maps. */
   recruitment?: boolean;
+  failStates?: boolean;
+  /** The day the game begins (1 = 1 April, Year 1): a scenario may start later in the year. */
+  startDay?: number;
+  catchment?: number;
+  patientVolume?: number;
 }
 
 export const DEFAULT_MAP_SIZE = 200;
@@ -451,6 +478,8 @@ export function emptyMonth(monthIndex: number, cash: number): MonthReport {
 }
 
 export function createSimState(opts: NewGameOptions): SimState {
+  // A game can begin later in the year: tick 0 is still the first day's 08:00.
+  const start = ((opts.startDay ?? 1) - 1) * TICKS_PER_DAY;
   const width = opts.width ?? DEFAULT_MAP_SIZE;
   const height = opts.height ?? DEFAULT_MAP_SIZE;
   const ground = createFloorGrid(width, height);
@@ -458,7 +487,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     version: SIM_STATE_VERSION,
     seed: opts.seed >>> 0,
     rng: createRng(opts.seed),
-    tick: 0,
+    tick: start,
     money: opts.money ?? STARTING_CASH,
     floors: [ground],
     site: opts.site ? layOutSite(ground) : null,
@@ -506,7 +535,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     },
     today: { ledger: emptyLedger(), stats: emptyStats(), services: emptyServices() },
     history: [],
-    month: emptyMonth(0, opts.money ?? STARTING_CASH),
+    month: emptyMonth(dateOf(opts.startDay ?? 1).monthIndex, opts.money ?? STARTING_CASH),
     months: [],
     loans: [],
     nextLoanId: 1,
@@ -519,7 +548,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     grants: {
       offer: null,
       active: [],
-      nextOffer: GRANT_OFFERS.everyDays[0] * TICKS_PER_DAY,
+      nextOffer: start + GRANT_OFFERS.everyDays[0] * TICKS_PER_DAY,
       done: [],
     },
     pressure: { active: [], past: [], nextId: 1, vaccinated: null, majorIncident: null },
@@ -527,7 +556,7 @@ export function createSimState(opts: NewGameOptions): SimState {
       overall: null,
       questions: null,
       // The first inspection comes in the first few months (systems/inspections.ts).
-      next: CQC.firstInspectionDays[0] * TICKS_PER_DAY,
+      next: start + CQC.firstInspectionDays[0] * TICKS_PER_DAY,
       visit: null,
       pending: null,
       reports: [],
@@ -539,11 +568,20 @@ export function createSimState(opts: NewGameOptions): SimState {
     applicants: [],
     nextApplicantId: 1,
     settings: {
-      catchment: DEFAULT_CATCHMENT,
-      patientVolume: 1,
+      catchment: opts.catchment ?? DEFAULT_CATCHMENT,
+      patientVolume: opts.patientVolume ?? 1,
       rotas: opts.rotas ?? false,
       eventFrequency: opts.eventFrequency ?? "off",
       recruitment: opts.recruitment ?? false,
+      failStates: opts.failStates ?? false,
+    },
+    goals: {
+      scenario: null,
+      objectives: {},
+      unlocked: [],
+      outcome: null,
+      segment4Since: null,
+      inadequateRun: 0,
     },
     alerts: {},
     incidents: [],

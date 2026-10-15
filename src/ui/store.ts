@@ -493,3 +493,13 @@ export interface StaffTable {
 
 export const patientTable = signal<PatientTable | null>(null);
 export const staffTable = signal<StaffTable | null>(null);
+
+/** Rooms and equipment a scenario has locked, with why (systems/scenarios.ts). */
+export const lockedItems = signal<Record<string, string>>({});
+
+/** The scenario's objectives, for the objectives panel; null in a sandbox game. */
+export const goals =
+  signal<ReturnType<typeof import("@sim/systems/scenarios").describeGoals>>(null);
+
+/** The scenario briefing is open (it opens when a scenario starts). */
+export const scenarioBriefing = signal(false);

@@ -6,6 +6,8 @@
  * In plan mode, commands go into the build plan instead (see sim/plan.ts), and
  * the map, tools and inspector all show the plan preview ("viewState").
  */
+import { scenarioById, type ScenarioId } from "@data/scenarios";
+import { describeGoals, lockReason, startScenario } from "@sim/systems/scenarios";
 import { openingCampaign } from "@sim/systems/recruitment";
 import { RATING_NAMES } from "@data/cqc";
 import { equipmentCondition, setEssentialRoom } from "@sim/systems/maintenance";
@@ -95,6 +97,9 @@ import {
   type StaffTab,
   tool,
   type InspectorData,
+  goals,
+  lockedItems,
+  scenarioBriefing,
 } from "@ui/store";
 import { tileHelp } from "@ui/help";
 import { autosaveOption, settings, settingsOpen } from "@ui/settings";
@@ -485,21 +490,49 @@ export class Game {
     this.publishInspector();
   }
 
-  newGame(funding: Funding = "nhs"): void {
+  /** A new sandbox game, with the New hospital dialog's settings. */
+  newGame(opts: SandboxOptions = {}): void {
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
     const state = createSimState({
       seed,
       site: true,
       rotas: true,
-      funding,
-      eventFrequency: "realistic",
-      recruitment: true,
+      funding: opts.funding ?? "nhs",
+      ...(opts.money !== undefined ? { money: opts.money } : {}),
+      ...(opts.catchment !== undefined ? { catchment: opts.catchment } : {}),
+      ...(opts.patientVolume !== undefined ? { patientVolume: opts.patientVolume } : {}),
+      eventFrequency: opts.eventFrequency ?? "realistic",
+      recruitment: opts.recruitment ?? true,
+      failStates: opts.failStates ?? false,
     });
-    openingCampaign(state);
+    if (state.settings.recruitment) openingCampaign(state);
     this.loadState(state);
     if (state.site) this.focus(siteView(state.site));
     // Until it's saved, a reload starts afresh rather than resuming the old hospital.
     rememberLastSave(null);
+  }
+
+  /** A new game of a scenario. */
+  newScenario(id: ScenarioId): void {
+    const def = scenarioById.get(id)!;
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
+    const state = createSimState({
+      seed,
+      site: true,
+      rotas: true,
+      funding: def.funding,
+      money: def.money,
+      catchment: def.catchment,
+      startDay: def.startDay,
+      eventFrequency: def.eventFrequency,
+      recruitment: true,
+    });
+    startScenario(state, def);
+    openingCampaign(state);
+    this.loadState(state);
+    if (state.site) this.focus(siteView(state.site));
+    rememberLastSave(null);
+    scenarioBriefing.value = true;
   }
 
   /** Sets the population the hospital serves (a sandbox setting saved with the game). */
@@ -822,6 +855,27 @@ export class Game {
     this.publishHud();
   }
 
+  private lastGoals = "";
+
+  /** The scenario's objectives and locks, when they change. */
+  private publishGoals(): void {
+    const g = describeGoals(this.state);
+    const locks: Record<string, string> = {};
+    for (const room of content.rooms) {
+      const why = lockReason(this.state, room.id);
+      if (why) locks[room.id] = why;
+    }
+    for (const e of content.equipment) {
+      const why = lockReason(this.state, e.id);
+      if (why) locks[e.id] = why;
+    }
+    const key = JSON.stringify([g, locks]);
+    if (key === this.lastGoals) return;
+    this.lastGoals = key;
+    goals.value = g;
+    lockedItems.value = locks;
+  }
+
   /** Refreshes whichever management panel is open. */
   refreshPanels(): void {
     const panel = sidePanel.value;
@@ -883,6 +937,7 @@ export class Game {
   }
 
   private publishHud(): void {
+    this.publishGoals();
     hud.value = {
       clock: formatClock(clockFromTick(this.state.tick)),
       speed: this.loop.speed,
@@ -1088,4 +1143,15 @@ export class Game {
       this.publishHud();
     }
   }
+}
+
+/** The New hospital dialog's sandbox settings. */
+export interface SandboxOptions {
+  funding?: Funding;
+  money?: number;
+  catchment?: number;
+  patientVolume?: number;
+  eventFrequency?: EventFrequency;
+  recruitment?: boolean;
+  failStates?: boolean;
 }

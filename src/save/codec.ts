@@ -614,6 +614,17 @@ const saveSchema = z.object({
     outpatients: z.array(outpatientSchema),
     visitors: z.array(visitorSchema),
     tours: z.array(tourSchema),
+    goals: z.object({
+      scenario: z.enum(["ae_before_winter", "major_incident", "private_that_pays"]).nullable(),
+      objectives: z.record(
+        z.string(),
+        z.object({ status: z.enum(["pending", "met", "failed"]), n: num, d: num }),
+      ),
+      unlocked: z.array(z.string()),
+      outcome: z.object({ won: z.boolean(), text: z.string(), tick: int }).nullable(),
+      segment4Since: nullableInt,
+      inadequateRun: int.min(0),
+    }),
     applicants: z.array(
       z.object({ id: int.positive(), key: z.string(), skill: num.min(0).max(100), until: int }),
     ),
@@ -757,6 +768,7 @@ const saveSchema = z.object({
       rotas: z.boolean(),
       eventFrequency: z.enum(["off", "rare", "realistic", "frequent"]),
       recruitment: z.boolean(),
+      failStates: z.boolean(),
     }),
     alerts: z.record(z.string(), int),
     incidents: z.array(
@@ -820,6 +832,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       outpatients: Object.values(state.outpatients),
       visitors: Object.values(state.visitors),
       tours: Object.values(state.tours),
+      goals: state.goals,
       applicants: state.applicants,
       nextApplicantId: state.nextApplicantId,
       cqc: state.cqc,
@@ -905,6 +918,7 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     outpatients: byId(s.outpatients, "outpatient"),
     visitors: byId(s.visitors, "visitor"),
     tours: byId(s.tours, "tour"),
+    goals: s.goals,
     applicants: s.applicants,
     nextApplicantId: s.nextApplicantId,
     cqc: s.cqc,
