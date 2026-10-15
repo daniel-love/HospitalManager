@@ -27,11 +27,15 @@ const HINTS: Record<Speed, string> = {
 const noFocus = (e: MouseEvent) => e.preventDefault();
 
 function censusTitle(c: Census): string {
+  const beds =
+    c.beds > 0
+      ? `${c.bedsUsed} of ${c.beds} beds in use (${Math.round((c.bedsUsed / c.beds) * 100)}%)`
+      : "no ward beds";
   const lines = [
-    `In A&E: ${c.ae}`,
-    `  waiting to be booked in, triaged or seen: ${c.waiting}`,
-    `  admitted, on a trolley waiting for a ward bed: ${c.awaitingBed}`,
-    `On the wards: ${c.wards}`,
+    `In A&E: ${c.ae} (amber: someone in over 4 hours; red: over 12)`,
+    `  waiting to be booked in, triaged or seen: ${c.waiting} (amber: someone past their target; red: twice it)`,
+    `  admitted, on a trolley waiting for a ward bed: ${c.awaitingBed} (red: 5 or more, or a 12-hour wait)`,
+    `On the wards: ${c.wards}, ${beds} (amber: 92% full; red: 98%)`,
     `In for surgery (Day Surgery, theatre, Recovery): ${c.surgery}`,
     `Outpatients in clinic: ${c.clinics}`,
     "Click for the list",
@@ -62,21 +66,24 @@ export function TopBar({ game }: { game: Game }) {
         }}
       >
         <span class="stat">
-          <span class="dim">A&amp;E</span> {census.ae}
+          <span class="dim">A&amp;E</span> <span class={census.aePressure}>{census.ae}</span>
           {(census.waiting > 0 || census.awaitingBed > 0) && (
             <span class="sub">
               {" ("}
-              {census.waiting > 0 && `${census.waiting} waiting`}
+              {census.waiting > 0 && (
+                <span class={census.waitingPressure}>{census.waiting} waiting</span>
+              )}
               {census.waiting > 0 && census.awaitingBed > 0 && ", "}
               {census.awaitingBed > 0 && (
-                <span class="warn">{census.awaitingBed} need a bed</span>
+                <span class={census.awaitingBedPressure}>{census.awaitingBed} need a bed</span>
               )}
               {")"}
             </span>
           )}
         </span>
         <span class="stat">
-          <span class="dim">Wards</span> {census.wards}
+          <span class="dim">Wards</span>{" "}
+          <span class={census.beds > 0 ? census.wardPressure : ""}>{census.wards}</span>
         </span>
         {census.surgery > 0 && (
           <span class="stat">

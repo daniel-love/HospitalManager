@@ -749,8 +749,16 @@ body.planning #game::after {
 .census .sub {
   color: var(--text-dim);
 }
-.census .sub .warn {
-  color: #f2c94c;
+/* Counts against their targets: the same colours as the 4-hour chip. */
+.census .ok {
+  color: var(--ok);
+}
+.census .warn {
+  color: #f0c060;
+}
+.census .bad {
+  color: var(--bad);
+  font-weight: 600;
 }
 .census:hover {
   color: var(--text);

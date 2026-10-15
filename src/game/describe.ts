@@ -46,6 +46,7 @@ import {
   type DeathStep,
 } from "@sim/systems/deaths";
 import { inCare } from "@sim/systems/curtains";
+import { wardBedUse } from "@sim/systems/escalation";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { annualCost } from "@sim/systems/finance";
 import { formatWait, inAE } from "@sim/systems/patients";
@@ -1177,16 +1178,29 @@ export function fourHourShare(stats: { within4h: number; departures: number }): 
   return stats.departures === 0 ? null : stats.within4h / stats.departures;
 }
 
-/** Where patients are right now, for the top bar. */
+/** How a top-bar count is doing against its target. */
+export type Pressure = "ok" | "warn" | "bad";
+
+/** Where patients are right now, for the top bar, each with how it's doing. */
 export interface Census {
   /** Still in A&E (not on their way out, or admitted to a ward). */
   ae: number;
+  /** Anyone in A&E over 4 hours (warn) or 12 hours (bad). */
+  aePressure: Pressure;
   /** Of those, waiting to be booked in, triaged or seen. */
   waiting: number;
+  /** Anyone waiting past their target (warn) or twice it (bad): 15 minutes to triage, then their triage category's. */
+  waitingPressure: Pressure;
   /** Of those, admitted and waiting on an A&E trolley for a ward bed. */
   awaitingBed: number;
+  /** Five or more, or anyone over 12 hours (bad); otherwise warn if any (OPEL). */
+  awaitingBedPressure: Pressure;
   /** Inpatients in a ward bed. */
   wards: number;
+  /** Ward and side-room beds, and how full they are: 92% (warn) and 98% (bad), as for OPEL. */
+  beds: number;
+  bedsUsed: number;
+  wardPressure: Pressure;
   /** In for surgery: in the Day Surgery Unit, theatre or Recovery. */
   surgery: number;
   /** Outpatients in for an appointment. */
@@ -1207,17 +1221,61 @@ const SURGERY_STAGES = new Set<PatientStage>([
   "in_recovery",
   "post_op",
 ]);
+const RANK: Record<Pressure, number> = { ok: 0, warn: 1, bad: 2 };
+const worse = (a: Pressure, b: Pressure): Pressure => (RANK[b] > RANK[a] ? b : a);
+
+/** Waiting to be seen: past their target (warn), or twice it (bad). */
+function waitPressure(state: SimState, p: Patient): Pressure {
+  const triaged = p.stage === "waiting_treatment" && p.times.triaged !== null;
+  const since = triaged ? p.times.triaged! : p.times.arrived;
+  const target = triaged
+    ? (TRIAGE_CATEGORIES[p.category]?.targetMins ?? TRIAGE_TARGET_MINS)
+    : TRIAGE_TARGET_MINS;
+  const mins = (state.tick - since) / TICKS_PER_MINUTE;
+  return mins > 2 * target ? "bad" : mins > target ? "warn" : "ok";
+}
 
 export function census(state: SimState): Census {
-  const c: Census = { ae: 0, waiting: 0, awaitingBed: 0, wards: 0, surgery: 0, clinics: 0 };
+  const c: Census = {
+    ae: 0,
+    aePressure: "ok",
+    waiting: 0,
+    waitingPressure: "ok",
+    awaitingBed: 0,
+    awaitingBedPressure: "ok",
+    wards: 0,
+    beds: 0,
+    bedsUsed: 0,
+    wardPressure: "ok",
+    surgery: 0,
+    clinics: 0,
+  };
   for (const p of Object.values(state.patients)) {
     if (p.death !== null) continue;
     if (inAE(p)) {
       c.ae++;
-      if (WAITING_STAGES.has(p.stage)) c.waiting++;
-      else if (p.stage === "awaiting_bed") c.awaitingBed++;
+      const hours = (state.tick - p.times.arrived) / TICKS_PER_MINUTE / 60;
+      if (hours > 12) c.aePressure = "bad";
+      else if (hours > FOUR_HOUR_MINS / 60) c.aePressure = worse(c.aePressure, "warn");
+      if (WAITING_STAGES.has(p.stage)) {
+        c.waiting++;
+        c.waitingPressure = worse(c.waitingPressure, waitPressure(state, p));
+      } else if (p.stage === "awaiting_bed") {
+        c.awaitingBed++;
+        const since = p.times.decided ?? p.times.arrived;
+        if ((state.tick - since) / TICKS_PER_MINUTE > 12 * 60) c.awaitingBedPressure = "bad";
+      }
     } else if (p.stage === "on_ward") c.wards++;
     else if (SURGERY_STAGES.has(p.stage)) c.surgery++;
+  }
+  if (c.awaitingBed >= 5) c.awaitingBedPressure = "bad";
+  else if (c.awaitingBed > 0) c.awaitingBedPressure = worse(c.awaitingBedPressure, "warn");
+  const { beds, used } = wardBedUse(state);
+  c.beds = beds;
+  c.bedsUsed = used;
+  if (beds > 0) {
+    const occ = used / beds;
+    c.wardPressure = occ >= 0.98 ? "bad" : occ >= 0.92 ? "warn" : "ok";
   }
   for (const o of Object.values(state.outpatients)) {
     if (o.stage !== "leaving") c.clinics++;
