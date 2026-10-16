@@ -116,6 +116,9 @@ export function updatePatients(state: SimState): void {
       case "awaiting_handover":
         break; // On the stretcher at the ambulance (systems/ambulances.ts).
       case "awaiting_bed":
+        // Admitted from a Minors cubicle: they sit in the Waiting Area until a porter comes.
+        if (p.bed === null && inAE(p)) waitInArea(state, p, beingSeen.has(p.id));
+        break;
       case "transferring":
       case "on_ward":
         break; // On a bed; porters move them (systems/admissions.ts).
@@ -424,18 +427,32 @@ export function postTreatment(state: SimState, p: Patient, objectId: number | nu
   const escalated = p.deterioration !== null && p.deterioration.noticed !== null;
   // A referral step goes to the specialty's team, if the hospital has one.
   const team = step.specialty !== undefined && hasTeam(state, step.specialty);
+  // Getting worse and already brought round to Resus: treated where they lie.
+  const resus = escalated && objectId === null ? resusTrolleyFor(state, p, step) : null;
   postJob(state, {
     kind: "treat",
     roles: team ? ["registrar", "consultant"] : step.roles,
     specialty: team ? step.specialty! : null,
     patientId: p.id,
-    objectId,
-    roomType: step.room,
+    objectId: resus ?? objectId,
+    roomType: resus !== null ? "resus_bay" : step.room,
     capabilities: step.capabilities,
     step: p.step,
     dueTick: escalated ? ESCALATED_DUE : p.times.arrived + target * TICKS_PER_MINUTE,
     durationTicks: ticksFor(state.rng, step.mins),
   });
+}
+
+/** Their Resus trolley, if they're on one and a Majors step can be done there. */
+function resusTrolleyFor(
+  state: SimState,
+  p: Patient,
+  step: { room: string; capabilities: readonly string[] },
+): number | null {
+  if (step.room !== "majors_bay" || p.bed === null) return null;
+  const room = roomOfObject(state, p.bed);
+  if (room?.typeId !== "resus_bay" || !room.valid) return null;
+  return step.capabilities.every((c) => room.capabilities.includes(c)) ? p.bed : null;
 }
 
 export function afterTriage(state: SimState, p: Patient): void {

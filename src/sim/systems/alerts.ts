@@ -33,6 +33,7 @@ import { roomOfObject } from "../world/rooms";
 import { ambulancesWaiting, needsTrolley } from "./ambulances";
 import { hasCleaningJob, postJob, ticksFor } from "./jobBoard";
 import { inAE } from "./patients";
+import { wardBedsOutOfReach } from "./admissions";
 import { inCare } from "./curtains";
 import { bedCover, nurseStations, stationsSeeing } from "./monitoring";
 
@@ -342,6 +343,18 @@ export function updateAlerts(state: SimState): void {
       "exit_block",
       COOLDOWN,
       `${plural(longWaits, "admitted patient has", "admitted patients have")} waited over 4 hours on an A&E trolley for a ward bed. More ward beds (or faster discharges) would free up A&E.`,
+    );
+  }
+
+  // Free ward beds a trolley can't get to (single doors, narrow corridors, another building).
+  const outOfReach = forBed.filter((p) => wardBedsOutOfReach(state, p)).length;
+  if (outOfReach > 0) {
+    warn(
+      state,
+      "ward_out_of_reach",
+      COOLDOWN,
+      `${plural(outOfReach, "admitted patient is", "admitted patients are")} waiting on A&E trolleys while ward beds are free: no bed-width route reaches them. Beds need double doors and corridors at least 2 tiles wide.`,
+      "bad",
     );
   }
 

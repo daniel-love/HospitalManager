@@ -35,7 +35,7 @@ import { earnEmergency } from "./finance";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo } from "./movement";
 import { die } from "./deaths";
-import { leave, lift, recordDeparture } from "./patients";
+import { leave, lift, recordDeparture, releaseSeat } from "./patients";
 import { cantOperate } from "./theatres";
 import { cantAdmit, decideToTransfer } from "./transfers";
 import { freeEscalationBeds } from "./escalation";
@@ -123,6 +123,13 @@ export function decideToAdmit(state: SimState, p: Patient): void {
   p.times.decided = state.tick;
   p.stage = "awaiting_bed";
   lift(p, MOOD_LIFT_DECISION);
+  // Well enough to sit: they wait for their bed in the Waiting Area, not
+  // holding a Minors cubicle. Trolley patients stay on their trolley.
+  if (p.bed !== null && !onTrolley(state, p)) {
+    release(state, p.bed, 0, p.id);
+    if (state.objects[p.bed]) dirtyCouch(state, p.bed);
+    p.bed = null;
+  }
   postJob(state, {
     kind: "transfer",
     roles: ["porter"],
@@ -315,6 +322,18 @@ export function claimWardBed(state: SimState, job: Job): Point | null {
   return from;
 }
 
+/**
+ * Whether a patient on an A&E trolley is stuck because no free ward bed can
+ * be reached by a bed-width route (single doors, a 1-tile corridor, or a
+ * ward in another building), though some are free.
+ */
+export function wardBedsOutOfReach(state: SimState, p: Patient): boolean {
+  if (!onTrolley(state, p)) return false;
+  const from = tileOf(p);
+  const free = freeCouches(state, "ward", ["inpatient_bed"], from);
+  return free.length > 0 && !free.some((b) => trolleyStop(state, from, b) !== null);
+}
+
 /** How well a ward suits them: 0 their specialty's, 1 open to any, 2 another specialty's. */
 function wardFit(state: SimState, p: Patient, bed: PlacedObject): number {
   const specialty = roomOfObject(state, bed.id)?.specialty ?? null;
@@ -357,6 +376,8 @@ export function runTransfer(state: SimState, job: Job, porter: Staff, p: Patient
     if (headTo(state, porter, at) !== "arrived") return;
     job.state = "working";
     p.stage = "transferring";
+    releaseSeat(state, p);
+    p.standing = null;
     if (p.bed !== null) {
       release(state, p.bed, 0, p.id);
       if (state.objects[p.bed]) dirtyCouch(state, p.bed);

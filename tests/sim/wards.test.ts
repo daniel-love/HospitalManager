@@ -274,7 +274,7 @@ describe("central monitoring", () => {
 describe("a hospital with a ward over three days", () => {
   // A seed whose first admissions include short stays (so beds free up within the three days)
   // and that admits more than six (so the ward fills).
-  const state = staffedMajorsAE(2, WITH_PORTER, { ward: "door_double", ambulance: true });
+  const state = staffedMajorsAE(11, WITH_PORTER, { ward: "door_double", ambulance: true });
   hireRegistrars(state);
   run(state, 3 * TICKS_PER_DAY);
 
@@ -291,7 +291,7 @@ describe("a hospital with a ward over three days", () => {
   });
 
   it("is deterministic", () => {
-    const again = staffedMajorsAE(2, WITH_PORTER, { ward: "door_double", ambulance: true });
+    const again = staffedMajorsAE(11, WITH_PORTER, { ward: "door_double", ambulance: true });
     hireRegistrars(again);
     run(again, 3 * TICKS_PER_DAY);
     expect(again.history).toEqual(state.history);

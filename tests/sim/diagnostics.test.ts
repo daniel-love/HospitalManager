@@ -82,9 +82,23 @@ describe("blood tests", () => {
     runUntil(state, () => p.transfer !== null, 8 * HOUR);
     expect(p.transfer!.reason).toMatch(/no working Pathology Lab/);
   });
+
+  it("can't be done without a biomedical scientist: the patient is transferred out", () => {
+    const state = quiet(staffedMajorsAE(1, { ...MAJORS_TEAM, biomedical_scientist: 0 }));
+    const p = arrive(state, "chest_pain");
+    runUntil(state, () => p.transfer !== null, 8 * HOUR);
+    expect(p.transfer!.reason).toMatch(/no Biomedical Scientist on the staff/);
+  });
 });
 
 describe("X-rays", () => {
+  it("can't be done without a radiographer: the patient is transferred, not left waiting", () => {
+    const state = quiet(staffedSmallAE(1, { ...SMALL_AE_TEAM, radiographer: 0 }));
+    const p = arrive(state, "broken_ankle");
+    runUntil(state, () => p.transfer !== null, 8 * HOUR);
+    expect(p.transfer!.reason).toBe("There's no Radiographer on the staff");
+  });
+
   it("send a walking patient from their cubicle to X-ray and back to wait", () => {
     const state = quiet(staffedSmallAE(1, SMALL_AE_TEAM));
     const p = arrive(state, "broken_ankle");

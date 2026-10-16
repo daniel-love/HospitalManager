@@ -203,14 +203,33 @@ function claimPlace(state: SimState, job: Job): Point | null {
   if (isBeingSeen(state, p.id)) return null; // Mid-observations.
   const trolley = step?.imaging === "xray" ? bedsideXray(state, job, p) : null;
   if (trolley) return trolley;
-  const couch = freeCouches(state, job.roomType, job.capabilities, p).find((c) =>
-    claimKit(state, job, c),
-  );
+  const couch =
+    freeCouches(state, job.roomType, job.capabilities, p).find((c) => claimKit(state, job, c)) ??
+    resusForEscalated(state, job, p);
   if (!couch) return null;
   job.objectId = couch.id;
   const wheeled = keepsTrolley(state, p, !!step?.imaging);
   callToBed(state, p, couch.id, wheeled);
   if (wheeled) sendForScan(state, p, couch.id);
+  return couch;
+}
+
+/**
+ * A patient getting worse (escalated) who needs a Majors Bay when every one
+ * is taken is brought round to Resus instead, if a trolley there is free and
+ * equipped for what they need: they're moved on to Majors once one frees up.
+ */
+function resusForEscalated(state: SimState, job: Job, p: Patient): PlacedObject | undefined {
+  if (job.roomType !== "majors_bay" || !(job.kind === "treat" || job.kind === "handover")) {
+    return undefined;
+  }
+  if (p.deterioration?.noticed == null) return undefined;
+  // Already on a Resus trolley: they wait there for Majors.
+  if (p.bed !== null && roomOfObject(state, p.bed)?.typeId === "resus_bay") return undefined;
+  const couch = freeCouches(state, "resus_bay", job.capabilities, p).find((c) =>
+    claimKit(state, job, c),
+  );
+  if (couch) job.roomType = "resus_bay";
   return couch;
 }
 
