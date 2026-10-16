@@ -1044,6 +1044,11 @@ export interface Incident {
   where: string;
   at: Point;
   causes: string[];
+  /**
+   * What the hospital should change, where the staffing, the building or a
+   * policy played a part: the actions a UK incident review would agree.
+   */
+  recommendations: string[];
 }
 
 /** A message for the notifications feed. Never read back by the sim. */

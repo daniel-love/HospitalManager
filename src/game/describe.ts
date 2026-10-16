@@ -1263,6 +1263,7 @@ export interface Census {
   /** Still in A&E (not on their way out, or admitted to a ward). */
   ae: number;
   /** Anyone in A&E over 4 hours (warn) or 12 hours (bad). */
+          recommendations: i.recommendations,
   aePressure: Pressure;
   /** Of those, waiting to be booked in, triaged or seen. */
   waiting: number;

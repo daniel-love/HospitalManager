@@ -189,6 +189,9 @@ describe("a deteriorating patient", () => {
         "4 staff nurses on duty for 1 patient in A&E",
       ]),
     );
+    expect(incident.recommendations).toEqual([
+      "Rearrange the Majors Bay, or add a nurse station, so every trolley can be seen from one (check with the Coverage overlay)",
+    ]);
     expect(allText(state)).toMatch(/Crash call: .* cardiac arrest in the Majors Bay/);
     expect(state.today.stats.incidents).toBe(1);
 
@@ -199,6 +202,9 @@ describe("a deteriorating patient", () => {
     expect(transferred + deaths).toBe(1);
     expect(incident.causes).toContainEqual(
       expect.stringMatching(/No A&E doctor reached the cardiac arrest/),
+    );
+    expect(incident.recommendations).toContainEqual(
+      expect.stringMatching(/^Rota more A&E doctors, so one can always lead a resuscitation/),
     );
     if (deaths === 1) {
       expect(state.patients[p.id]!.stage).toBe("deceased");
@@ -217,6 +223,9 @@ describe("a deteriorating patient", () => {
     runFor(state, 21 * MIN);
     expect(state.incidents[0]!.causes).toContain(
       "There's no nurse station, so nobody was watching their trolley in the Majors Bay",
+    );
+    expect(state.incidents[0]!.recommendations).toContain(
+      "Build a nurse station with a clear view of the trolleys in the Majors Bay",
     );
   });
 
@@ -243,6 +252,7 @@ describe("a deteriorating patient", () => {
     expect(incident.causes[0]).toMatch(
       /^Escalated at \d\d:\d\d, but doctor assessment and treatment hadn't started 1h \d\dm later: there are no Junior Doctors$/,
     );
+    expect(incident.recommendations).toContain("Hire Junior Doctors (Staff › Team)");
   });
 
   it("is stabilised by timely treatment", () => {

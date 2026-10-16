@@ -115,6 +115,16 @@ export function ReportsPanel({ onShow }: { onShow: (at: { x: number; y: number }
                     <li key={c}>{c}</li>
                   ))}
                 </ul>
+                {i.recommendations.length > 0 && (
+                  <>
+                    <p class="recs-head">Recommendations</p>
+                    <ul class="recs">
+                      {i.recommendations.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </li>
             ))}
           </ul>

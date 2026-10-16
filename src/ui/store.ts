@@ -451,6 +451,7 @@ export interface ReportData {
     causes: string[];
   }[];
 }
+    recommendations: string[];
 export const report = signal<ReportData | null>(null);
 export const toasts = signal<Toast[]>([]);
 

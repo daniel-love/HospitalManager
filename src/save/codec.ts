@@ -798,6 +798,7 @@ const saveSchema = z.object({
         where: z.string(),
         at: z.object({ x: int, y: int }),
         causes: z.array(z.string()),
+        recommendations: z.array(z.string()),
       }),
     ),
     nextIncidentId: int.positive(),

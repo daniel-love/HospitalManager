@@ -173,7 +173,7 @@ function lowerToFloor(state: SimState, p: Patient): void {
 /** Cardiac arrest: crash call, and an incident report. */
 function collapse(state: SimState, p: Patient): void {
   const d = p.deterioration!;
-  const causes = incidentCauses(state, p);
+  const { causes, recommendations } = incidentCauses(state, p);
   for (const job of jobsForPatient(state, p.id)) removeJob(state, job);
   lowerToFloor(state, p);
   releaseSeat(state, p);
@@ -210,6 +210,7 @@ function collapse(state: SimState, p: Patient): void {
     where,
     at: at(p),
     causes,
+    recommendations,
   };
   state.incidents.push(incident);
   if (state.incidents.length > MAX_INCIDENTS) state.incidents.shift();
@@ -240,9 +241,15 @@ function checkArrestTeam(state: SimState, p: Patient): void {
   if (lead?.state === "working") return;
   if (state.tick - p.deterioration!.crash < RESUS_WAIT_LIMIT_MINS * TICKS_PER_MINUTE) return;
   const incident = [...state.incidents].reverse().find((i) => i.patientId === p.id);
-  incident?.causes.push(
-    `No A&E doctor reached the cardiac arrest within ${RESUS_WAIT_LIMIT_MINS} minutes; the hospital's arrest team took over`,
-  );
+  if (incident) {
+    incident.causes.push(
+      `No A&E doctor reached the cardiac arrest within ${RESUS_WAIT_LIMIT_MINS} minutes; the hospital's arrest team took over`,
+    );
+    recommend(
+      incident,
+      `Rota more A&E doctors, so one can always lead a resuscitation within ${RESUS_WAIT_LIMIT_MINS} minutes`,
+    );
+  }
   emit(
     state,
     `The hospital's cardiac arrest team took over ${p.name}'s resuscitation: no A&E doctor came`,
@@ -283,19 +290,45 @@ export function finishResus(
   } else {
     if (startedAfterMins !== null && startedAfterMins >= 1) {
       const incident = [...state.incidents].reverse().find((i) => i.patientId === p.id);
-      incident?.causes.push(
-        `The resuscitation team leader reached them ${Math.round(startedAfterMins)} minutes after the arrest`,
-      );
+      if (incident) {
+        incident.causes.push(
+          `The resuscitation team leader reached them ${Math.round(startedAfterMins)} minutes after the arrest`,
+        );
+        if (startedAfterMins >= LATE_LEADER_MINS) {
+          recommend(
+            incident,
+            "Rota more A&E doctors, or build Resus closer to where they work, so a crash call is answered within minutes",
+          );
+        }
+      }
     }
     die(state, p, false, true);
   }
   debrief(state, team, !survived);
 }
 
-/** Contributing factors, in plain English, for the incident record. */
-function incidentCauses(state: SimState, p: Patient): string[] {
+/** A team leader this late to an arrest is a finding in itself. */
+const LATE_LEADER_MINS = 3;
+/** Patients on A&E trolleys per nurse beyond which staffing is a finding (RCN guide for Majors: 1 to 4). */
+const TROLLEYS_PER_NURSE = 4;
+
+/** Adds a recommendation to an incident, once. */
+export function recommend(incident: Incident, text: string): void {
+  if (!incident.recommendations.includes(text)) incident.recommendations.push(text);
+}
+
+/**
+ * Contributing factors, in plain English, for the incident record, and the
+ * changes recommended where the staffing, the building or a policy played a
+ * part. Bad luck with good care recommends nothing.
+ */
+function incidentCauses(
+  state: SimState,
+  p: Patient,
+): { causes: string[]; recommendations: string[] } {
   const d = p.deterioration!;
   const causes: string[] = [];
+  const recs = new Set<string>();
   const condition = conditionById.get(p.conditionId)!;
 
   if (d.noticed === null) {
@@ -304,9 +337,11 @@ function incidentCauses(state: SimState, p: Patient): string[] {
     );
   } else {
     const stabiliser = condition.pathway.find((s, i) => s.stabilises && i >= p.step);
+    const delay = delayReason(state, p);
     causes.push(
-      `Escalated at ${clockAt(d.noticed)}, but ${stabiliser ? stabiliser.name.toLowerCase() : "treatment"} hadn't started ${formatWait(mins(state.tick - d.noticed))} later${delayReason(state, p)}`,
+      `Escalated at ${clockAt(d.noticed)}, but ${stabiliser ? stabiliser.name.toLowerCase() : "treatment"} hadn't started ${formatWait(mins(state.tick - d.noticed))} later${delay.text}`,
     );
+    if (delay.rec) recs.add(delay.rec);
   }
 
   const onBed = p.bed !== null && p.stage === "in_cubicle";
@@ -316,6 +351,7 @@ function incidentCauses(state: SimState, p: Patient): string[] {
     const cover = bedCover(state, p.bed!);
     if (nurseStations(state).length === 0) {
       causes.push(`There's no nurse station, so nobody was watching their trolley in the ${name}`);
+      recs.add(`Build a nurse station with a clear view of the trolleys in the ${name}`);
     } else if (cover === "blind") {
       causes.push(`Their trolley in the ${name} isn't visible from any nurse station`);
       const far = monitorTooFar(state, p.bed!);
@@ -323,20 +359,34 @@ function incidentCauses(state: SimState, p: Patient): string[] {
         causes.push(
           `The central monitor is a ${far} m walk away, beyond the ${MONITOR_RESPONSE_DISTANCE} m a nurse can respond in time`,
         );
+        recs.add(
+          `Move the central monitoring station to within a ${MONITOR_RESPONSE_DISTANCE} m walk of the ${name}, or add another nearer`,
+        );
+      } else {
+        recs.add(
+          `Rearrange the ${name}, or add a nurse station, so every trolley can be seen from one (check with the Coverage overlay)`,
+        );
       }
     } else if (cover === "curtained") {
       causes.push(
         `The curtains round their trolley in the ${name} were drawn, hiding them from the nurse station`,
       );
+      recs.add(
+        `Fit bedside monitors in the ${name} with a central monitoring station nearby, so patients are still watched with the curtains drawn`,
+      );
     } else if (cover === "unstaffed") {
       causes.push(
         `The nurse station that can see their trolley in the ${name} was empty: every nurse was busy`,
+      );
+      recs.add(
+        "Rota more A&E nurses, so a nurse stays at the nurse station when the others are busy",
       );
     }
   } else if (p.stage === "awaiting_handover") {
     causes.push(
       `Still with the ambulance crew ${formatWait(mins(state.tick - p.times.arrived))} after arriving, waiting to be handed over`,
     );
+    for (const r of capacityRecs(state, "majors_bay", [])) recs.add(r);
   } else if (p.stage === "waiting_treatment" || p.stage === "waiting_triage") {
     const step = condition.pathway[p.step];
     const room = step ? roomById.get(step.room) : undefined;
@@ -344,7 +394,10 @@ function incidentCauses(state: SimState, p: Patient): string[] {
     if (room && p.category > 0) {
       const c = couchStatus(state, room.id, step!.capabilities);
       text += `, waiting ${formatWait(mins(state.tick - (p.times.triaged ?? p.times.arrived)))} for a ${room.name}`;
-      if (c.free === 0) text += ` (all ${c.total} in use or waiting to be cleaned)`;
+      if (c.free === 0) {
+        text += ` (all ${c.total} in use or waiting to be cleaned)`;
+        for (const r of capacityRecs(state, room.id, step!.capabilities)) recs.add(r);
+      }
     }
     causes.push(text);
   }
@@ -357,40 +410,116 @@ function incidentCauses(state: SimState, p: Patient): string[] {
         ? `Observations were ${formatWait(overdue)} overdue (due every ${every} min); the last, at ${clockAt(p.obs.tick)}, scored NEWS2 ${p.obs.news}`
         : `Last observations at ${clockAt(p.obs.tick)} scored NEWS2 ${p.obs.news}`,
     );
+    if (overdue > 0) recs.add("Rota more A&E nurses, so observations are done on time");
   } else if (p.times.triaged === null && p.stage !== "awaiting_handover") {
     const queue = Object.values(state.patients).filter((q) => q.stage === "waiting_triage").length;
     causes.push(
       `Not yet triaged after ${formatWait(mins(state.tick - p.times.arrived))}, with ${queue} waiting for triage`,
     );
+    if (queue > 1) {
+      const triage = couchStatus(state, "triage_room", []);
+      recs.add(
+        triage.total === 0
+          ? "Build a triage room, so patients are assessed soon after they arrive"
+          : triage.free === 0
+            ? "Build another triage room, so patients are assessed soon after they arrive"
+            : "Rota more A&E nurses, so patients are triaged soon after they arrive",
+      );
+    }
   }
 
   const nurses = Object.values(state.staff).filter((s) => s.role === "nurse" && onDuty(s)).length;
-  const inDept = Object.values(state.patients).filter(inAE).length;
+  const inDept = Object.values(state.patients).filter(inAE);
   causes.push(
-    `${nurses === 1 ? "1 staff nurse" : `${nurses} staff nurses`} on duty for ${inDept === 1 ? "1 patient" : `${inDept} patients`} in A&E`,
+    `${nurses === 1 ? "1 staff nurse" : `${nurses} staff nurses`} on duty for ${inDept.length === 1 ? "1 patient" : `${inDept.length} patients`} in A&E`,
   );
-  return causes;
+  const onTrolleys = inDept.filter((q) => q.bed !== null).length;
+  if (onTrolleys > nurses * TROLLEYS_PER_NURSE) {
+    recs.add(
+      `Rota more A&E nurses: ${onTrolleys} patients on trolleys is more than ${TROLLEYS_PER_NURSE} for each nurse on duty`,
+    );
+  }
+  return { causes, recommendations: [...recs] };
 }
 
-/** Why the patient's next treatment step is held up, as ": …" (or ""). */
-function delayReason(state: SimState, p: Patient): string {
+/**
+ * What would free a couch in a full room: a bed for admitted patients
+ * holding A&E trolleys (escalation, earlier discharges), or more couches.
+ */
+function capacityRecs(
+  state: SimState,
+  roomType: string,
+  capabilities: readonly string[],
+): string[] {
+  const boarders = Object.values(state.patients).filter(
+    (q) => q.stage === "awaiting_bed" && inAE(q),
+  ).length;
+  const recs: string[] = [];
+  if (boarders > 0) {
+    const waiting =
+      boarders === 1 ? "an admitted patient was" : `${boarders} admitted patients were`;
+    if (!state.policies.escalation) {
+      recs.push(
+        `Open escalation beds (Hospital › Policies): ${waiting} holding A&E trolleys while waiting for a ward bed`,
+      );
+    }
+    if (!state.policies.dischargeBeforeNoon) {
+      recs.push(
+        "Turn on discharge before noon (Hospital › Policies), so ward beds free up earlier in the day",
+      );
+    }
+    if (recs.length === 0) recs.push(`Build more ward beds: ${waiting} holding A&E trolleys`);
+  } else {
+    const room = roomById.get(roomType)?.name ?? roomType;
+    const c = couchStatus(state, roomType, capabilities);
+    recs.push(
+      c.dirty > 0
+        ? `Rota more cleaners, or build more ${room} space: ${c.dirty} waiting to be cleaned`
+        : `Build more ${room} space`,
+    );
+  }
+  return recs;
+}
+
+/**
+ * Why the patient's next treatment step is held up, as ": …" (or ""), and
+ * the change that would have helped.
+ */
+function delayReason(state: SimState, p: Patient): { text: string; rec?: string } {
   const job = jobsForPatient(state, p.id).find(
     (j) => (j.kind === "treat" || j.kind === "handover") && j.state === "open",
   );
-  if (!job) return "";
+  if (!job) return { text: "" };
   const hired = Object.values(state.staff).filter((s) => job.roles.includes(s.role));
-  if (hired.length === 0) return `: there are no ${roleNames(job.roles, true)}`;
+  const many = roleNames(job.roles, true);
+  if (hired.length === 0) {
+    return { text: `: there are no ${many}`, rec: `Hire ${many} (Staff › Team)` };
+  }
   const qualified = hired.filter(onDuty);
-  if (qualified.length === 0) return `: there were no ${roleNames(job.roles, true)} on duty`;
+  if (qualified.length === 0) {
+    return {
+      text: `: there were no ${many} on duty`,
+      rec: `Rota ${many} on every shift, so there's always one on duty (Staff › Rota)`,
+    };
+  }
   if (qualified.every((s) => s.jobId !== null)) {
-    return qualified.length === 1
-      ? `: the only ${roleNames(job.roles)} was busy`
-      : `: all ${qualified.length} ${roleNames(job.roles, true)} were busy`;
+    return {
+      text:
+        qualified.length === 1
+          ? `: the only ${roleNames(job.roles)} was busy`
+          : `: all ${qualified.length} ${many} were busy`,
+      rec: `Rota more ${many} at this time of day (Staff › Rota)`,
+    };
   }
   if (job.objectId === null) {
     const c = couchStatus(state, job.roomType, job.capabilities);
     const room = roomById.get(job.roomType)?.name ?? job.roomType;
-    if (c.free === 0) return `: no free ${room}`;
+    if (c.free === 0) {
+      return {
+        text: `: no free ${room}`,
+        rec: capacityRecs(state, job.roomType, job.capabilities)[0]!,
+      };
+    }
   }
-  return "";
+  return { text: "" };
 }

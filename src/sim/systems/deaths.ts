@@ -632,6 +632,11 @@ function noMortuarySpace(state: SimState, p: Patient): void {
       `${p.name} couldn't be moved after last offices: ${why}`,
       "The bay stays closed to other patients until there's space",
     ],
+    recommendations: [
+      total === 0
+        ? "Build a Mortuary with a fridge unit, with a door near the wards and A&E"
+        : "Add mortuary fridge units, so there's space for the busiest days",
+    ],
   });
   state.today.stats.incidents++;
   warn(

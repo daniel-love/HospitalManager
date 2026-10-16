@@ -1053,6 +1053,15 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v49: incident records carry recommendations.
+  48: (save) => {
+    const state = save.state as { incidents?: object[] };
+    if (!state.incidents) return save;
+    return {
+      ...save,
+      state: { ...state, incidents: state.incidents.map((i) => ({ ...i, recommendations: [] })) },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */
