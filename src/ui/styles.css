@@ -1743,6 +1743,22 @@ body.planning #game::after {
   left: 2px;
   color: var(--bad);
 }
+.incidents .recs-head {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.incidents .recs li {
+  font-size: 12px;
+  padding-left: 12px;
+  position: relative;
+}
+.incidents .recs li::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
 
 /* ---------- 4-hour chip (top bar) ---------- */
 .four-hour {
@@ -1766,22 +1782,6 @@ body.planning #game::after {
 }
 .list-section:first-child {
   margin-top: 0;
-}
-.incidents .recs-head {
-  margin: 6px 0 2px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.incidents .recs li {
-  font-size: 12px;
-  padding-left: 12px;
-  position: relative;
-}
-.incidents .recs li::before {
-  content: "→";
-  position: absolute;
-  left: 0;
-  color: var(--accent);
 }
 .panel .list-section > h3 {
   margin: 0 0 6px;

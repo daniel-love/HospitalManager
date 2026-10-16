@@ -449,9 +449,9 @@ export interface ReportData {
     where: string;
     at: { x: number; y: number };
     causes: string[];
+    recommendations: string[];
   }[];
 }
-    recommendations: string[];
 export const report = signal<ReportData | null>(null);
 export const toasts = signal<Toast[]>([]);
 
