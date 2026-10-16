@@ -75,8 +75,13 @@ export function waitAtBase(state: SimState, s: Staff): void {
   if (s.jobId !== null) return;
   // Staggered: finding a spot isn't urgent.
   if ((state.tick + s.id) % 10 !== 0) return;
-  const grid = state.floors[0]!;
   const taken = takenSpots(state, s);
+  goToBase(state, s, taken);
+  taken.moved(s);
+}
+
+function goToBase(state: SimState, s: Staff, taken: TakenSpots): void {
+  const grid = state.floors[0]!;
   const current = s.dest ?? { x: Math.round(s.x), y: Math.round(s.y) };
   const currentRoom = state.rooms[grid.roomId[tileIndex(grid, current.x, current.y)]! - 1];
 
@@ -107,15 +112,53 @@ export function waitAtBase(state: SimState, s: Staff): void {
 }
 
 /** Tiles other staff are standing on or heading to. */
-function takenSpots(state: SimState, self: Staff): Set<number> {
+interface TakenSpots {
+  has(tile: number): boolean;
+  /** Notes where `s` is heading now, for the next to look this tick. */
+  moved(s: Staff): void;
+}
+
+/**
+ * Who's standing on (or heading to) each tile, counted once a tick and kept
+ * up to date as staff pick their spots: counting everyone afresh for each
+ * of them is slow with hundreds of staff.
+ */
+const spotCounts = new WeakMap<
+  SimState,
+  { tick: number; count: Map<number, number>; at: Map<number, number> }
+>();
+
+function spotOf(state: SimState, o: Staff): number {
   const grid = state.floors[0]!;
-  const out = new Set<number>();
-  for (const o of Object.values(state.staff)) {
-    if (o.id === self.id || !onSite(o)) continue;
-    const p = o.dest ?? { x: Math.round(o.x), y: Math.round(o.y) };
-    out.add(tileIndex(grid, p.x, p.y));
+  const p = o.dest ?? { x: Math.round(o.x), y: Math.round(o.y) };
+  return tileIndex(grid, p.x, p.y);
+}
+
+function takenSpots(state: SimState, self: Staff): TakenSpots {
+  let c = spotCounts.get(state);
+  if (c?.tick !== state.tick) {
+    c = { tick: state.tick, count: new Map(), at: new Map() };
+    for (const o of Object.values(state.staff)) {
+      if (!onSite(o)) continue;
+      const i = spotOf(state, o);
+      c.at.set(o.id, i);
+      c.count.set(i, (c.count.get(i) ?? 0) + 1);
+    }
+    spotCounts.set(state, c);
   }
-  return out;
+  const { count, at } = c;
+  const mine = at.get(self.id);
+  return {
+    has: (i) => (count.get(i) ?? 0) - (i === mine ? 1 : 0) > 0,
+    moved: (s) => {
+      const was = at.get(s.id);
+      const now = spotOf(state, s);
+      if (was === now) return;
+      if (was !== undefined) count.set(was, count.get(was)! - 1);
+      count.set(now, (count.get(now) ?? 0) + 1);
+      at.set(s.id, now);
+    },
+  };
 }
 
 /** Where to wait, and the tile to walk to first (in front of a seat, say). */
@@ -162,7 +205,7 @@ function freeSpot(
   state: SimState,
   rooms: Room[],
   s: Staff,
-  taken: Set<number>,
+  taken: TakenSpots,
   seatedOnly = false,
 ): Spot | null {
   const grid = state.floors[0]!;

@@ -47,6 +47,7 @@ import {
   holder,
   inValidRoom,
   queueSpots,
+  receptionDesks,
   release,
   reserve,
   restPoint,
@@ -145,38 +146,103 @@ export function updatePatients(state: SimState): void {
 
 // ---------- Reception ----------
 
-/** Queue spots are only recomputed when the layout changes. */
-const spotCache = new WeakMap<SimState, { version: number; spots: Point[] }>();
+/** Queue spots, by reception room id, are only recomputed when the layout changes. */
+const spotCache = new WeakMap<SimState, { version: number; spots: Map<number, Point[]> }>();
 
-function cachedQueueSpots(state: SimState): Point[] {
-  const c = spotCache.get(state);
-  if (c && c.version === state.layoutVersion) return c.spots;
-  const spots = queueSpots(state);
-  spotCache.set(state, { version: state.layoutVersion, spots });
+function cachedQueueSpots(state: SimState, roomId: number): Point[] {
+  let c = spotCache.get(state);
+  if (!c || c.version !== state.layoutVersion) {
+    c = { version: state.layoutVersion, spots: new Map() };
+    spotCache.set(state, c);
+  }
+  let spots = c.spots.get(roomId);
+  if (!spots) {
+    spots = queueSpots(state, roomId);
+    c.spots.set(roomId, spots);
+  }
   return spots;
 }
 
-/** First come, first served: the head of the queue goes to the next free staffed desk. */
+/**
+ * First come, first served at each A&E Reception: the head of its queue goes
+ * to its next free staffed desk. Patients queue at the reception they're
+ * in, or else the nearest one with a receptionist at a desk (any, if none
+ * has), so a hospital with two receptions has two queues.
+ */
 function updateQueue(state: SimState): void {
-  const queue = Object.values(state.patients)
-    .filter((p) => p.stage === "queueing")
-    .sort((a, b) => a.times.arrived - b.times.arrived || a.id - b.id);
-  if (queue.length === 0) return;
-  const freeDesks = staffedDesks(state).filter((d) => holder(state, d.id, 0) === undefined);
-  while (freeDesks.length > 0 && queue.length > 0) {
-    const desk = freeDesks.shift()!;
-    const p = queue.shift()!;
-    p.stage = "booking";
-    p.desk = desk.id;
-    p.bookingLeft = ticksFor(state.rng, BOOKING_MINS);
-    reserve(state, desk.id, 0, p.id);
+  const queueing = Object.values(state.patients).filter((p) => p.stage === "queueing");
+  if (queueing.length === 0) return;
+  const desks = receptionDesks(state);
+  const roomOf = (d: PlacedObject) => state.objectRoom[d.id]!;
+  const staffed = staffedDesks(state);
+  const open = new Set(staffed.map(roomOf));
+  const rooms = new Map<number, PlacedObject[]>();
+  for (const d of desks) rooms.set(roomOf(d), [...(rooms.get(roomOf(d)) ?? []), d]);
+  const queues = new Map<number, Patient[]>();
+  for (const p of queueing) {
+    const room = receptionFor(state, p, rooms, open);
+    if (room === null) {
+      stop(p);
+      continue;
+    }
+    queues.set(room, [...(queues.get(room) ?? []), p]);
   }
-  const spots = cachedQueueSpots(state);
-  queue.forEach((p, n) => {
-    const spot = spots[Math.min(n, spots.length - 1)];
-    if (spot) headTo(state, p, spot);
-    else stop(p);
-  });
+  for (const [room, queue] of queues) {
+    queue.sort((a, b) => a.times.arrived - b.times.arrived || a.id - b.id);
+    const freeDesks = staffed.filter(
+      (d) => roomOf(d) === room && holder(state, d.id, 0) === undefined,
+    );
+    while (freeDesks.length > 0 && queue.length > 0) {
+      const desk = freeDesks.shift()!;
+      const p = queue.shift()!;
+      p.stage = "booking";
+      p.desk = desk.id;
+      p.bookingLeft = ticksFor(state.rng, BOOKING_MINS);
+      reserve(state, desk.id, 0, p.id);
+    }
+    const spots = cachedQueueSpots(state, room);
+    queue.forEach((p, n) => {
+      // Still walking in: keep heading for the spot they set off for, and
+      // take their place in the line on reaching the room, rather than
+      // re-plan the whole walk each time the queue moves up.
+      if (
+        p.path.length > 0 &&
+        p.dest &&
+        roomAt(state, 0, Math.round(p.x), Math.round(p.y))?.id !== room
+      ) {
+        return;
+      }
+      const spot = spots[Math.min(n, spots.length - 1)];
+      if (spot) headTo(state, p, spot);
+      else stop(p);
+    });
+  }
+}
+
+/** The reception room a queueing patient lines up in, or null if there's no desk. */
+function receptionFor(
+  state: SimState,
+  p: Patient,
+  rooms: Map<number, PlacedObject[]>,
+  open: Set<number>,
+): number | null {
+  const x = Math.round(p.x);
+  const y = Math.round(p.y);
+  const here = roomAt(state, 0, x, y);
+  const choices = open.size > 0 ? open : new Set(rooms.keys());
+  if (here && choices.has(here.id)) return here.id;
+  let best: number | null = null;
+  let bestD = Infinity;
+  for (const room of choices) {
+    for (const d of rooms.get(room) ?? []) {
+      const dist = Math.abs(d.x - x) + Math.abs(d.y - y);
+      if (dist < bestD || (dist === bestD && room < best!)) {
+        best = room;
+        bestD = dist;
+      }
+    }
+  }
+  return best;
 }
 
 function updateBooking(state: SimState, p: Patient): void {
@@ -336,12 +402,31 @@ function wheelInFromAmbulance(state: SimState, p: Patient, bed: PlacedObject): A
     planned.y === to.y &&
     planned.blocked < 0 &&
     (planned.ax !== side.x || planned.ay !== side.y);
+  // Already squeezing in on foot (no stretcher-width way): carry on, rather
+  // than search the whole site for a stretcher route again every tick.
+  const squeezing =
+    planned &&
+    planned.x === to.x &&
+    planned.y === to.y &&
+    planned.ax === side.x &&
+    planned.ay === side.y &&
+    p.pathVersion === state.layoutVersion;
+  if (squeezing) return headTo(state, p, to, side, false, true);
   const grid = state.floors[0]!;
   // Ruling out stops with no stretcher-width way to them at all first saves
   // searching the whole site for each.
-  const crewRoute = (at: Point) =>
-    bedRouteExists(state, from, at) &&
-    findPath(grid, from.x, from.y, at.x, at.y, { bed: true, patient: crewAccess(state) }) !== null;
+  // The stops are all beside the same trolley, in the same room: if public
+  // routes can't reach one, they can't reach the others, so one failed
+  // search (which covers the whole site) is enough.
+  let publicRouteFailed = false;
+  const crewRoute = (at: Point) => {
+    if (publicRouteFailed || !bedRouteExists(state, from, at)) return false;
+    const ok =
+      findPath(grid, from.x, from.y, at.x, at.y, { bed: true, patient: crewAccess(state) }) !==
+      null;
+    if (!ok) publicRouteFailed = true;
+    return ok;
+  };
   const at = onTheWay
     ? { x: planned.ax, y: planned.ay }
     : (trolleyStop(state, from, bed, crewRoute) ?? trolleyStop(state, from, bed));

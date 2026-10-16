@@ -147,7 +147,8 @@ function cantDoStep(state: SimState, p: Patient, job: Job): string | null {
   if (imaging && !anyoneFor(state, job)) return `There's no ${roleNames(job.roles)} on the staff`;
   const bloodsStuck = p.investigations.some((i) => i.test === "bloods" && i.ready === null);
   if (bloodsStuck) {
-    if (analysers(state).length === 0) return "There's no working Pathology Lab to test their bloods";
+    if (analysers(state).length === 0)
+      return "There's no working Pathology Lab to test their bloods";
     if (!anyoneWithRole(state, ["biomedical_scientist"])) {
       return "There's no Biomedical Scientist on the staff to test their bloods";
     }

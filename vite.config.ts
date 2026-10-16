@@ -17,8 +17,13 @@ export default defineConfig({
     },
   },
   test: {
-    // `npm run balance` runs the slow economy checks instead (tests/balance).
-    include: process.env.BALANCE ? ["tests/balance/**/*.balance.ts"] : ["tests/**/*.test.ts"],
+    // `npm run balance` runs the slow economy checks instead (tests/balance),
+    // and `npm run bench` the simulation benchmark (tests/bench).
+    include: process.env.BALANCE
+      ? ["tests/balance/**/*.balance.ts"]
+      : process.env.BENCH
+        ? ["tests/bench/**/*.bench.ts"]
+        : ["tests/**/*.test.ts"],
     environment: "node",
     // Multi-day headless simulations take a second or two each, and longer
     // when every test file runs in parallel.

@@ -297,6 +297,10 @@ Benefits: balancing without code changes, easy to add conditions, and a path to 
 
 Levers if needed: staggered AI updates, path caching and flow fields, moving the sim into a Web Worker (the state is already plain data), and spatial hashing for proximity queries.
 
+**Measuring (M7 step 1).** `npm run bench` (tests/bench/sim.bench.ts) builds the stress map (game/maps/stressHospital.ts: copies of the district hospital side by side on one site, `COPIES` and `CATCHMENT` env overrides), warms it up for `WARM_UP_DAYS` (default 3) so the wards fill, then times a simulated day tick by tick with `profiledTick` (sim.ts runs its systems from the named `SYSTEMS` list). It prints the mean, p50, p99, p99.9 and worst tick, each system's share, agents on the map, and the slowest ticks with the systems behind each. For a CPU profile: `BENCH=1 npx vitest run --pool=forks --execArgv=--cpu-prof --execArgv=--cpu-prof-dir=<dir>`. At 16× the game runs 160 ticks a second inside a 10 ms-per-frame sim budget, so a tick must average under about 3.75 ms, and single ticks over about 10 ms show as dropped frames.
+
+Built-in limits on the sim's own work: idle staff look for a base spot every 10 ticks, staggered; waiting patients look for a seat or toilet every 10 ticks; admitted patients look for a ward bed once a sim minute, staggered (jobs.ts); at most `MAX_PLANS_PER_TICK` (16) routes are planned in one tick and anyone else sets off a tick later (movement.ts), which spreads a shift change; and a route search that can't succeed is ruled out first by walk or bed region labels (world/walkRegions.ts, admissions.ts `bedRegions`, with `regionsAt` memoised per layout). Route searches that fail only because of patients' access rules (public routes) still search the whole site; access-aware region labels are the next step, due with multi-floor routing.
+
 ## 11. Tooling & conventions
 
 - ESLint + Prettier, `strict` TS, path aliases (`@sim`, `@data`, `@render`, `@ui`).

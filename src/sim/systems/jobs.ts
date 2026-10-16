@@ -36,7 +36,7 @@ import {
 import { handoverDone } from "./ambulances";
 import { finishResus, newsScore, notice } from "./deterioration";
 import { NEWS_URGENT } from "@data/monitoring";
-import { dropKit, removeJob, unassignJob } from "./jobBoard";
+import { dropKit, isBeingSeen, removeJob, unassignJob } from "./jobBoard";
 import { headTo } from "./movement";
 import { TICKS_PER_MINUTE } from "../time";
 import { canReviewDeath, claimDeathPlace, runDeathJob } from "./deaths";
@@ -157,7 +157,12 @@ function pullOffWork(state: SimState, job: Job): Staff[] {
  * it's chosen now. Null if the job can't start yet.
  */
 function claimPlace(state: SimState, job: Job): Point | null {
-  if (job.kind === "transfer") return claimWardBed(state, job);
+  if (job.kind === "transfer") {
+    // A ward bed is looked for once a minute per patient, staggered: checking
+    // every free bed's route every tick is costly with many waiting.
+    if ((state.tick + (job.patientId ?? 0)) % TICKS_PER_MINUTE !== 0) return null;
+    return claimWardBed(state, job);
+  }
   if (job.kind === "isolate") {
     // To their bed: they're wheeled to the side room bed already kept for them.
     const p = job.patientId === null ? undefined : state.patients[job.patientId];
@@ -203,15 +208,34 @@ function claimPlace(state: SimState, job: Job): Point | null {
   if (isBeingSeen(state, p.id)) return null; // Mid-observations.
   const trolley = step?.imaging === "xray" ? bedsideXray(state, job, p) : null;
   if (trolley) return trolley;
-  const couch =
-    freeCouches(state, job.roomType, job.capabilities, p).find((c) => claimKit(state, job, c)) ??
-    resusForEscalated(state, job, p);
+  const couch = freeCouch(state, job, p) ?? resusForEscalated(state, job, p);
   if (!couch) return null;
   job.objectId = couch.id;
   const wheeled = keepsTrolley(state, p, !!step?.imaging);
   callToBed(state, p, couch.id, wheeled);
   if (wheeled) sendForScan(state, p, couch.id);
   return couch;
+}
+
+/**
+ * Room types (with capabilities) found to have no free couch at all so far
+ * this tick. Couches are only taken during a tick's assignments, never
+ * freed, so the rest of the queue for a full room needn't search it again.
+ */
+const fullThisTick = new WeakMap<SimState, { tick: number; full: Set<string> }>();
+
+/** The nearest free couch for the job with its shared kit, if any. */
+function freeCouch(state: SimState, job: Job, p: Patient): PlacedObject | undefined {
+  let memo = fullThisTick.get(state);
+  if (memo?.tick !== state.tick) {
+    memo = { tick: state.tick, full: new Set() };
+    fullThisTick.set(state, memo);
+  }
+  const key = `${job.roomType}|${job.capabilities.join(",")}`;
+  if (memo.full.has(key)) return undefined;
+  const couches = freeCouches(state, job.roomType, job.capabilities, p);
+  if (couches.length === 0) memo.full.add(key);
+  return couches.find((c) => claimKit(state, job, c));
 }
 
 /**
@@ -281,10 +305,6 @@ function treatStep(state: SimState, job: Job) {
   if (job.kind !== "treat" || job.patientId === null) return undefined;
   const p = state.patients[job.patientId];
   return p && conditionById.get(p.conditionId)!.pathway[job.step];
-}
-
-function isBeingSeen(state: SimState, patientId: number): boolean {
-  return Object.values(state.jobs).some((j) => j.patientId === patientId && j.state === "working");
 }
 
 function nearest(staff: Staff[], to: Point): Staff {

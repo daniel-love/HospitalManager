@@ -47,6 +47,10 @@ export function postJob(state: SimState, j: NewJob): Job {
     kit: null,
   };
   state.jobs[job.id] = job;
+  const index = byPatient.get(state);
+  if (index && job.patientId !== null) {
+    index.set(job.patientId, [...(index.get(job.patientId) ?? []), job]);
+  }
   return job;
 }
 
@@ -64,6 +68,12 @@ export function removeJob(state: SimState, job: Job): void {
     }
   }
   delete state.jobs[job.id];
+  const index = byPatient.get(state);
+  if (index && job.patientId !== null) {
+    const left = (index.get(job.patientId) ?? []).filter((j) => j !== job);
+    if (left.length > 0) index.set(job.patientId, left);
+    else index.delete(job.patientId);
+  }
   dropKit(state, job, staff);
 }
 
@@ -142,8 +152,34 @@ export function jobsForObject(state: SimState, objectId: number): Job[] {
   return Object.values(state.jobs).filter((j) => j.objectId === objectId);
 }
 
+/**
+ * Jobs by patient id, built on first use and kept up to date by postJob and
+ * removeJob (the only places jobs come and go). Rebuilt for a state loaded
+ * from a save, which is a new object.
+ */
+const byPatient = new WeakMap<SimState, Map<number, Job[]>>();
+
+function patientIndex(state: SimState): Map<number, Job[]> {
+  let index = byPatient.get(state);
+  if (!index) {
+    index = new Map();
+    for (const j of Object.values(state.jobs)) {
+      if (j.patientId !== null) index.set(j.patientId, [...(index.get(j.patientId) ?? []), j]);
+    }
+    byPatient.set(state, index);
+  }
+  return index;
+}
+
+/** A patient's jobs, oldest first (a copy: safe to remove jobs while going through it). */
 export function jobsForPatient(state: SimState, patientId: number): Job[] {
-  return Object.values(state.jobs).filter((j) => j.patientId === patientId);
+  // Still on the board: a stray `delete state.jobs[id]` mustn't leave a ghost.
+  return (patientIndex(state).get(patientId) ?? []).filter((j) => state.jobs[j.id] === j);
+}
+
+/** Whether staff are working with a patient now (triage, treatment, obs…). */
+export function isBeingSeen(state: SimState, patientId: number): boolean {
+  return jobsForPatient(state, patientId).some((j) => j.state === "working");
 }
 
 /** Whether a cleaning job is already posted for an object. */

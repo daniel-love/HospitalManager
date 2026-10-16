@@ -148,13 +148,15 @@ interface BedRegions {
   version: number;
   /** Bed-passable tile → connected region label (0 = not bed-passable). */
   label: Int32Array;
+  /** regionsAt() by tile index, filled as asked: it only changes with the layout. */
+  touching: Map<number, Set<number>>;
 }
 const regionCache = new WeakMap<SimState, BedRegions>();
 
 /** Connected areas a bed can be wheeled around, labelled once per layout. */
-function bedRegions(state: SimState): Int32Array {
+function bedRegions(state: SimState): BedRegions {
   const cached = regionCache.get(state);
-  if (cached && cached.version === state.layoutVersion) return cached.label;
+  if (cached && cached.version === state.layoutVersion) return cached;
   const grid = state.floors[0]!;
   const { width, height } = grid;
   const label = new Int32Array(width * height);
@@ -184,8 +186,9 @@ function bedRegions(state: SimState): Int32Array {
       }
     }
   }
-  regionCache.set(state, { version: state.layoutVersion, label });
-  return label;
+  const regions = { version: state.layoutVersion, label, touching: new Map() };
+  regionCache.set(state, regions);
+  return regions;
 }
 
 /**
@@ -195,9 +198,13 @@ function bedRegions(state: SimState): Int32Array {
  */
 function regionsAt(state: SimState, t: Point): Set<number> {
   const grid = state.floors[0]!;
-  const label = bedRegions(state);
+  const { label, touching } = bedRegions(state);
   const out = new Set<number>();
   if (t.x < 0 || t.y < 0 || t.x >= grid.width || t.y >= grid.height) return out;
+  const key = tileIndex(grid, t.x, t.y);
+  const known = touching.get(key);
+  if (known) return known;
+  touching.set(key, out);
   const id = grid.objectId[tileIndex(grid, t.x, t.y)]!;
   const obj = id === -1 ? undefined : state.objects[id];
   const r = obj ? objectRect(obj) : { x: t.x, y: t.y, w: 1, h: 1 };

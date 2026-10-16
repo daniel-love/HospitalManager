@@ -14,6 +14,13 @@ import { walkRouteExists } from "../world/walkRegions";
 
 /** Ticks to wait before retrying a route that couldn't be found. */
 const RETRY_TICKS = 60;
+/**
+ * Routes planned in one tick at most; anyone else sets off a tick later.
+ * At a shift change fifty-odd staff head for their bases at once, which
+ * on a big site is tens of milliseconds of searching in a single tick.
+ */
+export const MAX_PLANS_PER_TICK = 16;
+const planned = new WeakMap<SimState, { tick: number; n: number }>();
 /** Walking through a doorway is slower. */
 const DOOR_SPEED_FACTOR = 0.6;
 /** Walking across grass is slower than on floor or paving (see GRASS_COST). */
@@ -75,10 +82,15 @@ function plan(
   bed: boolean,
   withCrew: boolean,
 ): Arrival {
+  // Over budget this tick: try again next tick, carrying on as they were
+  // (their old destination kept, so the old route isn't taken for the new one).
+  const arrived = Math.abs(agent.x - to.x) < EPS && Math.abs(agent.y - to.y) < EPS;
+  const budget = planned.get(state);
+  if (!arrived && budget?.tick === state.tick && budget.n >= MAX_PLANS_PER_TICK) return "moving";
   const dest = { x: to.x, y: to.y, ax: approach.x, ay: approach.y, blocked: -1 };
   agent.dest = dest;
   agent.pathVersion = state.layoutVersion;
-  if (Math.abs(agent.x - to.x) < EPS && Math.abs(agent.y - to.y) < EPS) {
+  if (arrived) {
     agent.path = [];
     return "arrived";
   }
@@ -95,6 +107,8 @@ function plan(
     agent.path = [];
     return "no_route";
   }
+  if (budget?.tick === state.tick) budget.n++;
+  else planned.set(state, { tick: state.tick, n: 1 });
   const access = withCrew ? crewAccess(state) : onFoot ? patientAccess(state) : undefined;
   let tiles = findPath(grid, sx, sy, approach.x, approach.y, {
     bed,

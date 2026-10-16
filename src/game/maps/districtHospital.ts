@@ -60,40 +60,69 @@ const COVER: Cover[] = [
  * staff and rota. The cost is not charged: it's the hospital you inherit.
  */
 export function buildDistrictHospital(state: SimState): void {
+  buildDistrictCopies(state, 1);
+}
+
+/** How far apart side-by-side copies are built (game/maps/stressHospital.ts). */
+export const DISTRICT_PITCH = 60;
+
+/**
+ * `copies` of the district hospital side by side, DISTRICT_PITCH tiles
+ * apart, on one site with one road, staffed `copies` times over. One copy
+ * is the scenario hospital; more make the performance stress map.
+ */
+export function buildDistrictCopies(state: SimState, copies: number): void {
   // An inherited hospital: built and staffed, not bought or recruited.
   const money = state.money;
   const recruiting = state.settings.recruitment;
   state.money = Number.MAX_SAFE_INTEGER;
   state.settings.recruitment = false;
-  applyAll(state, [
-    ...SMALL_AE_COMMANDS,
-    ...DIAGNOSTICS_COMMANDS,
-    ...MAJORS_WING_COMMANDS,
-    ...NURSE_STATION,
-    ...RESUS_AND_BAY_COMMANDS,
-    ...wardCommands("door_double"),
-    ...shift(OUTPATIENTS_COMMANDS, OUTPATIENTS_AT),
-    ...shift(THEATRES_COMMANDS, SURGICAL_AT),
-  ]);
+  const offsets = Array.from({ length: copies }, (_, i) => ({ x: i * DISTRICT_PITCH, y: 0 }));
+  for (const by of offsets) {
+    applyAll(
+      state,
+      shift(
+        [
+          ...SMALL_AE_COMMANDS,
+          ...DIAGNOSTICS_COMMANDS,
+          ...MAJORS_WING_COMMANDS,
+          ...NURSE_STATION,
+          ...RESUS_AND_BAY_COMMANDS,
+          ...wardCommands("door_double"),
+          ...shift(OUTPATIENTS_COMMANDS, OUTPATIENTS_AT),
+          ...shift(THEATRES_COMMANDS, SURGICAL_AT),
+        ],
+        by,
+      ),
+    );
+  }
   const site = fitSite(state.floors[F]!);
   if (!site) throw new Error("No room for the road below the district hospital");
   state.site = site;
   state.layoutVersion++;
   const pavement = site.pavements[0]!;
   const bottom = pavement.y + pavement.h - 1;
-  applyAll(state, [
-    // An access road from the ambulance bay down to the road.
-    { type: "pave", floor: F, rect: rect(15, 35, 17, bottom), surface: "road" },
-    // Footpaths from the outpatients and surgical blocks' doors down to the pavement.
-    { type: "pave", floor: F, rect: rect(39, 14, 40, 15), surface: "path" },
-    { type: "pave", floor: F, rect: rect(33, 15, 40, 15), surface: "path" },
-    { type: "pave", floor: F, rect: rect(32, 15, 32, bottom), surface: "path" },
-  ]);
-  const at = (p: { x: number; y: number }, by: { x: number; y: number }) =>
-    roomAt(state, F, p.x + by.x, p.y + by.y)!;
-  setRoomSpecialty(state, at(CLINIC_A, OUTPATIENTS_AT), "cardiology");
-  setRoomSpecialty(state, at(THEATRE_A, SURGICAL_AT), "trauma_orthopaedics");
-  staff(state);
+  for (const by of offsets) {
+    applyAll(
+      state,
+      shift(
+        [
+          // An access road from the ambulance bay down to the road.
+          { type: "pave", floor: F, rect: rect(15, 35, 17, bottom), surface: "road" },
+          // Footpaths from the outpatients and surgical blocks' doors down to the pavement.
+          { type: "pave", floor: F, rect: rect(39, 14, 40, 15), surface: "path" },
+          { type: "pave", floor: F, rect: rect(33, 15, 40, 15), surface: "path" },
+          { type: "pave", floor: F, rect: rect(32, 15, 32, bottom), surface: "path" },
+        ],
+        by,
+      ),
+    );
+    const at = (p: { x: number; y: number }, block: { x: number; y: number }) =>
+      roomAt(state, F, p.x + block.x + by.x, p.y + block.y + by.y)!;
+    setRoomSpecialty(state, at(CLINIC_A, OUTPATIENTS_AT), "cardiology");
+    setRoomSpecialty(state, at(THEATRE_A, SURGICAL_AT), "trauma_orthopaedics");
+  }
+  staff(state, copies);
   state.money = money;
   state.month.flows.building = 0;
   state.settings.recruitment = recruiting;
@@ -101,7 +130,7 @@ export function buildDistrictHospital(state: SimState): void {
   state.events.length = 0;
 }
 
-function staff(state: SimState): void {
+function staff(state: SimState, copies: number): void {
   const wanted = new Map<
     string,
     { role: StaffRoleId; extra: object; day: number; night: number }
@@ -109,8 +138,8 @@ function staff(state: SimState): void {
   for (const [role, day, night, extra = {}] of COVER) {
     const key = `${role}:${JSON.stringify(extra)}`;
     const w = wanted.get(key) ?? { role, extra, day: 0, night: 0 };
-    w.day += day;
-    w.night += night;
+    w.day += day * copies;
+    w.night += night * copies;
     wanted.set(key, w);
   }
   for (const w of wanted.values()) {
@@ -138,12 +167,14 @@ function staff(state: SimState): void {
     applyStaffCommand(state, { type: "set_clinic_sessions", id, sessions: clinics });
     if (lists) applyStaffCommand(state, { type: "set_theatre_sessions", id, sessions: lists });
   };
-  consultant("general_medicine", 0, 0);
-  consultant("cardiology", 4, 0);
-  consultant("trauma_orthopaedics", 3, 3);
-  consultant("trauma_orthopaedics", 0, 0, true);
-  consultant("anaesthetics", 0, 3);
-  consultant("general_surgery", 0, 0, true);
-  applyStaffCommand(state, { type: "hire_staff", role: "discharge_coordinator" });
-  applyStaffCommand(state, { type: "hire_staff", role: "clinical_engineer" });
+  for (let i = 0; i < copies; i++) {
+    consultant("general_medicine", 0, 0);
+    consultant("cardiology", 4, 0);
+    consultant("trauma_orthopaedics", 3, 3);
+    consultant("trauma_orthopaedics", 0, 0, true);
+    consultant("anaesthetics", 0, 3);
+    consultant("general_surgery", 0, 0, true);
+    applyStaffCommand(state, { type: "hire_staff", role: "discharge_coordinator" });
+    applyStaffCommand(state, { type: "hire_staff", role: "clinical_engineer" });
+  }
 }

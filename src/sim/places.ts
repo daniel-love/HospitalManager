@@ -459,10 +459,12 @@ export function staffedDesks(state: SimState): PlacedObject[] {
 /**
  * Places to queue for reception, best first: in front of each desk, then
  * the tiles of the reception room in order of walking distance from the
- * desks (breadth-first).
+ * desks (breadth-first). Just one A&E Reception's, given its room id.
  */
-export function queueSpots(state: SimState): Point[] {
-  const desks = receptionDesks(state);
+export function queueSpots(state: SimState, roomId?: number): Point[] {
+  const desks = receptionDesks(state).filter(
+    (d) => roomId === undefined || state.objectRoom[d.id] === roomId,
+  );
   if (desks.length === 0) return [];
   const grid = state.floors[0]!;
   const roomIds = new Set(desks.map((d) => state.objectRoom[d.id]!));
