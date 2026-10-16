@@ -1,8 +1,9 @@
 /**
- * The performance stress map (ROADMAP M7 step 1): three district hospitals
- * side by side on one site, sharing one catchment three times the size, so
- * a few hundred patients, staff, outpatients and visitors are on the map at
- * once. Used by `npm run bench` (tests/bench) and, in the browser, to watch
+ * The performance stress map (ROADMAP M7 steps 1 and 2): three district
+ * hospitals side by side on one site, each with a two-storey ward tower
+ * reached by a bed lift (three storeys in all), sharing a catchment twice
+ * each hospital's, so a few hundred patients, staff, outpatients and
+ * visitors are on the map at once. Used by `npm run bench` (tests/bench) and, in the browser, to watch
  * frame times: `__game.loadState((await import('/src/game/maps/stressHospital.ts')).buildStressHospital())`.
  */
 import { createSimState, type SimState } from "@sim/state";
@@ -27,6 +28,6 @@ export function buildStressHospital(
     eventFrequency: "off",
     recruitment: false,
   });
-  buildDistrictCopies(state, copies);
+  buildDistrictCopies(state, copies, { towers: true });
   return state;
 }

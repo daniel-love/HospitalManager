@@ -8,7 +8,9 @@
  */
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import type { NurseBand } from "@data/staff";
+import type { Command } from "@sim/commands";
 import type { SimState } from "@sim/state";
+import { WallType } from "@sim/world/grid";
 import { setCover } from "@sim/systems/rota";
 import { applyStaffCommand } from "@sim/systems/staffing";
 import { fitSite } from "@sim/world/site";
@@ -71,7 +73,11 @@ export const DISTRICT_PITCH = 60;
  * apart, on one site with one road, staffed `copies` times over. One copy
  * is the scenario hospital; more make the performance stress map.
  */
-export function buildDistrictCopies(state: SimState, copies: number): void {
+export function buildDistrictCopies(
+  state: SimState,
+  copies: number,
+  opts: { towers?: boolean } = {},
+): void {
   // An inherited hospital: built and staffed, not bought or recruited.
   const money = state.money;
   const recruiting = state.settings.recruitment;
@@ -122,6 +128,7 @@ export function buildDistrictCopies(state: SimState, copies: number): void {
     setRoomSpecialty(state, at(CLINIC_A, OUTPATIENTS_AT), "cardiology");
     setRoomSpecialty(state, at(THEATRE_A, SURGICAL_AT), "trauma_orthopaedics");
   }
+  if (opts.towers) for (const by of offsets) applyAll(state, shift(towerCommands(), by));
   staff(state, copies);
   state.money = money;
   state.month.flows.building = 0;
@@ -177,4 +184,39 @@ function staff(state: SimState, copies: number): void {
     applyStaffCommand(state, { type: "hire_staff", role: "discharge_coordinator" });
     applyStaffCommand(state, { type: "hire_staff", role: "clinical_engineer" });
   }
+}
+
+/**
+ * A ward tower over the medical ward and Majors (the stress map's upper
+ * floors): a bed lift in the ground-floor ward, between its rows of beds
+ * and opening east towards Majors, and on each of two floors above, a
+ * corridor from the lift through double doors to an 8-bed ward.
+ */
+export function towerCommands(): Command[] {
+  const lift = (floor: number): Command => ({
+    type: "place_object",
+    floor,
+    defId: "lift",
+    x: 2,
+    y: 22,
+    rotation: 3,
+  });
+  const out: Command[] = [lift(0)];
+  for (const floor of [1, 2]) {
+    out.push(
+      { type: "build_floor", floor, rect: rect(1, 18, 17, 28) },
+      { type: "build_walls", floor, rect: rect(1, 18, 17, 28), wall: WallType.Standard },
+      lift(floor),
+      { type: "build_walls", floor, rect: rect(7, 18, 7, 28), wall: WallType.Standard },
+      { type: "place_object", floor, defId: "door_double", x: 7, y: 21, rotation: 1 },
+      { type: "zone", floor, rect: rect(2, 19, 6, 27), roomType: "corridor" },
+      { type: "zone", floor, rect: rect(8, 19, 16, 27), roomType: "ward" },
+      ...[8, 10, 12, 14].flatMap((x): Command[] => [
+        { type: "place_object", floor, defId: "hospital_bed", x, y: 19, rotation: 0 },
+        { type: "place_object", floor, defId: "hospital_bed", x, y: 26, rotation: 0 },
+      ]),
+      { type: "place_object", floor, defId: "sink", x: 16, y: 27, rotation: 2 },
+    );
+  }
+  return out;
 }
