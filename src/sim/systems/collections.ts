@@ -227,6 +227,7 @@ export function updateCollections(state: SimState): void {
         c.crew.prevX = c.crew.x;
         c.crew.prevY = c.crew.y;
         c.crew.x = p.x;
+        c.crew.floor = p.floor;
         c.crew.y = p.y;
         c.crew.path = [];
         c.crew.dest = null;

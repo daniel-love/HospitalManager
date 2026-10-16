@@ -482,6 +482,7 @@ function runToMortuary(state: SimState, job: Job, porter: Staff, p: Patient): vo
   porter.prevX = porter.x;
   porter.prevY = porter.y;
   porter.x = p.x;
+  porter.floor = p.floor;
   porter.y = p.y;
   porter.path = [];
   porter.dest = null;

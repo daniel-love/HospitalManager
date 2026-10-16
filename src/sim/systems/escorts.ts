@@ -172,6 +172,7 @@ export function runEscort(state: SimState, job: Job, staff: Staff, p: Patient): 
   staff.prevX = staff.x;
   staff.prevY = staff.y;
   staff.x = p.x;
+  staff.floor = p.floor;
   staff.y = p.y;
   staff.path = [];
   staff.dest = null;

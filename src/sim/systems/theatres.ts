@@ -631,6 +631,7 @@ function runOperation(state: SimState, op: Operation): void {
     pusher.prevX = pusher.x;
     pusher.prevY = pusher.y;
     pusher.x = p.x;
+    pusher.floor = p.floor;
     pusher.y = p.y;
     pusher.path = [];
     pusher.dest = null;
@@ -920,6 +921,7 @@ function wheelToTheatre(state: SimState, op: Operation, p: Patient, table: Place
     porter.prevX = porter.x;
     porter.prevY = porter.y;
     porter.x = p.x;
+    porter.floor = p.floor;
     porter.y = p.y;
     porter.path = [];
     porter.dest = null;

@@ -12,6 +12,7 @@ import type { Point } from "../agents";
 import type { SimState } from "../state";
 import { tileIndex, type FloorGrid } from "./grid";
 import { isWalkable } from "./pathfinding";
+import { portals, portalStop, type Portal } from "./portals";
 
 interface WalkRegions {
   version: number;
@@ -22,6 +23,8 @@ interface WalkRegions {
   label: Int32Array[];
   /** Tiles in each region, by label. */
   size: number[];
+  /** Each label's representative, once regions joined by stairs and lifts are merged. */
+  root: Int32Array;
 }
 const cache = new WeakMap<SimState, WalkRegions>();
 
@@ -30,7 +33,8 @@ function walkRegions(state: SimState): WalkRegions {
   if (cached && cached.version === state.layoutVersion) return cached;
   const size = [0];
   const labels = state.floors.map((grid) => labelFloor(grid, size));
-  const regions = { version: state.layoutVersion, label: labels, size };
+  const root = joinFloors(state, labels, size.length, () => true);
+  const regions = { version: state.layoutVersion, label: labels, size, root };
   cache.set(state, regions);
   return regions;
 }
@@ -84,13 +88,14 @@ function regionsAt(state: SimState, p: Point): Set<number> {
   const x = Math.round(p.x);
   const y = Math.round(p.y);
   if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return out;
+  const { root } = walkRegions(state);
   const own = label[tileIndex(grid, x, y)]!;
-  if (own !== 0) return out.add(own);
+  if (own !== 0) return out.add(root[own]!);
   for (let ny = y - 1; ny <= y + 1; ny++) {
     for (let nx = x - 1; nx <= x + 1; nx++) {
       if (nx < 0 || ny < 0 || nx >= grid.width || ny >= grid.height) continue;
       const l = label[tileIndex(grid, nx, ny)]!;
-      if (l !== 0) out.add(l);
+      if (l !== 0) out.add(root[l]!);
     }
   }
   return out;
@@ -109,4 +114,44 @@ export function walkableArea(state: SimState, x: number, y: number, floor = 0): 
   if (!grid || x < 0 || y < 0 || x >= grid.width || y >= grid.height) return 0;
   const { label, size } = walkRegions(state);
   return size[label[floor]![tileIndex(grid, x, y)]!]!;
+}
+
+/**
+ * Merges regions on different floors that a portal joins (stairs and lifts
+ * for walking; `use` picks which), so a route search can be ruled out across
+ * floors too. Returns each label's representative.
+ */
+export function joinFloors(
+  state: SimState,
+  labels: Int32Array[],
+  count: number,
+  use: (p: Portal) => boolean,
+): Int32Array {
+  const root = new Int32Array(count);
+  for (let i = 0; i < count; i++) root[i] = i;
+  const find = (a: number): number => {
+    while (root[a] !== a) {
+      root[a] = root[root[a]!]!;
+      a = root[a]!;
+    }
+    return a;
+  };
+  const labelAt = (floor: number, p: Point): number => {
+    const grid = state.floors[floor]!;
+    if (p.x < 0 || p.y < 0 || p.x >= grid.width || p.y >= grid.height) return 0;
+    return labels[floor]![tileIndex(grid, p.x, p.y)]!;
+  };
+  for (const portal of portals(state)) {
+    if (!use(portal)) continue;
+    for (let k = 1; k < portal.floors.length; k++) {
+      const a = labelAt(portal.floors[k - 1]!, portalStop(portal, portal.floors[k - 1]!));
+      const b = labelAt(portal.floors[k]!, portalStop(portal, portal.floors[k]!));
+      if (a === 0 || b === 0) continue;
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) root[Math.max(ra, rb)] = Math.min(ra, rb);
+    }
+  }
+  for (let i = 0; i < count; i++) root[i] = find(i);
+  return root;
 }

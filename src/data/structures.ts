@@ -16,6 +16,41 @@ export const BRIDGE_MAX_SPAN = 8;
 /** A link bridge (a glazed, enclosed footbridge) costs this much more per tile than foundations. */
 export const BRIDGE_COST_FACTOR = 3;
 
+/**
+ * A flight of stairs is as long a walk as this many tiles of corridor per
+ * floor (it's slower going, and there are landings), at walking speed.
+ */
+export const STAIRS_TILES_PER_FLOOR = 15;
+
+/** Bed lifts (systems/portals.ts). Times in ticks, scaled like walking (see PATIENT_SPEED). */
+export const LIFT = {
+  /** Spaces in the car: a person takes 1. */
+  capacity: 8,
+  /** A bed or trolley with whoever pushes it (leaving room for two more). */
+  bedLoad: 6,
+  /** Doors open, people getting on and off. */
+  doorTicks: 8,
+  /** Travelling one floor. */
+  ticksPerFloor: 6,
+};
+
+/**
+ * Choosing between stairs and a lift, as tiles of walking each is worth.
+ * Staff take the stairs for a floor or two; walking patients and visitors
+ * prefer the lift unless its queue is long; beds always take the lift.
+ */
+export const PORTAL_CHOICE = {
+  /** Calling a lift and riding it, before anyone else in the queue. */
+  liftTiles: 10,
+  liftTilesPerFloor: 4,
+  /** Each person already waiting for that lift on your floor. */
+  liftTilesPerWaiter: 4,
+  /** Staff would rather not wait for a lift. */
+  staffLiftTiles: 25,
+  /** Patients and visitors find stairs this much harder going. */
+  publicStairsFactor: 2,
+};
+
 /** Outdoor paving the player lays on their own land, linking the hospital to the public road. */
 export const surfaces = [
   {

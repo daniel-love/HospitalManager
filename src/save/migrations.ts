@@ -1088,6 +1088,9 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       },
     };
   },
+  // v52: stairs and lifts. Lift cars are new state; nobody in an older save
+  // is on the way between floors.
+  51: (save) => ({ ...save, state: { ...(save.state as object), lifts: {} } }),
 };
 
 /** Base64 of n zero bytes, without building them. */

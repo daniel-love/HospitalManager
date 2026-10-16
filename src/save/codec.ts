@@ -130,6 +130,19 @@ const agentFields = {
   dest: z
     .object({ x: num, y: num, floor: floorIndex.optional(), ax: int, ay: int, blocked: int })
     .nullable(),
+  transit: z
+    .object({
+      portal: z.string(),
+      kind: z.enum(["stairs", "lift"]),
+      from: floorIndex,
+      to: floorIndex,
+      phase: z.enum(["walking", "climbing", "waiting", "riding"]),
+      at: int,
+      until: int,
+      load: int.positive(),
+    })
+    .nullable()
+    .optional(),
   pathVersion: int.min(0),
 };
 
@@ -696,6 +709,16 @@ const saveSchema = z.object({
       z.string().regex(/^\d+:\d+$/),
       z.object({ since: int, by: z.enum(["ipc", "player"]) }),
     ),
+    lifts: z.record(
+      z.string(),
+      z.object({
+        floor: floorIndex,
+        phase: z.enum(["idle", "doors", "moving"]),
+        target: floorIndex,
+        until: int,
+        riders: z.array(int.positive()),
+      }),
+    ),
     name: z.string().min(1),
     funding: z.enum(["phs", "private", "hybrid"]),
     departments: z.object({
@@ -868,6 +891,7 @@ export function encodeSave(state: SimState, name: string, now = new Date()): Sav
       policies: state.policies,
       privateRooms: state.privateRooms,
       closedRooms: state.closedRooms,
+      lifts: state.lifts,
       essentialRooms: state.essentialRooms,
       waitingAreas: state.waitingAreas,
       inheritedLists: state.inheritedLists,
@@ -957,6 +981,9 @@ export function decodeSave(raw: unknown): { meta: SaveMeta; state: SimState } {
     policies: { ...s.policies, phsReferrals: { ...s.policies.phsReferrals } },
     privateRooms: { ...s.privateRooms },
     closedRooms: { ...s.closedRooms },
+    lifts: Object.fromEntries(
+      Object.entries(s.lifts).map(([k, c]) => [k, { ...c, riders: [...c.riders] }]),
+    ),
     essentialRooms: { ...s.essentialRooms },
     waitingAreas: { ...s.waitingAreas },
     inheritedLists: [...s.inheritedLists],

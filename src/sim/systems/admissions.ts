@@ -30,7 +30,7 @@ import { tileIndex, type FloorGrid } from "../world/grid";
 import { isStandable, objectRect } from "../world/objects";
 import { roomOfObject } from "../world/rooms";
 import { isBedPassable, isWalkable } from "../world/pathfinding";
-import { walkRouteExists } from "../world/walkRegions";
+import { joinFloors, walkRouteExists } from "../world/walkRegions";
 import { earnEmergency } from "./finance";
 import { dirtyCouch, jobsForPatient, postJob, removeJob, ticksFor } from "./jobBoard";
 import { headTo } from "./movement";
@@ -153,6 +153,8 @@ interface BedRegions {
   label: Int32Array[];
   /** regionsAt() by floor and tile index, filled as asked: it only changes with the layout. */
   touching: Map<number, Set<number>>[];
+  /** Each label's representative, once regions joined by lifts (not stairs) are merged. */
+  root: Int32Array;
 }
 const regionCache = new WeakMap<SimState, BedRegions>();
 
@@ -195,6 +197,7 @@ function bedRegions(state: SimState): BedRegions {
     version: state.layoutVersion,
     label,
     touching: state.floors.map(() => new Map<number, Set<number>>()),
+    root: joinFloors(state, label, next + 1, (p) => p.kind === "lift"),
   };
   regionCache.set(state, regions);
   return regions;
@@ -230,7 +233,7 @@ function regionsAt(state: SimState, t: Point): Set<number> {
       const corner = (x < r.x || x >= r.x + r.w) && (y < r.y || y >= r.y + r.h);
       if (corner && (obj || !diagonalStep(grid, x, y, t.x, t.y))) continue;
       const l = label[tileIndex(grid, x, y)]!;
-      if (l !== 0) out.add(l);
+      if (l !== 0) out.add(regions.root[l]!);
     }
   }
   return out;
@@ -440,6 +443,7 @@ export function runTransfer(state: SimState, job: Job, porter: Staff, p: Patient
   porter.prevX = porter.x;
   porter.prevY = porter.y;
   porter.x = p.x;
+  porter.floor = p.floor;
   porter.y = p.y;
   porter.path = [];
   porter.dest = null;

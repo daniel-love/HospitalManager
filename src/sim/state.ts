@@ -43,7 +43,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 51;
+export const SIM_STATE_VERSION = 52;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;
@@ -103,6 +103,18 @@ export interface Room {
    * (e.g. an ECG for chest pain). Doesn't affect `valid`.
    */
   forConditions: RoomCheck[];
+}
+
+/** A lift car: where it is, what it's doing, and who's in it. */
+export interface LiftCar {
+  floor: number;
+  /** idle: waiting for a call; doors: open, people getting on and off; moving: to `target`. */
+  phase: "idle" | "doors" | "moving";
+  target: number;
+  /** Tick the doors close or it arrives. */
+  until: number;
+  /** Agents in the car, by id. */
+  riders: number[];
 }
 
 export interface SimState {
@@ -180,6 +192,8 @@ export interface SimState {
    * (systems/outbreaks.ts).
    */
   closedRooms: Record<string, { since: number; by: "ipc" | "player" }>;
+  /** Lift cars, by their portal's key (systems/portals.ts). */
+  lifts: Record<string, LiftCar>;
   /**
    * Rooms put on or taken off the essential supply, against their type's
    * default (data/maintenance.ts POWER), keyed like privateRooms.
@@ -536,6 +550,7 @@ export function createSimState(opts: NewGameOptions): SimState {
     emergencyTheatres: {},
     privateRooms: {},
     closedRooms: {},
+    lifts: {},
     essentialRooms: {},
     waitingAreas: {},
     maintenance: {},

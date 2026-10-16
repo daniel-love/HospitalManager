@@ -5,12 +5,16 @@
  * then walks everyone along their routes.
  */
 import { PATIENT_SPEED, STAFF_SPEED } from "@data/patients";
+import { LIFT, PORTAL_CHOICE, STAIRS_TILES_PER_FLOOR } from "@data/structures";
 import type { AgentBase, Point } from "../agents";
 import type { SimState } from "../state";
 import { FloorType, tileIndex } from "../world/grid";
 import { crewAccess, patientAccess } from "../world/access";
 import { findPath } from "../world/pathfinding";
+import { portals, portalStop, portalWorking, serves, type Portal } from "../world/portals";
 import { walkRouteExists } from "../world/walkRegions";
+import { bedRouteExists } from "./admissions";
+import { waitingFor } from "./portals";
 
 /** Ticks to wait before retrying a route that couldn't be found. */
 const RETRY_TICKS = 60;
@@ -47,6 +51,9 @@ export function headTo(
    */
   withCrew = false,
 ): Arrival {
+  // On the stairs or in a lift: nothing to do until they're off.
+  const t = agent.transit;
+  if (t && (t.phase === "climbing" || t.phase === "riding")) return "moving";
   const d = agent.dest;
   const same =
     d !== null &&
@@ -60,6 +67,13 @@ export function headTo(
       if (state.tick - d.blocked < RETRY_TICKS) return "no_route";
       return plan(state, agent, to, approach, bed, withCrew);
     }
+    // On the way to the stairs or a lift, or waiting for one.
+    if (t) {
+      if (t.phase === "walking" && agent.pathVersion !== state.layoutVersion) {
+        return plan(state, agent, to, approach, bed, withCrew);
+      }
+      return "moving";
+    }
     if (agent.path.length === 0) return "arrived";
     if (agent.pathVersion !== state.layoutVersion)
       return plan(state, agent, to, approach, bed, withCrew);
@@ -68,16 +82,20 @@ export function headTo(
   return plan(state, agent, to, approach, bed, withCrew);
 }
 
-/** Stops the agent where it is. */
+/** Stops the agent where it is (and out of any lift queue: not off the stairs or out of a lift). */
 export function stop(agent: AgentBase): void {
+  const t = agent.transit;
+  if (t && (t.phase === "climbing" || t.phase === "riding")) return;
   agent.path = [];
   agent.dest = null;
+  agent.transit = null;
 }
 
 /** Whether an agent is at a point (and not walking somewhere else). */
 export function isAt(agent: AgentBase, p: Point): boolean {
   return (
     agent.path.length === 0 &&
+    !agent.transit &&
     (p.floor ?? agent.floor) === agent.floor &&
     Math.abs(agent.x - p.x) < EPS &&
     Math.abs(agent.y - p.y) < EPS
@@ -102,16 +120,50 @@ function plan(
   const dest = { x: to.x, y: to.y, floor, ax: approach.x, ay: approach.y, blocked: -1 };
   agent.dest = dest;
   agent.pathVersion = state.layoutVersion;
+  agent.transit = null; // A new plan: out of any lift queue they were in.
   if (arrived) {
     agent.path = [];
     return "arrived";
   }
-  // Another floor: no way up or down yet.
-  if (floor !== agent.floor) {
+  if (budget?.tick === state.tick) budget.n++;
+  else planned.set(state, { tick: state.tick, n: 1 });
+  if (floor === agent.floor) return walk(state, agent, to, approach, bed, withCrew);
+  // Another floor: first to the best stairs or lift.
+  const leg = chooseLeg(state, agent, { ...approach, floor }, bed);
+  if (!leg) {
     dest.blocked = state.tick;
     agent.path = [];
     return "no_route";
   }
+  const walked = walk(state, agent, leg.stop, leg.stop, bed, withCrew);
+  if (walked === "no_route") return walked;
+  agent.transit = {
+    portal: leg.portal.key,
+    kind: leg.portal.kind,
+    from: agent.floor,
+    to: floor,
+    phase: "walking",
+    at: state.tick,
+    until: 0,
+    load: bed ? LIFT.bedLoad : 1,
+  };
+  return "moving";
+}
+
+/**
+ * Plans a walk on the agent's own floor to `to` via `approach`; the agent's
+ * dest says where they're ultimately going (perhaps another floor).
+ */
+function walk(
+  state: SimState,
+  agent: AgentBase,
+  to: Point,
+  approach: Point,
+  bed: boolean,
+  withCrew: boolean,
+): Arrival {
+  const dest = agent.dest!;
+  const floor = agent.floor;
   const grid = state.floors[floor]!;
   const sx = Math.round(agent.x);
   const sy = Math.round(agent.y);
@@ -125,8 +177,6 @@ function plan(
     agent.path = [];
     return "no_route";
   }
-  if (budget?.tick === state.tick) budget.n++;
-  else planned.set(state, { tick: state.tick, n: 1 });
   const access = withCrew
     ? crewAccess(state, floor)
     : onFoot
@@ -149,6 +199,50 @@ function plan(
   if (path.length === 0) path.push(approach.x, approach.y);
   agent.path = path;
   return "moving";
+}
+
+/**
+ * The stairs or lift to take to another floor, by tiles of walking each is
+ * worth (PORTAL_CHOICE): beds and trolleys only by lift; staff mostly by the
+ * stairs; walking patients and visitors by lift unless its queue is long.
+ * Only ones with a way to them here and on from them there count.
+ */
+function chooseLeg(
+  state: SimState,
+  agent: AgentBase,
+  target: Point,
+  bed: boolean,
+): { portal: Portal; stop: Point } | null {
+  const toFloor = target.floor!;
+  const here = { x: Math.round(agent.x), y: Math.round(agent.y), floor: agent.floor };
+  const reach = bed ? bedRouteExists : walkRouteExists;
+  const staff = "role" in agent;
+  const floors = Math.abs(toFloor - agent.floor);
+  const dist = (a: Point, b: Point) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+  let best: { portal: Portal; stop: Point } | null = null;
+  let bestCost = Infinity;
+  for (const portal of portals(state)) {
+    if (!serves(portal, agent.floor, toFloor) || !portalWorking(state, portal)) continue;
+    if (bed && portal.kind !== "lift") continue;
+    const enter = portalStop(portal, agent.floor);
+    const exit = portalStop(portal, toFloor);
+    if (!reach(state, here, enter) || !reach(state, exit, target)) continue;
+    let cost = dist(here, enter) + dist(exit, target);
+    if (portal.kind === "stairs") {
+      cost += STAIRS_TILES_PER_FLOOR * floors * (staff ? 1 : PORTAL_CHOICE.publicStairsFactor);
+    } else {
+      cost +=
+        PORTAL_CHOICE.liftTiles +
+        PORTAL_CHOICE.liftTilesPerFloor * floors +
+        PORTAL_CHOICE.liftTilesPerWaiter * waitingFor(state, portal.key, agent.floor) +
+        (staff ? PORTAL_CHOICE.staffLiftTiles : 0);
+    }
+    if (cost < bestCost) {
+      best = { portal, stop: enter };
+      bestCost = cost;
+    }
+  }
+  return best;
 }
 
 export function moveAgents(state: SimState): void {

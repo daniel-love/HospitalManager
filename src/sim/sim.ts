@@ -14,6 +14,7 @@ import { updateDeterioration } from "./systems/deterioration";
 import { assignJobs, runJobs } from "./systems/jobs";
 import { postObservations } from "./systems/monitoring";
 import { moveAgents } from "./systems/movement";
+import { updatePortals } from "./systems/portals";
 import { updatePatients } from "./systems/patients";
 import { updateStaff } from "./systems/staffing";
 import { updateTransfers } from "./systems/transfers";
@@ -57,6 +58,7 @@ export const SYSTEMS: readonly (readonly [string, (state: SimState) => void])[] 
   ["postObservations", postObservations],
   ["assignJobs", assignJobs],
   ["moveAgents", moveAgents],
+  ["updatePortals", updatePortals],
   ["runJobs", runJobs],
   ["updateWorkforce", updateWorkforce],
   ["updateFinance", updateFinance],

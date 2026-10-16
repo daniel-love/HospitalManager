@@ -27,11 +27,32 @@ export interface Destination extends Point {
   blocked: number;
 }
 
+/**
+ * On the way to another floor by stairs or lift (world/portals.ts,
+ * systems/portals.ts): walking to it, on the stairs, waiting for the lift,
+ * or in it.
+ */
+export interface Transit {
+  /** The portal's key. */
+  portal: string;
+  kind: "stairs" | "lift";
+  from: number;
+  to: number;
+  phase: "walking" | "climbing" | "waiting" | "riding";
+  /** Tick they set off up the stairs or started waiting; off the stairs at `until`. */
+  at: number;
+  until: number;
+  /** Space taken in a lift car: one person, or a bed with whoever pushes it. */
+  load: number;
+}
+
 export interface AgentBase extends Point {
   id: number;
   name: string;
   /** The floor they're on: 0 is the ground floor. */
   floor: number;
+  /** On the way to another floor, if they are. */
+  transit?: Transit | null | undefined;
   /** Position at the start of this tick, for smooth drawing between ticks. */
   prevX: number;
   prevY: number;
