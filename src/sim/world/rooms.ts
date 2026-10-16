@@ -22,7 +22,7 @@ import {
 import type { RoomDef, SpecialtyId } from "@data/schema";
 import type { Room, RoomCheck, SimState, WaitingFor } from "../state";
 import { isSolidWall, isWallOrDoor, tileIndex, WallType, type FloorGrid } from "./grid";
-import { isStandable, objectRect, sideTiles } from "./objects";
+import { accessRequirements, isStandable, objectRect, sideTiles } from "./objects";
 import { shareKit } from "./sharedKit";
 
 export function detectRooms(state: SimState): void {
@@ -282,6 +282,8 @@ function evaluateRoom(state: SimState, room: Room, rooms: Room[]): void {
   }
 
   if (def.bothBedSides) checks.push(bedSidesCheck(state, room));
+  const reach = reachCheck(state, room);
+  if (reach) checks.push(reach);
 
   if (def.connectedTo.length > 0) {
     const neighbours = connectedRoomTypes(grid, room, rooms);
@@ -356,6 +358,72 @@ function connectedRoomTypes(grid: FloorGrid, room: Room, rooms: Room[]): Set<str
     }
   }
   return types;
+}
+
+/**
+ * Everything in the room can be got at: where staff and patients stand to
+ * use each item can be walked to from the way in. Kit can have its own sides
+ * clear yet still be boxed in by other kit (a clinic desk's chair penned in
+ * by the couch, say), and then nobody can use it. Null for a room with no
+ * way in yet (other checks cover that).
+ */
+function reachCheck(state: SimState, room: Room): RoomCheck | null {
+  const grid = state.floors[room.floor]!;
+  const { width } = grid;
+  const inRoom = new Set(room.tiles);
+  const open = (i: number) => isStandable(grid, i % width, Math.floor(i / width));
+  const neighbours = (i: number): number[] => {
+    const x = i % width;
+    const y = (i - x) / width;
+    const out: number[] = [];
+    if (x > 0) out.push(i - 1);
+    if (x < width - 1) out.push(i + 1);
+    if (y > 0) out.push(i - width);
+    if (y < grid.height - 1) out.push(i + width);
+    return out;
+  };
+  // In through a door, or across an open side from somewhere walkable.
+  const reached = new Set<number>();
+  const stack: number[] = [];
+  for (const i of room.tiles) {
+    if (!open(i)) continue;
+    const entry = neighbours(i).some(
+      (n) => grid.door[n] !== 0 || (!inRoom.has(n) && !isWallOrDoor(grid, n) && open(n)),
+    );
+    if (entry) {
+      reached.add(i);
+      stack.push(i);
+    }
+  }
+  if (stack.length === 0) return null;
+  while (stack.length > 0) {
+    for (const n of neighbours(stack.pop()!)) {
+      if (inRoom.has(n) && !reached.has(n) && open(n)) {
+        reached.add(n);
+        stack.push(n);
+      }
+    }
+  }
+  // Tiles outside the room are left to the rest of the layout.
+  const ok = (t: { x: number; y: number }) => {
+    if (!isStandable(grid, t.x, t.y)) return false;
+    const i = tileIndex(grid, t.x, t.y);
+    return !inRoom.has(i) || reached.has(i);
+  };
+  const cut: string[] = [];
+  for (const id of room.objectIds) {
+    const obj = state.objects[id]!;
+    const reqs = accessRequirements(obj.defId, objectRect(obj), obj.rotation);
+    if (reqs.some((req) => !req.options.some((option) => option.every(ok)))) {
+      const name = objectDef(obj.defId)?.def.name ?? obj.defId;
+      if (!cut.includes(name)) cut.push(name);
+    }
+  }
+  return {
+    label: "Every item can be reached",
+    ok: cut.length === 0,
+    ...(cut.length > 0 ? { detail: `boxed in: ${cut.join(", ")}` } : {}),
+  };
 }
 
 /** Majors/Resus: every bed or trolley needs clear space down both long sides. */

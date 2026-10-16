@@ -117,6 +117,27 @@ describe("room validation", () => {
     expect(room.capabilities).toEqual(["examination", "hand_hygiene", "obs"]);
   });
 
+  it("fails when kit boxes in where someone has to stand to use it", () => {
+    // A clinic room (interior 1..4 × 1..3) whose desk chair is penned in by
+    // the wall, the desk and the sink: every item's own sides are clear.
+    const state = newState();
+    applyAll(state, [
+      { type: "build_walls", floor: 0, rect: rect(0, 0, 6, 5), wall: WallType.Standard },
+      { type: "zone", floor: 0, rect: rect(1, 1, 4, 3), roomType: "outpatient_clinic" },
+      { type: "place_object", floor: 0, defId: "door_single", x: 5, y: 1, rotation: 1 },
+      { type: "place_object", floor: 0, defId: "desk", x: 2, y: 1, rotation: 3 },
+      { type: "place_object", floor: 0, defId: "exam_couch", x: 4, y: 2, rotation: 2 },
+      { type: "place_object", floor: 0, defId: "sink", x: 1, y: 3, rotation: 3 },
+    ]);
+    const boxed = roomAt(state, 0, 3, 2)!;
+    expect(boxed.objectIds).toHaveLength(3);
+    expect(boxed.valid).toBe(false);
+    expect(boxed.checks.find((c) => c.label === "Every item can be reached")).toMatchObject({
+      ok: false,
+      detail: "boxed in: Desk",
+    });
+  });
+
   it("only counts items wholly inside the room", () => {
     const state = newState();
     applyAll(state, [
