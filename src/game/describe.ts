@@ -75,7 +75,16 @@ import { reputationFactor } from "@sim/systems/reputation";
 import { PRIVATE } from "@data/economy";
 import { NURSE_BANDS, SHIFTS } from "@data/staff";
 import { inClinic, liveSessions } from "@sim/systems/outpatients";
-import { describeRota, nextShift, rotaSummary } from "@sim/systems/rota";
+import {
+  coverFor,
+  describeRota,
+  groupName,
+  nextShift,
+  rotaGroup,
+  rotaSummary,
+} from "@sim/systems/rota";
+import { groupMember } from "@sim/systems/workforce";
+import { coverCost, gapCost, groupPay, peopleFor, sickShifts, staffingPlan } from "./staffingPlan";
 import { emergencyOpOf, inTheatre } from "@sim/systems/theatres";
 import { privateIncomeShare, waitingLists } from "@sim/systems/referrals";
 import { FloorType, isPublic, tileIndex } from "@sim/world/grid";
@@ -88,7 +97,10 @@ import type {
   PatientTable,
   ReportData,
   StatementMonth,
+  HireSpec,
   RosterData,
+  RotaRow,
+  StaffPlanRow,
   StaffRow,
   StaffTable,
 } from "@ui/store";
@@ -1075,26 +1087,89 @@ export function describeRoster(state: SimState): RosterData {
       bank: staff.filter((s) => s.contract === "bank").length,
       agency: staff.filter((s) => s.contract === "agency").length,
     },
-    rota: rotaSummary(state).map((g) => {
-      const days = g.filled.filter((_, i) => i % 2 === 0);
-      const nights = g.filled.filter((_, i) => i % 2 === 1);
-      const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
-      const cover = g.cover ?? { day: 0, night: 0 };
-      return {
-        key: g.key,
-        name: g.name,
-        people: g.people,
-        cover,
-        avgDay: sum(days) / 7,
-        avgNight: sum(nights) / 7,
-        minDay: Math.min(...days),
-        minNight: Math.min(...nights),
-        filled: g.filled,
-        gaps: g.gaps,
-        needed: Math.ceil(((cover.day + cover.night) * 7) / SHIFTS.perWeek),
-        onNow: g.onNow,
-      };
-    }),
+    ...rotaAndPlan(state),
+  };
+}
+
+/** Who a rota group's next hire is, or null if hiring wouldn't put them on the rota. */
+function hireSpec(key: string): HireSpec | null {
+  const m = groupMember(key);
+  // New registrars start with clinic sessions, so work weekdays off the rota.
+  if (m.role === "registrar") return null;
+  return { role: m.role, ...(m.band ? { band: m.band } : {}) };
+}
+
+/** The Rota tab's cards and its staffing plan. */
+function rotaAndPlan(state: SimState): Pick<RosterData, "rota" | "plan"> {
+  const plan = staffingPlan(state);
+  const planned = new Map(plan.groups.map((g) => [g.key, g]));
+  const summary = rotaSummary(state);
+  const rota: RotaRow[] = summary.map((g) => {
+    const days = g.filled.filter((_, i) => i % 2 === 0);
+    const nights = g.filled.filter((_, i) => i % 2 === 1);
+    const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+    const cover = g.cover ?? { day: 0, night: 0 };
+    const p = planned.get(g.key);
+    return {
+      key: g.key,
+      name: g.name,
+      people: g.people,
+      cover,
+      avgDay: sum(days) / 7,
+      avgNight: sum(nights) / 7,
+      minDay: Math.min(...days),
+      minNight: Math.min(...nights),
+      filled: g.filled,
+      gaps: g.gaps,
+      needed: peopleFor(cover),
+      onNow: g.onNow,
+      pay: groupPay(g.key),
+      cost: coverCost(g.key, cover),
+      gapCost: gapCost(g.key, cover, g.gaps),
+      sick: sickShifts(cover),
+      spare: Math.max(0, g.people * SHIFTS.perWeek - (cover.day + cover.night) * 7),
+      suggested: p?.suggested ?? null,
+      why: p?.why ?? null,
+      hire: hireSpec(g.key),
+    };
+  });
+  const people = new Map(summary.map((g) => [g.key, g.people]));
+  const keys = [...new Set([...plan.groups.map((g) => g.key), ...summary.map((g) => g.key)])];
+  const total = (c: { salaries: number; unsocial: number }) => c.salaries + c.unsocial;
+  const rows: StaffPlanRow[] = keys.map((key) => {
+    const p = planned.get(key);
+    const suggested = p?.suggested ?? { day: 0, night: 0 };
+    return {
+      key,
+      name: p?.name ?? groupName(key),
+      optional: p?.optional ?? true,
+      why: p?.why ?? "Not needed for the patients you can expect now.",
+      suggested,
+      suggestedPeople: peopleFor(suggested),
+      suggestedCost: total(coverCost(key, suggested)),
+      cover: coverFor(state, key),
+      have: people.get(key) ?? 0,
+      hire: hireSpec(key),
+      pay: groupPay(key),
+    };
+  });
+  // Rostered staff now: their salaries, and unsocial hours on the cover set.
+  const rostered = Object.values(state.staff).filter((s) => rotaGroup(s) !== null);
+  const costNow =
+    rostered.reduce((n, s) => n + annualCost(s), 0) +
+    summary.reduce((n, g) => n + coverCost(g.key, g.cover ?? { day: 0, night: 0 }).unsocial, 0);
+  const required = rows.filter((r) => !r.optional || r.have > 0 || r.cover);
+  return {
+    rota,
+    plan: {
+      demand: plan.demand,
+      rows,
+      people: required.reduce((n, r) => n + r.suggestedPeople, 0),
+      cost: required.reduce((n, r) => n + r.suggestedCost, 0),
+      costNow,
+      peopleNow: rostered.length,
+      blockPerDay: state.funding === "private" ? null : dailyBlock(state),
+    },
   };
 }
 

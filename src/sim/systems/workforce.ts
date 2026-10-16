@@ -183,7 +183,7 @@ export function endOfShift(s: Staff): void {
 }
 
 /** The role, band and specialty a rota group's members have. */
-function groupMember(key: string): {
+export function groupMember(key: string): {
   role: StaffRoleId;
   band: NurseBand | null;
   specialty: SpecialtyId | null;

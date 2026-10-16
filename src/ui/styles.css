@@ -1199,6 +1199,106 @@ body.planning #game::after {
   font-size: 12px;
   margin-top: 6px;
 }
+.rota-note {
+  margin-top: 3px;
+}
+.ratio-note {
+  margin: 4px 0 10px;
+  padding: 8px 10px;
+  max-width: 80ch;
+  font-size: 12px;
+  border-left: 3px solid var(--accent);
+  background: rgba(59, 130, 196, 0.08);
+  border-radius: 0 4px 4px 0;
+}
+.ratio-note ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.cover-sum {
+  margin-top: 8px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid var(--ok);
+}
+.cover-sum.warn {
+  border-left-color: #f2c94c;
+}
+.fill-options {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.fill-options table {
+  margin-top: 3px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.fill-options th,
+.fill-options td {
+  padding: 2px 10px 2px 0;
+  text-align: left;
+  font-weight: 400;
+  vertical-align: baseline;
+}
+.fill-options th {
+  white-space: nowrap;
+}
+.fill-options td:nth-child(2) {
+  text-align: right;
+  font-weight: 600;
+}
+.plan-table thead th .sub {
+  display: block;
+  font-weight: 400;
+}
+.rota-suggest {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--panel-border);
+}
+.card-hire {
+  margin-left: 6px;
+}
+.demand-text {
+  display: block;
+  max-width: 80ch;
+}
+.plan-table td {
+  width: auto;
+  padding-left: 10px;
+  white-space: nowrap;
+}
+.plan-table tbody th .sub {
+  display: block;
+  max-width: 46ch;
+  font-size: 11px;
+  white-space: normal;
+}
+.plan-table td .sub {
+  display: block;
+  font-size: 11px;
+}
+.plan-table .plan-actions {
+  padding-left: 12px;
+}
+.plan-table .plan-actions button + button {
+  margin-left: 4px;
+}
+.plan-totals {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 10px;
+}
+.plan-totals .hire-desc {
+  flex: 1;
+}
 .hire-buttons {
   display: flex;
   flex-direction: column;

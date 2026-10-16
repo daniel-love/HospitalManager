@@ -51,7 +51,7 @@ describe("Help panel recommendations", () => {
     big.settings.catchment = small.settings.catchment * 3;
     const row = (s: typeof small, label: string) =>
       describeAdvice(s).capacity.find((r) => r.label === label)!.recommended!;
-    for (const label of ["Minors Cubicles", "Junior doctors", "Staff nurses"]) {
+    for (const label of ["Minors Cubicles", "Doctors", "Nurses"]) {
       expect(row(big, label)).toBeGreaterThan(row(small, label));
     }
     expect(row(small, "Minors Cubicles")).toBeGreaterThanOrEqual(2);

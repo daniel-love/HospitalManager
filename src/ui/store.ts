@@ -10,6 +10,7 @@ import type { EventChip } from "@game/describeEvents";
 import type { FinanceData } from "@game/describeFinance";
 import type { HospitalData } from "@game/describeHospital";
 import type { Census } from "@game/describe";
+import type { PlanDemand } from "@game/staffingPlan";
 import type { Speed } from "@game/loop";
 import type { Tool } from "@game/tools";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
@@ -292,6 +293,47 @@ export interface RosterData {
   temps: { bank: number; agency: number };
   /** Each rota group's cover and how the rota meets it. */
   rota: RotaRow[];
+  /** Patient demand, and the cover and hiring it suggests (game/staffingPlan.ts). */
+  plan: StaffPlanData;
+}
+
+/** Who to hire into a rota group. */
+export interface HireSpec {
+  role: StaffRoleId;
+  band?: NurseBand;
+  specialty?: SpecialtyId;
+}
+
+export interface StaffPlanData {
+  demand: PlanDemand;
+  rows: StaffPlanRow[];
+  /** The suggested cover across every group: people, and pay a year with unsocial hours. */
+  people: number;
+  cost: number;
+  /** Rostered staff's pay a year now, with unsocial hours on the cover set. */
+  costNow: number;
+  peopleNow: number;
+  /** The block contract a day now (PHS and Hybrid), for scale. */
+  blockPerDay: number | null;
+}
+
+export interface StaffPlanRow {
+  key: string;
+  name: string;
+  optional: boolean;
+  why: string;
+  suggested: { day: number; night: number };
+  /** People the suggested cover takes, and what they cost a year with unsocial hours. */
+  suggestedPeople: number;
+  suggestedCost: number;
+  /** The cover set now, if any. */
+  cover: { day: number; night: number } | null;
+  /** On the rota now. */
+  have: number;
+  /** Null when hiring doesn't put someone on the rota (registrars start with clinics). */
+  hire: HireSpec | null;
+  /** One more person's pay a year. */
+  pay: number;
 }
 
 export interface RotaRow {
@@ -313,6 +355,19 @@ export interface RotaRow {
   /** People needed to meet the cover on contracted hours alone. */
   needed: number;
   onNow: number;
+  /** One person's pay a year, and the cover's cost a year: salaries for `needed` people, and unsocial hours. */
+  pay: number;
+  cost: { salaries: number; unsocial: number };
+  /** Filling the gaps a year from the bank or an agency, £, and the share the bank fills. */
+  gapCost: { bank: number; agency: number; bankFills: number; unsocial: number };
+  /** Shifts a week the cover can expect to lose to sickness. */
+  sick: number;
+  /** Contracted shifts a week beyond the cover. */
+  spare: number;
+  /** What demand suggests for this group, if it's in the plan. */
+  suggested: { day: number; night: number } | null;
+  why: string | null;
+  hire: HireSpec | null;
 }
 
 export interface RosterRole {

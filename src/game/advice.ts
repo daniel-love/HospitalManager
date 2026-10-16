@@ -4,14 +4,9 @@
  * to how many cubicles, bays and staff the catchment's demand calls for.
  * Pure functions of SimState, like describe.ts.
  */
-import { content, specialtyById } from "@data/catalogue";
-import {
-  ARRIVALS_BY_HOUR,
-  BOOKING_MINS,
-  CUBICLE_CLEAN_MINS,
-  HANDOVER_MINS,
-  TRIAGE_MINS,
-} from "@data/patients";
+import { content, specialtyById, staffRoleById } from "@data/catalogue";
+import { peopleFor, staffingPlan } from "./staffingPlan";
+import { ARRIVALS_BY_HOUR, CUBICLE_CLEAN_MINS } from "@data/patients";
 import type { ConditionDef, SpecialtyId, StaffRoleId } from "@data/schema";
 import { holder, missingRoom, roomsPatientsCantReach } from "@sim/places";
 import type { Funding, SimState } from "@sim/state";
@@ -23,9 +18,7 @@ import { clinicDemandPerDay, offersClinic, offersPrivateClinic } from "@sim/syst
 import { PRIVATE } from "@data/economy";
 import { dailyBlock } from "@sim/systems/funding";
 import { formatMoney } from "./tools";
-import { SLOTS } from "@sim/systems/rota";
 import { operates, runsClinics } from "@sim/systems/staffing";
-import { SHIFTS } from "@data/staff";
 import { PRACTITIONERS, TURNAROUND_MINS } from "@sim/systems/theatres";
 import { CLINIC_SESSIONS } from "@data/outpatients";
 
@@ -63,21 +56,16 @@ export interface AdviceData {
 }
 
 /**
- * Planning assumptions for the capacity guide. A patient keeps their cubicle
- * or trolley while they wait between steps, not just during them, and the
- * busiest hour of the day sees about 1.5× the average arrivals.
+ * Planning assumptions for the capacity guide's rooms (staff are planned in
+ * game/staffingPlan.ts). A patient keeps their cubicle or trolley while they
+ * wait between steps, not just during them, and the busiest hour of the day
+ * sees about 1.5× the average arrivals.
  */
 export const PLANNING = {
   /** Time in a room ÷ time being treated in it. */
   occupancyPerTreatment: 2,
-  /** Highest share of the time a room or person should be busy at the peak. */
+  /** Highest share of the time a room should be busy at the peak. */
   roomUtilisation: 0.85,
-  staffUtilisation: 0.75,
-  /** Nurse-to-trolley ratio in Majors (RCN guidance: 1 to 4), and Resus (1 to 2). */
-  majorsBedsPerNurse: 4,
-  resusBedsPerNurse: 2,
-  /** Rule of thumb: one cleaner per this many cubicles, trolleys and ward beds. */
-  bedsPerCleaner: 15,
 };
 
 const PEAK_FACTOR =
@@ -592,17 +580,20 @@ function listOf(items: string[]): string {
 }
 
 /**
- * How many rooms and staff the catchment's full demand needs at the busiest
- * time of day, from the conditions' pathways: patients a day × minutes each,
- * spread over the day, scaled up to the peak and down to a safe utilisation.
- * A rough guide: it ignores queues, deterioration and admissions.
+ * How many rooms the catchment's full demand needs at the busiest time of
+ * day, from the conditions' pathways: patients a day × minutes each, spread
+ * over the day, scaled up to the peak and down to a safe utilisation. Then
+ * clinics and theatre lists, and staff from the staffing plan. A rough
+ * guide: it ignores queues, deterioration and admissions.
  */
 export function capacityGuide(
   state: SimState,
   demand: { walkIns: number; ambulances: number },
 ): CapacityRow[] {
   // A Private Hospital has no A&E: only its clinics and theatres to plan for.
-  if (state.funding === "private") return [...clinicCapacity(state), ...theatreCapacity(state)];
+  if (state.funding === "private") {
+    return [...clinicCapacity(state), ...theatreCapacity(state), ...staffCapacity(state)];
+  }
   const perDay = new Map<ConditionDef, number>();
   for (const ch of ["walk_in", "ambulance"] as const) {
     const total = content.conditions.reduce((n, c) => n + c.channels[ch], 0);
@@ -613,53 +604,22 @@ export function capacityGuide(
   }
 
   const roomMins = new Map<string, number>();
-  const roleMins = new Map<StaffRoleId, number>();
-  const add = <K>(m: Map<K, number>, k: K, v: number) => m.set(k, (m.get(k) ?? 0) + v);
+  const add = (k: string, v: number) => roomMins.set(k, (roomMins.get(k) ?? 0) + v);
   for (const [c, n] of perDay) {
     for (const step of c.pathway) {
-      const mins = mean(step.mins) * n;
-      add(roomMins, step.room, mins * PLANNING.occupancyPerTreatment);
-      // The first role listed is who does it when free; injuries go to nurse practitioners.
-      add(roleMins, step.roles[0]!, mins);
+      add(step.room, mean(step.mins) * n * step.chance * PLANNING.occupancyPerTreatment);
     }
-    if (c.pathway[0]?.room === "minors_cubicle") {
-      add(roomMins, "minors_cubicle", mean(CUBICLE_CLEAN_MINS) * n);
-    }
+    if (c.pathway[0]?.room === "minors_cubicle")
+      add("minors_cubicle", mean(CUBICLE_CLEAN_MINS) * n);
   }
-  add(
-    roleMins,
-    "nurse",
-    demand.walkIns * mean(TRIAGE_MINS) + demand.ambulances * mean(HANDOVER_MINS),
-  );
-  add(roleMins, "receptionist", demand.walkIns * mean(BOOKING_MINS));
 
   const atPeak = (mins: number, utilisation: number) =>
     Math.ceil((mins * PEAK_FACTOR) / MINS_PER_DAY / utilisation);
   const rooms = (type: string) => atPeak(roomMins.get(type) ?? 0, PLANNING.roomUtilisation);
-  const people = (role: StaffRoleId) => atPeak(roleMins.get(role) ?? 0, PLANNING.staffUtilisation);
-  const count = (role: StaffRoleId) =>
-    Object.values(state.staff).filter((s) => s.role === role).length;
   const valid = (type: string) => state.rooms.filter((r) => r.valid && r.typeId === type).length;
-
-  /**
-   * A staff row: the guide works out how many are needed at work at once;
-   * with rotas, each person works three shifts a week, so it takes about
-   * 14 ÷ 3 times as many people to have that many on every shift.
-   */
-  const staffRow = (label: string, role: StaffRoleId, perShift: number, note: string) =>
-    rotaRow(state, { label, have: count(role), recommended: perShift, note });
-
   const majorsBays = Math.max(1, rooms("majors_bay"));
   const resusBays = Math.max(1, rooms("resus_bay"));
-  const wardBeds = state.rooms
-    .filter((r) => r.valid && (r.typeId === "ward" || r.typeId === "side_room"))
-    .reduce((n, r) => n + r.objectIds.filter((id) => isBed(state, id)).length, 0);
   const minors = Math.max(1, rooms("minors_cubicle"));
-  // Watching Majors and Resus is on top of the nursing steps.
-  const nurses =
-    people("nurse") +
-    Math.ceil(majorsBays / PLANNING.majorsBedsPerNurse) +
-    Math.ceil(resusBays / PLANNING.resusBedsPerNurse);
 
   return [
     {
@@ -680,56 +640,42 @@ export function capacityGuide(
       recommended: resusBays,
       note: "Always keep one free for the next arrest.",
     },
-    staffRow(
-      "Receptionists",
-      "receptionist",
-      Math.max(1, people("receptionist")),
-      "One per desk at the busiest time.",
-    ),
-    staffRow(
-      "Staff nurses",
-      "nurse",
-      Math.max(1, nurses),
-      `Triage, handovers and nursing steps, plus 1 per ${PLANNING.majorsBedsPerNurse} Majors trolleys and 1 per ${PLANNING.resusBedsPerNurse} Resus trolleys.`,
-    ),
-    staffRow(
-      "Junior doctors",
-      "junior_doctor",
-      Math.max(1, people("junior_doctor")),
-      "Assessing and reviewing every illness, and Majors and Resus patients.",
-    ),
-    staffRow(
-      "Nurse practitioners",
-      "nurse_practitioner",
-      people("nurse_practitioner"),
-      "Minor injuries. Without them, the doctors see these too.",
-    ),
     ...clinicCapacity(state),
     ...theatreCapacity(state),
-    staffRow(
-      "Cleaners",
-      "cleaner",
-      Math.max(
-        1,
-        Math.ceil((minors + majorsBays + resusBays + wardBeds) / PLANNING.bedsPerCleaner),
-      ),
-      `About 1 per ${PLANNING.bedsPerCleaner} cubicles, trolleys and ward beds.`,
-    ),
+    ...staffCapacity(state),
   ];
 }
 
 /**
- * With rotas on, turns a row's people needed at once into people to hire,
- * saying how many that is on each shift.
+ * Staff from the staffing plan (game/staffingPlan.ts), one row per role:
+ * with rotas, the people it takes to have the suggested number on each
+ * shift (three shifts a week each); without, the most needed at once.
  */
-function rotaRow(state: SimState, row: CapacityRow): CapacityRow {
-  const perShift = row.recommended;
-  if (!state.settings.rotas || !perShift) return row;
-  return {
-    ...row,
-    recommended: Math.ceil((perShift * SLOTS) / SHIFTS.perWeek),
-    note: `${perShift} on each shift, day and night, takes about ${Math.ceil((perShift * SLOTS) / SHIFTS.perWeek)} people on three shifts a week. ${row.note}`,
-  };
+function staffCapacity(state: SimState): CapacityRow[] {
+  const byRole = new Map<StaffRoleId, { day: number; night: number; why: string[] }>();
+  for (const g of staffingPlan(state).groups) {
+    if (g.role === "registrar") continue;
+    const row = byRole.get(g.role) ?? { day: 0, night: 0, why: [] };
+    row.day += g.suggested.day;
+    row.night += g.suggested.night;
+    if (g.role !== "nurse" || g.band === 5) row.why.push(g.why);
+    byRole.set(g.role, row);
+  }
+  return [...byRole].map(([role, r]) => {
+    const have = Object.values(state.staff).filter(
+      (s) => s.role === role && s.contract !== "bank" && s.contract !== "agency",
+    ).length;
+    const label = staffRoleById.get(role)!.short;
+    const shifts = `${r.day} on a day shift and ${r.night} at night`;
+    return state.settings.rotas
+      ? {
+          label,
+          have,
+          recommended: peopleFor(r),
+          note: `${shifts} takes about ${peopleFor(r)} people on three shifts a week. ${r.why.join(" ")}`,
+        }
+      : { label, have, recommended: Math.max(r.day, r.night), note: r.why.join(" ") };
+  });
 }
 
 /**
@@ -802,20 +748,5 @@ function theatreCapacity(state: SimState): CapacityRow[] {
     recommended: surgeonLists,
     note: "One for every surgeon's list. A list without an anaesthetist doesn't run.",
   });
-  rows.push(
-    rotaRow(state, {
-      label: "Theatre practitioners",
-      have: Object.values(state.staff).filter((s) => s.role === "theatre_practitioner").length,
-      recommended:
-        PRACTITIONERS *
-        Math.max(1, state.rooms.filter((r) => r.valid && r.typeId === "theatre").length),
-      note: `${PRACTITIONERS} for each theatre that may be in use at once.`,
-    }),
-  );
   return rows;
-}
-
-function isBed(state: SimState, id: number): boolean {
-  const defId = state.objects[id]?.defId;
-  return defId === "hospital_bed" || defId === "profiling_bed";
 }

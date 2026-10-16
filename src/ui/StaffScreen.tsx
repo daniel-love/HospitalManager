@@ -5,14 +5,16 @@
  * the bank or an agency, and dismissals. Hire lists every role by group,
  * with each description folded away until asked for. Rota sets the cover
  * levels (systems/rota.ts) and the gap-filling policy, with a week's grid
- * for each rota group showing how the people hired meet the cover. Hiring
- * is instant until recruitment pools arrive.
+ * for each rota group showing how the people hired meet the cover, what
+ * the cover takes in people and pay, and the patient demand behind a
+ * suggested cover and hiring plan (game/staffingPlan.ts).
  */
 import { useEffect, useState } from "preact/hooks";
 import { staffRoleSections } from "@data/catalogue";
 import type { SpecialtyId, StaffRoleId } from "@data/schema";
 import { ON_CALL, SHIFTS, type NurseBand } from "@data/staff";
 import type { Game } from "@game/game";
+import { peopleFor } from "@game/staffingPlan";
 import { formatMoney } from "@game/tools";
 import type { GapFill } from "@sim/state";
 import { ListSection } from "./ListSection";
@@ -22,8 +24,11 @@ import {
   staffScreen,
   staffTable,
   type RosterData,
+  type HireSpec,
   type RosterRole,
   type RotaRow,
+  type StaffPlanData,
+  type StaffPlanRow,
   type StaffRow,
   type StaffTab,
   type StaffTable,
@@ -600,6 +605,10 @@ function RotaTab({ game, data }: { game: Game; data: RosterData }) {
         </p>
       </details>
 
+      <ListSection title="Patient demand and hiring">
+        <DemandPlan game={game} plan={data.plan} />
+      </ListSection>
+
       <ListSection title="Filling gaps">
         <div class="chips gap-chips" role="radiogroup" aria-label="Filling gaps">
           {GAP_FILLS.map((o) => (
@@ -630,7 +639,7 @@ function RotaTab({ game, data }: { game: Game; data: RosterData }) {
             <Legend />
             <div class="rota-cards">
               {data.rota.map((r) => (
-                <RotaCard key={r.key} game={game} row={r} />
+                <RotaCard key={r.key} game={game} row={r} gapFill={data.gapFill} />
               ))}
             </div>
           </>
@@ -659,16 +668,273 @@ function Legend() {
   );
 }
 
-/** A rota group: cover steppers, and the week's 14 shifts against them. */
-function RotaCard({ game, row }: { game: Game; row: RotaRow }) {
+/** "£81k", "£1.2M": money at a glance. */
+function compact(n: number): string {
+  if (n >= 999_500) return `£${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `£${Math.round(n / 1_000)}k`;
+  return formatMoney(n);
+}
+
+/** "☀ 3 · ☾ 2". */
+const coverText = (c: { day: number; night: number }) => `☀ ${c.day} · ☾ ${c.night}`;
+const sameCover = (a: { day: number; night: number }, b: { day: number; night: number }) =>
+  a.day === b.day && a.night === b.night;
+
+/** "☀ 4 × 7 + ☾ 3 × 7": a cover's shifts a week, as a sum. */
+function shiftSum(c: { day: number; night: number }): string {
+  const parts = [c.day > 0 && `☀ ${c.day} × 7 days`, c.night > 0 && `☾ ${c.night} × 7 nights`];
+  return parts.filter(Boolean).join(" + ") || "0";
+}
+
+/** How cover on each shift turns into people to hire, with examples. */
+function RatioNote() {
+  return (
+    <div class="ratio-note">
+      <strong>Shifts and people.</strong> Cover is how many are at work <em>at once</em> on each
+      shift. A week has 7 day shifts and 7 night shifts, and each person works {SHIFTS.perWeek} of
+      them, so:
+      <ul>
+        <li>
+          ☀ 1 · ☾ 1 (one on every shift) = 14 shifts a week ÷ 3 = <strong>5 people</strong>
+        </li>
+        <li>
+          ☀ 2 · ☾ 1 = 21 shifts a week ÷ 3 = <strong>7 people</strong>
+        </li>
+        <li>
+          ☀ 1 · ☾ 0 (days only) = 7 shifts a week ÷ 3 = <strong>3 people</strong>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * The ways to fill a cover's gaps, side by side: hiring the shortfall, the
+ * bank, or an agency, a year each, with how reliable each is.
+ */
+function FillOptions(props: { row: RotaRow; toHire: number; gapFill: GapFill }) {
+  const { row, toHire, gapFill } = props;
+  const c = row.gapCost;
+  const yours = (fill: "bank" | "agency") =>
+    (fill === "bank" ? gapFill !== "none" : gapFill === "bank_agency") && (
+      <span class="flag">your policy</span>
+    );
+  return (
+    <div class="fill-options">
+      <span class="warn-text">
+        {row.gaps} {row.gaps === 1 ? "shift" : "shifts"} a week uncovered. To fill them:
+      </span>
+      <table>
+        <tbody>
+          <tr>
+            <th>Hire {toHire} more</th>
+            <td>{compact(row.pay * toHire + c.unsocial)}/yr</td>
+            <td class="dim">every shift, by your own staff</td>
+          </tr>
+          <tr>
+            <th>Bank {yours("bank")}</th>
+            <td>{compact(c.bank)}/yr</td>
+            <td class="dim">same pay, but only about {Math.round(c.bankFills * 3)} in 3 filled</td>
+          </tr>
+          <tr>
+            <th>Agency {yours("agency")}</th>
+            <td>{compact(c.agency)}/yr</td>
+            <td class="dim">every shift, at twice the cost, a little slower</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function hire(game: Game, spec: HireSpec) {
+  game.applyStaff({ type: "hire_staff", ...spec });
+}
+
+/**
+ * What patients the hospital can expect, and the cover and hiring that
+ * suggests, group by group, with what it costs.
+ */
+function DemandPlan({ game, plan }: { game: Game; plan: StaffPlanData }) {
+  const d = plan.demand;
+  const n = (x: number) => (x < 10 ? x.toFixed(1).replace(/\.0$/, "") : String(Math.round(x)));
+  const here = d.hereWalkIns + d.hereAmbulances;
+  const all = d.walkIns + d.ambulances;
+  const hour = `${String(d.peakHour).padStart(2, "0")}:00`;
+  const required = plan.rows.filter((r) => !r.optional || r.have > 0 || r.cover);
+  const useAll = () => {
+    for (const r of required) game.setCover(r.key, r.suggested.day, r.suggested.night);
+  };
+  const allSet = required.every((r) => r.cover && sameCover(r.cover, r.suggested));
+  return (
+    <>
+      <RatioNote />
+      {all > 0 ? (
+        <p class="hire-desc demand-text">
+          Your catchment of {d.catchment.toLocaleString("en-GB")} people sends about{" "}
+          <strong>{n(all)} emergency patients a day</strong> ({n(d.walkIns)} walk in,{" "}
+          {n(d.ambulances)} by ambulance)
+          {d.surge && <>, more than usual: {d.surge}</>}.{" "}
+          {here > 0 ? (
+            <>
+              With what you can treat now, about <strong>{n(here)} come here</strong>
+              {all - here >= 1 && <> and {n(all - here)} go elsewhere</>}: {n(d.dayArrivals)} during
+              day shifts and {n(d.nightArrivals)} at night, busiest around {hour} (
+              {n(d.peakArrivals)} an hour).
+            </>
+          ) : (
+            <>None come here yet: build the rooms their care needs (Help shows what).</>
+          )}{" "}
+          {d.admissions >= 0.5 && <>About {n(d.admissions)} a day need admitting. </>}
+          {d.wardBeds > 0 && <>You have {d.wardBeds} ward beds to nurse. </>}
+          {d.theatres > 0 && (
+            <>
+              {d.theatres} {d.theatres === 1 ? "theatre" : "theatres"} to staff.
+            </>
+          )}
+        </p>
+      ) : (
+        <p class="hire-desc demand-text">
+          No A&E: staff for your wards ({d.wardBeds} beds), theatres ({d.theatres}) and clinics.
+        </p>
+      )}
+      {plan.rows.length === 0 ? (
+        <p class="dim">Build some of the hospital to see what staff it needs.</p>
+      ) : (
+        <table class="capacity-table plan-table">
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th title="People wanted at work at once on every day shift and every night shift, from patient demand">
+                Demand suggests
+                <span class="sub">at once, per shift</span>
+              </th>
+              <th title="People it takes to staff that cover, each working three shifts a week">
+                People needed
+                <span class="sub">shifts a week ÷ 3</span>
+              </th>
+              <th title="On the rota now">You have</th>
+              <th title="People to hire to staff what demand suggests">To hire</th>
+              <th title="The cover you've set on the cards below">Your cover</th>
+              <th title="The suggested cover's pay a year, with unsocial hours">Pay a year</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {plan.rows.map((r) => (
+              <PlanRow key={r.key} game={game} row={r} />
+            ))}
+          </tbody>
+        </table>
+      )}
+      {plan.rows.length > 0 && (
+        <div class="plan-totals">
+          <span class="hire-desc">
+            The suggested cover takes <strong>{plan.people} people</strong>, about{" "}
+            <strong>{compact(plan.cost)} a year</strong> in pay with unsocial hours (
+            {formatMoney(plan.cost / 365)} a day). Your rota now: {plan.peopleNow} people,{" "}
+            {compact(plan.costNow)} a year.
+            {plan.blockPerDay !== null && (
+              <> The block contract pays {formatMoney(plan.blockPerDay)} a day now.</>
+            )}{" "}
+            Your own staff are the cheapest reliable cover: the bank costs the same per shift but
+            fills only about two gaps in three, and an agency fills every one at twice the cost.
+          </span>
+          <button
+            class="small-button"
+            disabled={allSet}
+            onMouseDown={noFocus}
+            onClick={useAll}
+            title="Set every group's cover to what demand suggests (optional groups only if you have some)"
+          >
+            Use suggested cover
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+function PlanRow({ game, row }: { game: Game; row: StaffPlanRow }) {
+  const shifts = (row.suggested.day + row.suggested.night) * 7;
+  const toHire = row.suggestedPeople - row.have;
+  const coverTone = !row.cover
+    ? "dim"
+    : row.cover.day >= row.suggested.day && row.cover.night >= row.suggested.night
+      ? "ok-text"
+      : "warn-text";
+  return (
+    <tr>
+      <th>
+        {row.name}
+        {row.optional && <span class="flag"> optional</span>}
+        <span class="sub dim">{row.why}</span>
+      </th>
+      <td>{coverText(row.suggested)}</td>
+      <td title={`${shiftSum(row.suggested)} = ${shifts} shifts a week, ÷ 3 each`}>
+        <strong>{row.suggestedPeople}</strong>
+        <span class="sub dim">{shifts} ÷ 3</span>
+      </td>
+      <td>{row.have}</td>
+      <td class={toHire > 0 ? (row.optional ? "" : "warn-text") : "ok-text"}>
+        {toHire > 0 ? `+${toHire}` : toHire === 0 ? "✓" : `✓ ${-toHire} spare`}
+      </td>
+      <td class={coverTone}>{row.cover ? coverText(row.cover) : "none"}</td>
+      <td title={`${formatMoney(row.pay)} a year each, before unsocial hours`}>
+        {compact(row.suggestedCost)}
+      </td>
+      <td class="plan-actions">
+        {!(row.cover && sameCover(row.cover, row.suggested)) && (
+          <button
+            class="small-button"
+            onMouseDown={noFocus}
+            onClick={() => game.setCover(row.key, row.suggested.day, row.suggested.night)}
+            title="Set this group's cover to what demand suggests"
+          >
+            Use
+          </button>
+        )}
+        {row.hire && (
+          <button
+            class="small-button"
+            onMouseDown={noFocus}
+            onClick={() => hire(game, row.hire!)}
+            title={`Hire one, ${formatMoney(row.pay)} a year`}
+          >
+            Hire
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * A rota group: cover steppers, and the week's 14 shifts against them; what
+ * the cover takes in people and pay; and what demand suggests.
+ */
+function RotaCard({ game, row, gapFill }: { game: Game; row: RotaRow; gapFill: GapFill }) {
   const { cover } = row;
   const hasCover = cover.day + cover.night > 0;
+  const shifts = (cover.day + cover.night) * 7;
+  const toHire = Math.max(0, row.needed - row.people);
+  const enough = row.people >= row.needed;
   return (
     <div class="rota-card">
       <div class="rota-card-head">
         <strong>{row.name}</strong>
         <span class="dim">
           {row.people} staff · {row.onNow} at work
+          {row.hire && (
+            <button
+              class="small-button card-hire"
+              onMouseDown={noFocus}
+              onClick={() => hire(game, row.hire!)}
+              title={`Hire one, ${formatMoney(row.pay)} a year`}
+            >
+              Hire
+            </button>
+          )}
         </span>
       </div>
       <div class="rota-card-body">
@@ -728,16 +994,70 @@ function RotaCard({ game, row }: { game: Game; row: RotaRow }) {
           />
         </div>
       </div>
-      {row.gaps > 0 ? (
-        <span class="rota-status warn-text">
-          {row.gaps} {row.gaps === 1 ? "shift" : "shifts"} a week short · this cover needs about{" "}
-          {row.needed} people, you have {row.people}
-        </span>
-      ) : hasCover ? (
-        <span class="rota-status ok-text">Every shift covered</span>
+      {hasCover ? (
+        <>
+          <div class={`cover-sum ${enough && row.gaps === 0 ? "ok" : "warn"}`}>
+            <div>
+              {shiftSum(cover)} = <strong>{shifts} shifts a week</strong>
+            </div>
+            <div title={`${(shifts / 3).toFixed(1)}, rounded up`}>
+              ÷ 3 shifts each = <strong>{row.needed} people</strong> · you have {row.people}
+              {toHire > 0 ? (
+                <strong class="warn-text"> · {toHire} to hire</strong>
+              ) : row.people > row.needed ? (
+                <span class="dim"> · {row.people - row.needed} more than needed</span>
+              ) : (
+                <span class="ok-text"> · ✓</span>
+              )}
+            </div>
+          </div>
+          {row.gaps > 0 &&
+            (toHire > 0 ? (
+              <FillOptions row={row} toHire={toHire} gapFill={gapFill} />
+            ) : (
+              <span class="rota-status rota-note warn-text">
+                {row.gaps} {row.gaps === 1 ? "shift" : "shifts"} a week uncovered: enough people,
+                but the rota can't fit them all in (never a day straight after a night). One more
+                person closes the gaps.
+              </span>
+            ))}
+          {row.spare > 0 && row.gaps === 0 && (
+            <span class="rota-status rota-note dim">
+              Their {row.spare} spare {row.spare === 1 ? "shift" : "shifts"} a week go where they
+              help most.
+            </span>
+          )}
+          <span class="rota-status rota-note dim">
+            Pay for this cover: about {compact(row.cost.salaries + row.cost.unsocial)} a year (
+            {compact(row.cost.unsocial)} of it unsocial hours). Expect about{" "}
+            {row.sick < 1 ? "one shift every few weeks" : `${Math.round(row.sick)} a week`} lost to
+            sickness.
+          </span>
+        </>
       ) : (
         <span class="rota-status dim">
           No cover set: shifts shared 60:40 days to nights. Set cover to see gaps.
+        </span>
+      )}
+      {row.suggested && (
+        <span
+          class={`rota-status rota-suggest${sameCover(row.suggested, cover) ? " ok-text" : ""}`}
+          title={row.why ?? undefined}
+        >
+          {sameCover(row.suggested, cover) ? (
+            "✓ Matches patient demand"
+          ) : (
+            <>
+              Patient demand suggests {coverText(row.suggested)}: {peopleFor(row.suggested)} people
+              <button
+                class="small-button"
+                onMouseDown={noFocus}
+                onClick={() => game.setCover(row.key, row.suggested!.day, row.suggested!.night)}
+              >
+                Use
+              </button>
+            </>
+          )}
         </span>
       )}
     </div>
