@@ -108,7 +108,11 @@ import {
   lockedItems,
   tutorialHighlight,
   scenarioBriefing,
+  viewFloor,
+  floorCount,
 } from "@ui/store";
+import { gridOrBlank } from "@sim/world/storeys";
+import { MAX_FLOORS } from "@data/structures";
 import { tileHelp } from "@ui/help";
 import { autosaveOption, settings, settingsOpen } from "@ui/settings";
 import { describeAdvice } from "./advice";
@@ -140,7 +144,6 @@ const NOTIFICATION_SECS = { info: 8, warn: 12, bad: 20 } as const;
 const AGENT_PICK_RADIUS = 0.6;
 /** How long the mouse must rest on something before its help card appears. */
 const HOVER_HELP_DELAY_MS = 350;
-const FLOOR = 0;
 
 const COVER_TEXT = {
   watched: { text: "Watched from a staffed nurse station", ok: true },
@@ -258,6 +261,7 @@ export class Game {
       : applyCommand(this.state, cmd);
     if (result.ok) {
       mapHelp.value = null;
+      floorCount.value = this.viewState.floors.length; // Building may have started a storey.
       this.renderer.layoutChanged(result.changed);
       // Real building can get in the way of planned steps (or shift item ids).
       if (!planning.value && this.state.plan.length > 0) this.rebuildPreview();
@@ -317,7 +321,7 @@ export class Game {
    */
   setRoomSpecialty(specialty: SpecialtyId | null): void {
     const tile = this.selectedTile;
-    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    const room = tile && roomAt(this.state, viewFloor.value, tile.x, tile.y);
     if (!room || !roomById.get(room.typeId)?.specialty) return;
     setRoomSpecialty(this.state, room, specialty);
     if (this.preview) this.rebuildPreview();
@@ -330,7 +334,7 @@ export class Game {
    */
   setWaitingFor(who: WaitingFor | null): void {
     const tile = this.selectedTile;
-    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    const room = tile && roomAt(this.state, viewFloor.value, tile.x, tile.y);
     if (!room || room.typeId !== "waiting_area") return;
     setWaitingFor(this.state, room, who);
     if (this.preview) this.rebuildPreview();
@@ -340,7 +344,7 @@ export class Game {
   /** Keeps the selected theatre for emergencies, or opens it to planned lists. */
   setEmergencyTheatre(on: boolean): void {
     const tile = this.selectedTile;
-    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    const room = tile && roomAt(this.state, viewFloor.value, tile.x, tile.y);
     if (!room || room.typeId !== "theatre") return;
     setEmergencyTheatre(this.state, room, on);
     if (this.preview) this.rebuildPreview();
@@ -350,7 +354,7 @@ export class Game {
   /** Closes the selected ward room or side room to admissions, or reopens it. */
   setRoomClosed(closed: boolean): void {
     const tile = this.selectedTile;
-    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    const room = tile && roomAt(this.state, viewFloor.value, tile.x, tile.y);
     if (!room || (room.typeId !== "ward" && room.typeId !== "side_room")) return;
     setRoomClosed(this.state, room, closed, "player");
     this.publishInspector();
@@ -359,7 +363,7 @@ export class Game {
   /** Puts the selected room on the essential supply, or takes it off. */
   setEssentialRoom(on: boolean): void {
     const tile = this.selectedTile;
-    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    const room = tile && roomAt(this.state, viewFloor.value, tile.x, tile.y);
     if (!room) return;
     setEssentialRoom(this.state, room, on);
     this.publishInspector();
@@ -380,7 +384,7 @@ export class Game {
   /** Hybrid trusts: puts the selected room in the Private Patient Unit, or takes it out. */
   setPrivateRoom(on: boolean): void {
     const tile = this.selectedTile;
-    const room = tile && roomAt(this.state, FLOOR, tile.x, tile.y);
+    const room = tile && roomAt(this.state, viewFloor.value, tile.x, tile.y);
     if (!room || this.state.funding !== "hybrid" || !PRIVATE_ROOM_TYPES.has(room.typeId)) return;
     setPrivateRoom(this.state, room, on);
     if (this.preview) this.rebuildPreview();
@@ -402,7 +406,8 @@ export class Game {
   }
 
   /** Centres the camera on a tile (e.g. from a notification). */
-  focus(at: { x: number; y: number }): void {
+  focus(at: { x: number; y: number; floor?: number | undefined }): void {
+    if (at.floor !== undefined && at.floor !== viewFloor.value) this.setFloor(at.floor);
     this.renderer.camera.centreOn((at.x + 0.5) * TILE_SIZE, (at.y + 0.5) * TILE_SIZE);
   }
 
@@ -410,8 +415,8 @@ export class Game {
   showAgent(id: number): void {
     const a = this.state.patients[id] ?? this.state.staff[id] ?? this.state.outpatients[id];
     if (!a) return;
+    this.focus({ x: Math.round(a.x), y: Math.round(a.y), floor: a.floor });
     this.selectAgent(id);
-    this.focus({ x: Math.round(a.x), y: Math.round(a.y) });
   }
 
   /** Selects a patient or member of staff and shows them in the inspector. */
@@ -431,7 +436,9 @@ export class Game {
 
   /** Redraws the coverage overlay from what the map shows (or hides it). */
   private refreshCoverage(): void {
-    this.renderer.setCoverage(coverageOverlay.value ? coverageView(this.viewState) : null);
+    this.renderer.setCoverage(
+      coverageOverlay.value ? coverageView(this.viewState, viewFloor.value) : null,
+    );
   }
 
   /** Enters or leaves plan mode. The plan itself is kept either way. */
@@ -517,10 +524,27 @@ export class Game {
     if (state.plan.length > 0) this.rebuildPreview();
     this.refreshPlanView();
     this.renderer.setState(state);
+    this.setFloor(0);
     this.refreshCoverage();
     this.build.refresh();
     this.setSpeed(0);
     this.publishInspector();
+  }
+
+  /**
+   * Shows another floor (0 = ground), and builds on it. Up to one above the
+   * top storey, to start building it.
+   */
+  setFloor(floor: number): void {
+    const top = Math.min(this.viewState.floors.length, MAX_FLOORS - 1);
+    const f = Math.max(0, Math.min(floor, top));
+    floorCount.value = this.viewState.floors.length;
+    if (f === viewFloor.value && f === this.renderer.floor) return;
+    viewFloor.value = f;
+    this.renderer.setFloor(f);
+    this.select(null);
+    this.refreshCoverage();
+    this.build.refresh();
   }
 
   /** A new sandbox game, with the New hospital dialog's settings. */
@@ -986,6 +1010,7 @@ export class Game {
       ...Object.values(this.state.outpatients),
     ];
     for (const a of people) {
+      if (a.floor !== viewFloor.value) continue;
       // In the mortuary they're shown as a label on their fridge drawer.
       const at = "stage" in a && a.stage === "in_mortuary" ? tagSpot(this.state, a) : a;
       const d = Math.hypot(at.x - x, at.y - y);
@@ -1013,7 +1038,7 @@ export class Game {
       return;
     }
     if (mapHelp.value || performance.now() - this.hoverSince < HOVER_HELP_DELAY_MS) return;
-    const content = tileHelp(this.viewState, FLOOR, tile.x, tile.y);
+    const content = tileHelp(this.viewState, viewFloor.value, tile.x, tile.y);
     if (content) mapHelp.value = { ...at, content };
   }
 
@@ -1036,7 +1061,7 @@ export class Game {
     };
     if (!debugVisible.value) return;
     const { camera } = this.renderer;
-    const grid = this.state.floors[FLOOR]!;
+    const grid = gridOrBlank(this.state, viewFloor.value);
     debugStats.value = {
       fps: this.fps,
       frameMs: this.frameMs,
@@ -1093,10 +1118,10 @@ export class Game {
       this.renderer.setSelection(null);
       return;
     }
-    const grid = this.viewState.floors[FLOOR]!;
+    const grid = gridOrBlank(this.viewState, viewFloor.value);
     const data: InspectorData = { tile };
 
-    const obj = itemsAt(this.viewState, FLOOR, tile.x, tile.y)[0];
+    const obj = itemsAt(this.viewState, viewFloor.value, tile.x, tile.y)[0];
     const def = obj && objectDef(obj.defId);
     if (def) {
       data.object = {
@@ -1117,7 +1142,7 @@ export class Game {
       if (condition) data.object.condition = condition;
     }
 
-    const room = roomAt(this.viewState, FLOOR, tile.x, tile.y);
+    const room = roomAt(this.viewState, viewFloor.value, tile.x, tile.y);
     const roomDef = room && roomById.get(room.typeId);
     if (room && roomDef) {
       const counts = new Map<string, number>();
@@ -1221,6 +1246,9 @@ export class Game {
       this.stepOnce();
     } else if (e.code === "KeyR") {
       this.build.rotate();
+    } else if (e.code === "PageUp" || e.code === "PageDown") {
+      e.preventDefault();
+      this.setFloor(viewFloor.value + (e.code === "PageUp" ? 1 : -1));
     } else if (e.code === "Escape") {
       if (this.build.cancel()) return;
       if (hospitalTab.value) hospitalTab.value = null;

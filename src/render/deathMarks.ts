@@ -339,8 +339,9 @@ function familySofas(state: SimState) {
 }
 
 /** Two relatives sitting on each sofa where a family is being told. */
-export function drawFamilies(g: Graphics, state: SimState): void {
+export function drawFamilies(g: Graphics, state: SimState, floor = 0): void {
   for (const sofa of familySofas(state)) {
+    if (sofa.floor !== floor) continue;
     const r = objectRect(sofa);
     const seats =
       r.w >= r.h

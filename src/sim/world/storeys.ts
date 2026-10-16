@@ -9,7 +9,7 @@
  */
 import { BRIDGE_MAX_SPAN } from "@data/structures";
 import type { SimState } from "../state";
-import { FloorType, inBounds, isPublic, tileIndex } from "./grid";
+import { createUpperFloor, FloorType, inBounds, isPublic, tileIndex, type FloorGrid } from "./grid";
 
 /** Whether every storey below a tile has floor built there (always, on the ground floor). */
 export function supported(state: SimState, floor: number, x: number, y: number): boolean {
@@ -79,3 +79,21 @@ export const NO_SUPPORT = `Needs floor beneath it (or a first-floor link bridge 
 export const HOLDS_UP_FLOOR_ABOVE = "Remove what's built on the floor above first";
 /** Error for zoning a room on a link bridge. */
 export const BRIDGE_CORRIDOR_ONLY = "A link bridge can only be a corridor";
+
+const blanks = new WeakMap<SimState, FloorGrid>();
+
+/**
+ * A floor's grid, or (for the storey above the top one, before anything's
+ * built there) a blank one of open air, for build tools to work against.
+ */
+export function gridOrBlank(state: SimState, floor: number): FloorGrid {
+  const grid = state.floors[floor];
+  if (grid) return grid;
+  const g0 = state.floors[0]!;
+  let blank = blanks.get(state);
+  if (!blank || blank.width !== g0.width || blank.height !== g0.height) {
+    blank = createUpperFloor(g0.width, g0.height);
+    blanks.set(state, blank);
+  }
+  return blank;
+}

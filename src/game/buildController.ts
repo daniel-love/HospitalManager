@@ -17,12 +17,11 @@ import { isPanModifier } from "@render/cameraControls";
 import type { Renderer } from "@render/renderer";
 import { NOTHING_TO_CHANGE, planCommand, type Command, type CommandResult } from "@sim/commands";
 import type { SimState } from "@sim/state";
-import { cursorInfo, planning, rotation, tool } from "@ui/store";
+import { cursorInfo, planning, rotation, tool, viewFloor } from "@ui/store";
+import { gridOrBlank } from "@sim/world/storeys";
 import { objectDef } from "@data/catalogue";
 import { objectRect } from "@sim/world/objects";
 import { describePlan, equipmentAt, ghostFor, isPlacementTool, toolCommand } from "./tools";
-
-const FLOOR = 0;
 
 export interface BuildHost {
   /** The layout the tools work on: the plan preview while planning. */
@@ -121,7 +120,7 @@ export class BuildController {
 
   /** Move tool with empty hands: highlight what would be picked up. */
   private refreshPickUp(tile: { x: number; y: number }): void {
-    const obj = equipmentAt(this.host.viewState, FLOOR, tile);
+    const obj = equipmentAt(this.host.viewState, viewFloor.value, tile);
     if (!obj) {
       this.renderer.setGhost(null);
       cursorInfo.value = { ...this.pointer, text: "Click equipment to pick it up", ok: true };
@@ -139,9 +138,10 @@ export class BuildController {
 
   private command(tile: { x: number; y: number }): Command | null {
     const state = this.host.viewState;
-    const grid = state.floors[FLOOR]!;
+    const floor = viewFloor.value;
+    const grid = gridOrBlank(state, floor);
     const start = this.dragStart ?? tile;
-    return toolCommand(tool.value!, grid, FLOOR, start, tile, rotation.value, state);
+    return toolCommand(tool.value!, grid, floor, start, tile, rotation.value, state);
   }
 
   /** Tracks the pointer from the event itself, not whichever listener ran first. */
@@ -157,7 +157,7 @@ export class BuildController {
     if (e.button !== 0 || !t || !tile || isPanModifier(e)) return;
     if (t.kind === "move") {
       if (!t.carry) {
-        const obj = equipmentAt(this.host.viewState, FLOOR, tile);
+        const obj = equipmentAt(this.host.viewState, viewFloor.value, tile);
         if (obj) this.pickUp(obj.id, tile);
       } else {
         const cmd = this.command(tile)!;

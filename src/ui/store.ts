@@ -478,6 +478,11 @@ export const planSummary = signal<{ steps: number; cost: number }>({ steps: 0, c
 /** Map overlay showing which beds nurse stations can see (GAME_DESIGN §7). */
 export const coverageOverlay = signal(false);
 
+/** The floor on view and being built on (0 = ground). */
+export const viewFloor = signal(0);
+/** Storeys built so far (the one above them can be viewed, to start building it). */
+export const floorCount = signal(1);
+
 /** The Patients dialog: every patient's status. */
 export const patientsOpen = signal(false);
 

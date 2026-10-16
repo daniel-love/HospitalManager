@@ -232,9 +232,11 @@ export interface CoverageView {
   seen: number[];
 }
 
-export function coverageView(state: SimState): CoverageView {
+/** The coverage overlay for one floor. */
+export function coverageView(state: SimState, floor = 0): CoverageView {
   const seen = new Set<number>();
-  const stations = nurseStations(state).map((s) => {
+  const onFloor = nurseStations(state).filter((s) => s.floor === floor);
+  const stations = onFloor.map((s) => {
     for (const i of visibleTiles(state, s)) seen.add(i);
     return {
       id: s.id,
@@ -244,11 +246,13 @@ export function coverageView(state: SimState): CoverageView {
     };
   });
   return {
-    beds: observedBeds(state).map((b) => ({
-      id: b.id,
-      ...objectRect(b),
-      cover: bedCover(state, b.id),
-    })),
+    beds: observedBeds(state)
+      .filter((b) => b.floor === floor)
+      .map((b) => ({
+        id: b.id,
+        ...objectRect(b),
+        cover: bedCover(state, b.id),
+      })),
     stations,
     seen: [...seen],
   };

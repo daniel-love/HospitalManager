@@ -178,6 +178,8 @@ export class TilemapLayer {
         } else if (surface === FloorType.Road) {
           g.rect(px, py, T, T).fill(this.isDroppedKerb(x, y) ? DROPPED_KERB_COLOUR : ROAD_COLOUR);
           this.drawCentreLine(g, x, y);
+        } else if (surface === FloorType.Void) {
+          continue; // Open air upstairs: the floor below shows through.
         } else {
           g.rect(px, py, T, T).fill(GRASS_SHADES[tileHash(x, y) % GRASS_SHADES.length]!);
         }

@@ -4,7 +4,8 @@ import { SPEEDS, type Speed } from "@game/loop";
 import { formatMoney } from "@game/tools";
 import { settingsOpen } from "./settings";
 import type { Census } from "@game/describe";
-import { hud, saveDialogOpen, tutorialHighlight } from "./store";
+import { MAX_FLOORS } from "@data/structures";
+import { floorCount, hud, saveDialogOpen, tutorialHighlight, viewFloor } from "./store";
 
 const LABELS: Record<Speed, string> = {
   0: "❚❚",
@@ -127,6 +128,7 @@ export function TopBar({ game }: { game: Game }) {
           {e.label} <span class="dim">{e.when}</span>
         </button>
       ))}
+      <FloorPicker game={game} />
       <div
         class={`speeds${tutorialHighlight.value === "speed" ? " tutorial-glow" : ""}`}
         role="group"
@@ -155,6 +157,34 @@ export function TopBar({ game }: { game: Game }) {
       <button class="menu-button" onMouseDown={noFocus} onClick={() => (settingsOpen.value = true)}>
         Settings
       </button>
+    </div>
+  );
+}
+
+const FLOOR_NAMES = ["Ground", "First", "Second"];
+
+/**
+ * Which floor is on view and being built on (PgUp/PgDn): every storey built
+ * so far, and the next one up to start building it.
+ */
+function FloorPicker({ game }: { game: Game }) {
+  const shown = Math.min(floorCount.value + 1, MAX_FLOORS);
+  if (shown <= 1) return null;
+  return (
+    <div class="speeds floors" role="group" aria-label="Floor on view">
+      {Array.from({ length: shown }, (_, f) => (
+        <button
+          key={f}
+          class={f === viewFloor.value ? "active" : ""}
+          title={`${FLOOR_NAMES[f] ?? `Floor ${f}`} floor${f >= floorCount.value ? " (not built yet)" : ""} · PgUp/PgDn`}
+          aria-pressed={f === viewFloor.value}
+          onMouseDown={noFocus}
+          onClick={() => game.setFloor(f)}
+        >
+          {f === 0 ? "G" : f}
+          {f >= floorCount.value ? <span class="dim">+</span> : null}
+        </button>
+      ))}
     </div>
   );
 }

@@ -29,16 +29,16 @@ export class ObjectLayer {
   /** Each view remembers where it was drawn, so moved objects get redrawn. */
   private readonly views = new Map<number, { view: Container; at: string }>();
 
-  sync(state: SimState): void {
+  sync(state: SimState, floor = 0): void {
     for (const [id, { view, at }] of this.views) {
       const obj = state.objects[id];
-      if (!obj || placement(obj) !== at) {
+      if (!obj || obj.floor !== floor || placement(obj) !== at) {
         view.destroy({ children: true });
         this.views.delete(id);
       }
     }
     for (const obj of Object.values(state.objects)) {
-      if (this.views.has(obj.id)) continue;
+      if (obj.floor !== floor || this.views.has(obj.id)) continue;
       const def = equipmentById.get(obj.defId);
       if (!def) continue; // Doors.
       const view = drawEquipment(def, objectRect(obj), obj.rotation);

@@ -91,9 +91,18 @@ export class AgentLayer {
     this.container.addChild(this.bays, this.vehicles, this.families, this.kits, this.people);
   }
   selectedId: number | null = null;
+  /** The floor on view: only those on it are drawn (vehicles only on the ground). */
+  floor = 0;
+
+  /** On the floor on view, and not out of sight on the stairs or in a lift. */
+  private shown(a: AgentBase): boolean {
+    const t = a.transit;
+    return a.floor === this.floor && !(t && (t.phase === "climbing" || t.phase === "riding"));
+  }
 
   /** Positions every agent, interpolated `alpha` of the way from last tick to this one. */
   update(state: SimState, alpha: number): void {
+    this.vehicles.visible = this.floor === 0;
     this.updateAmbulances(Object.values(state.ambulances), alpha);
     const attended = attendedPatients(state);
     const wheeled = wheeledPatients(state);
@@ -101,6 +110,7 @@ export class AgentLayer {
     const live = new Set<number>();
     const screened = new Map<number, BayScreen>();
     for (const p of Object.values(state.patients)) {
+      if (!this.shown(p)) continue;
       live.add(p.id);
       const selected = p.id === this.selectedId;
       if (p.death) {
@@ -126,7 +136,7 @@ export class AgentLayer {
       );
     }
     for (const s of Object.values(state.staff)) {
-      if (!onSite(s)) continue; // On call at home, or on the way in.
+      if (!onSite(s) || !this.shown(s)) continue; // On call at home, or on the way in.
       live.add(s.id);
       const selected = s.id === this.selectedId;
       this.place(s, alpha, `${s.role}|${selected}`, (g) => drawStaff(g, s, selected));
@@ -138,20 +148,23 @@ export class AgentLayer {
       }
     }
     for (const o of Object.values(state.outpatients)) {
+      if (!this.shown(o)) continue;
       live.add(o.id);
       const selected = o.id === this.selectedId;
       this.place(o, alpha, `outpatient|${selected}`, (g) => drawOutpatient(g, selected));
     }
     for (const v of Object.values(state.visitors)) {
+      if (!this.shown(v)) continue;
       live.add(v.id);
       this.place(v, alpha, "visitor", drawVisitor);
     }
     for (const t of Object.values(state.tours)) {
+      if (!this.shown(t)) continue;
       live.add(t.id);
       this.place(t, alpha, t.kind, t.kind === "inspector" ? drawInspector : drawVip);
     }
     for (const c of Object.values(state.collections)) {
-      if (!crewOnFoot(c)) continue;
+      if (!crewOnFoot(c) || !this.shown(c.crew)) continue;
       live.add(c.crew.id);
       this.place(c.crew, alpha, "crew", drawCrew);
       const at = crewSpot(state, c, alpha);
@@ -163,10 +176,10 @@ export class AgentLayer {
     this.drawBays(screened);
     this.updatePrivateAmbulances(state, alpha);
     this.drawKits(state);
-    const families = familiesLook(state);
+    const families = `${this.floor}|${familiesLook(state)}`;
     if (families !== this.familiesDrawn) {
       this.families.clear();
-      drawFamilies(this.families, state);
+      drawFamilies(this.families, state, this.floor);
       this.familiesDrawn = families;
     }
     for (const [id, view] of this.views) {
@@ -199,7 +212,7 @@ export class AgentLayer {
       const kit = state.objects[kitId];
       const s = state.staff[staffId];
       const view = this.views.get(staffId);
-      if (!kit || !s || !view) continue;
+      if (!kit || !s || !view || !this.shown(s)) continue;
       const def = equipmentById.get(kit.defId);
       const dx = s.x - s.prevX;
       const dy = s.y - s.prevY;

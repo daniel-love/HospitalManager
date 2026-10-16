@@ -18,15 +18,15 @@ export class CleaningLayer {
   readonly container = new Graphics();
   private last = "";
 
-  update(state: SimState): void {
+  update(state: SimState, floor = 0): void {
     const statuses = cleaningStatuses(state);
     const key = [...statuses].map(([id, s]) => `${id}:${s}`).join(",");
-    if (key === this.last) return;
-    this.last = key;
+    if (`${floor}|${key}` === this.last) return;
+    this.last = `${floor}|${key}`;
     const g = this.container.clear();
     for (const [id, status] of statuses) {
       const obj = state.objects[id];
-      if (obj) draw(g, objectRect(obj), status);
+      if (obj && obj.floor === floor) draw(g, objectRect(obj), status);
     }
   }
 

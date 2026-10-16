@@ -16,7 +16,7 @@ import { Application, Container, Graphics } from "pixi.js";
 import { objectDef } from "@data/catalogue";
 import type { Rotation, SimState } from "@sim/state";
 import type { CoverageView } from "@sim/systems/monitoring";
-import { inBounds } from "@sim/world/grid";
+import { createUpperFloor, inBounds, type FloorGrid } from "@sim/world/grid";
 import { accessRequirements, footprintRect, isStandable } from "@sim/world/objects";
 import { outlineTiles, type Rect } from "@sim/world/rect";
 import { AgentLayer } from "./agentLayer";
@@ -63,10 +63,19 @@ const TONES: Record<GhostTone, number> = {
   neutral: 0xffffff,
 };
 
+/** How strongly the floor below shows through open air upstairs. */
+const BELOW_ALPHA = 0.3;
+
 export class Renderer {
   readonly camera: Camera;
   private readonly world = new Container();
   private tilemap: TilemapLayer;
+  /** The floor below the one on view, faint, seen through open air. */
+  private below: TilemapLayer | null = null;
+  /** The grid the tile map was drawn from (a blank one for a storey not built yet). */
+  private tilemapGrid: FloorGrid;
+  /** The floor on view (0 = ground). */
+  floor = 0;
   private readonly bays = new BayLayer();
   private readonly objects = new ObjectLayer();
   private readonly cleaning = new CleaningLayer();
@@ -106,6 +115,7 @@ export class Renderer {
     this.camera.centreOn((grid.width * TILE_SIZE) / 2, (grid.height * TILE_SIZE) / 2);
 
     this.tilemap = new TilemapLayer(grid, state.site);
+    this.tilemapGrid = grid;
     this.hoverBox
       .rect(0, 0, TILE_SIZE, TILE_SIZE)
       .stroke({ width: 2, color: 0xffffff, alpha: 0.9, alignment: 1 });
@@ -176,9 +186,10 @@ export class Renderer {
     const old = this.state.floors[0]!;
     this.state = state;
     const grid = state.floors[0]!;
-    this.tilemap.destroy();
-    this.tilemap = new TilemapLayer(grid, state.site);
-    this.world.addChildAt(this.tilemap.container, 0);
+    // A storey more than one above the top built one can't be on view.
+    this.floor = Math.min(this.floor, state.floors.length);
+    this.agents.floor = this.floor;
+    this.buildTilemaps();
     this.objects.clear();
     this.cleaning.clear();
     this.service.clear();
@@ -217,8 +228,60 @@ export class Renderer {
   /** Call after a build command changed the layout. */
   layoutChanged(changed: Rect | null): void {
     this.dirty = true;
-    if (changed) this.tilemap.markDirty(changed);
+    if (this.gridOf(this.floor) !== this.tilemapGrid) {
+      this.buildTilemaps(); // A new storey: draw it from its own grid.
+    } else if (changed) {
+      this.tilemap.markDirty(changed);
+      this.below?.markDirty(changed);
+    }
     this.syncContent();
+  }
+
+  /** Shows another floor (0 = ground; one above the top storey, to start building it). */
+  setFloor(floor: number): void {
+    const f = Math.max(0, Math.min(floor, this.state.floors.length));
+    if (f === this.floor) return;
+    this.floor = f;
+    this.agents.floor = f;
+    this.dirty = true;
+    this.buildTilemaps();
+    this.objects.clear();
+    this.cleaning.clear();
+    this.service.clear();
+    this.agents.clear();
+    this.setSelection(null);
+    this.syncContent();
+  }
+
+  /** A floor's grid; a blank one for the storey above the top one, before it's built on. */
+  private gridOf(floor: number): FloorGrid {
+    const grid = this.state.floors[floor];
+    if (grid) return grid;
+    const g0 = this.state.floors[0]!;
+    if (this.blank?.width !== g0.width || this.blank.height !== g0.height) {
+      this.blank = createUpperFloor(g0.width, g0.height);
+    }
+    return this.blank;
+  }
+  private blank: FloorGrid | null = null;
+
+  /** The tile maps for the floor on view and, upstairs, the floor below it. */
+  private buildTilemaps(): void {
+    this.tilemap.destroy();
+    this.below?.destroy();
+    this.below = null;
+    const site = (f: number) => (f === 0 ? this.state.site : null);
+    const grid = this.gridOf(this.floor);
+    this.tilemap = new TilemapLayer(grid, site(this.floor));
+    this.tilemapGrid = grid;
+    this.world.addChildAt(this.tilemap.container, 0);
+    if (this.floor > 0) {
+      this.below = new TilemapLayer(this.gridOf(this.floor - 1), site(this.floor - 1));
+      this.below.container.alpha = BELOW_ALPHA;
+      this.world.addChildAt(this.below.container, 0);
+    }
+    this.bays.container.visible = this.floor === 0;
+    this.publicLand.renderable = this.floor === 0;
   }
 
   setGhost(ghost: Ghost | null): void {
@@ -262,7 +325,7 @@ export class Renderer {
    */
   private drawAccess(g: Graphics, r: Rect, ghost: Extract<Ghost, { kind: "object" }>): void {
     const T = TILE_SIZE;
-    const grid = this.state.floors[0]!;
+    const grid = this.gridOf(this.floor);
     const clear = (t: { x: number; y: number }) => isStandable(grid, t.x, t.y, ghost.ignoreId);
     for (const req of accessRequirements(ghost.defId, r, ghost.rotation)) {
       const okColour = req.who === "staff" ? STAFF_COLOUR : GHOST_OK;
@@ -376,7 +439,7 @@ export class Renderer {
     const hovered = this.hoveredTile ? `${this.hoveredTile.x},${this.hoveredTile.y}` : "";
     // Hiring or dismissing while paused changes who's on the map without a tick.
     const people = `${Object.keys(live.patients).length},${Object.keys(live.staff).length},${Object.keys(live.ambulances).length}`;
-    const frame = `${camera.x},${camera.y},${camera.zoom},${camera.viewportWidth},${camera.viewportHeight}|${hovered}|${live.tick},${alpha}|${people}`;
+    const frame = `${camera.x},${camera.y},${camera.zoom},${camera.viewportWidth},${camera.viewportHeight}|${hovered}|${live.tick},${alpha}|${people}|${this.floor}`;
     if (!this.dirty && frame === this.lastFrame) return;
     this.dirty = false;
     this.lastFrame = frame;
@@ -385,10 +448,11 @@ export class Renderer {
       camera.viewportWidth / 2 - camera.x * camera.zoom,
       camera.viewportHeight / 2 - camera.y * camera.zoom,
     );
+    this.below?.update(camera.visibleWorldRect(), camera.zoom);
     this.tilemap.update(camera.visibleWorldRect(), camera.zoom);
     this.objects.update(camera.zoom, live);
-    this.cleaning.update(live);
-    this.service.update(live);
+    this.cleaning.update(live, this.floor);
+    this.service.update(live, this.floor);
     this.agents.update(live, alpha);
     this.labels.update(camera.zoom);
 
@@ -402,8 +466,8 @@ export class Renderer {
   }
 
   private syncContent(): void {
-    this.objects.sync(this.state);
+    this.objects.sync(this.state, this.floor);
     this.bays.sync(this.state);
-    this.labels.sync(this.state.rooms);
+    this.labels.sync(this.state.rooms.filter((r) => r.floor === this.floor));
   }
 }
