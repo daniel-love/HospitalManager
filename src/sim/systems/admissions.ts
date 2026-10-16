@@ -146,10 +146,13 @@ export function decideToAdmit(state: SimState, p: Patient): void {
 
 interface BedRegions {
   version: number;
-  /** Bed-passable tile → connected region label (0 = not bed-passable). */
-  label: Int32Array;
-  /** regionsAt() by tile index, filled as asked: it only changes with the layout. */
-  touching: Map<number, Set<number>>;
+  /**
+   * Bed-passable tile → connected region label (0 = not bed-passable), one
+   * array per floor; labels are unique across floors.
+   */
+  label: Int32Array[];
+  /** regionsAt() by floor and tile index, filled as asked: it only changes with the layout. */
+  touching: Map<number, Set<number>>[];
 }
 const regionCache = new WeakMap<SimState, BedRegions>();
 
@@ -157,55 +160,66 @@ const regionCache = new WeakMap<SimState, BedRegions>();
 function bedRegions(state: SimState): BedRegions {
   const cached = regionCache.get(state);
   if (cached && cached.version === state.layoutVersion) return cached;
-  const grid = state.floors[0]!;
-  const { width, height } = grid;
-  const label = new Int32Array(width * height);
   let next = 0;
-  const stack: number[] = [];
-  for (let start = 0; start < label.length; start++) {
-    if (label[start] !== 0 || !isBedPassable(grid, start)) continue;
-    label[start] = ++next;
-    stack.push(start);
-    while (stack.length > 0) {
-      const i = stack.pop()!;
-      const x = i % width;
-      const y = (i - x) / width;
-      for (const [dx, dy] of [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-      ] as const) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-        const n = tileIndex(grid, nx, ny);
-        if (label[n] !== 0 || !isBedPassable(grid, n)) continue;
-        label[n] = next;
-        stack.push(n);
+  const label = state.floors.map((grid) => {
+    const { width, height } = grid;
+    const out = new Int32Array(width * height);
+    const stack: number[] = [];
+    for (let start = 0; start < out.length; start++) {
+      if (out[start] !== 0 || !isBedPassable(grid, start)) continue;
+      out[start] = ++next;
+      stack.push(start);
+      while (stack.length > 0) {
+        const i = stack.pop()!;
+        const x = i % width;
+        const y = (i - x) / width;
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const n = tileIndex(grid, nx, ny);
+          if (out[n] !== 0 || !isBedPassable(grid, n)) continue;
+          out[n] = next;
+          stack.push(n);
+        }
       }
     }
-  }
-  const regions = { version: state.layoutVersion, label, touching: new Map() };
+    return out;
+  });
+  const regions = {
+    version: state.layoutVersion,
+    label,
+    touching: state.floors.map(() => new Map<number, Set<number>>()),
+  };
   regionCache.set(state, regions);
   return regions;
 }
 
 /**
- * Bed regions touching a tile: its own, or (if a bed can't stand on it) its
- * neighbours'. On a trolley, the regions it can be wheeled out into: those
- * beside any of its tiles, since it can leave head or foot first.
+ * Bed regions touching a tile (on its floor, the ground floor if it doesn't
+ * say): its own, or (if a bed can't stand on it) its neighbours'. On a
+ * trolley, the regions it can be wheeled out into: those beside any of its
+ * tiles, since it can leave head or foot first.
  */
 function regionsAt(state: SimState, t: Point): Set<number> {
-  const grid = state.floors[0]!;
-  const { label, touching } = bedRegions(state);
+  const floor = t.floor ?? 0;
+  const grid = state.floors[floor];
   const out = new Set<number>();
+  if (!grid) return out;
+  const regions = bedRegions(state);
+  const label = regions.label[floor]!;
+  const touching = regions.touching[floor]!;
   if (t.x < 0 || t.y < 0 || t.x >= grid.width || t.y >= grid.height) return out;
   const key = tileIndex(grid, t.x, t.y);
   const known = touching.get(key);
   if (known) return known;
   touching.set(key, out);
-  const id = grid.objectId[tileIndex(grid, t.x, t.y)]!;
+  const id = grid.objectId[key]!;
   const obj = id === -1 ? undefined : state.objects[id];
   const r = obj ? objectRect(obj) : { x: t.x, y: t.y, w: 1, h: 1 };
   for (let y = r.y - 1; y <= r.y + r.h; y++) {
@@ -238,7 +252,7 @@ export function bedRouteExists(state: SimState, from: Point, to: Point): boolean
 
 /** Where a patient on (or off) a trolley is, as a whole tile. */
 function tileOf(p: Patient): Point {
-  return { x: Math.round(p.x), y: Math.round(p.y) };
+  return { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor };
 }
 
 /**
@@ -261,13 +275,14 @@ export function trolleyStop(
   bed: PlacedObject,
   canReach = (to: Point) => bedRouteExists(state, from, to),
 ): Point | null {
-  const grid = state.floors[0]!;
+  const floor = bed.floor;
+  const grid = state.floors[floor]!;
   const r = objectRect(bed);
   for (let y = r.y - 1; y <= r.y + r.h; y++) {
     for (let x = r.x - 1; x <= r.x + r.w; x++) {
       const inside = x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
       if (inside || !isStandable(grid, x, y)) continue;
-      if (canReach({ x, y })) return { x, y };
+      if (canReach({ x, y, floor })) return { x, y, floor };
     }
   }
   return null;
@@ -289,9 +304,9 @@ export function wheelTo(state: SimState, p: AgentBase, bed: PlacedObject): Point
     d.blocked < 0 &&
     p.pathVersion === state.layoutVersion
   ) {
-    return { x: d.ax, y: d.ay };
+    return { x: d.ax, y: d.ay, floor: bed.floor };
   }
-  return trolleyStop(state, { x: Math.round(p.x), y: Math.round(p.y) }, bed);
+  return trolleyStop(state, { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor }, bed);
 }
 
 /**

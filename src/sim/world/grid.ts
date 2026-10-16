@@ -11,6 +11,8 @@ export const FloorType = {
   Path: 2,
   /** Tarmac for vehicles: the public road or a player-laid access road. */
   Road: 3,
+  /** Open air: an upper floor's tile with nothing built on it yet. */
+  Void: 4,
 } as const;
 export type FloorType = (typeof FloorType)[keyof typeof FloorType];
 
@@ -74,6 +76,13 @@ export function createFloorGrid(width: number, height: number): FloorGrid {
     objectId: new Int32Array(n).fill(-1),
     mountId: new Int32Array(n).fill(-1),
   };
+}
+
+/** An upper floor with nothing built on it: all open air, and all the hospital's land. */
+export function createUpperFloor(width: number, height: number): FloorGrid {
+  const grid = createFloorGrid(width, height);
+  grid.floorType.fill(FloorType.Void);
+  return grid;
 }
 
 export function inBounds(grid: FloorGrid, x: number, y: number): boolean {

@@ -109,8 +109,8 @@ export function plannedWhere(dayCase: boolean): Where {
 }
 
 /** The department of the room at a tile, or null outside any room. */
-function lineAt(state: SimState, x: number, y: number): ServiceLine | null {
-  const room = roomAt(state, 0, Math.round(x), Math.round(y));
+function lineAt(state: SimState, x: number, y: number, floor: number): ServiceLine | null {
+  const room = roomAt(state, floor, Math.round(x), Math.round(y));
   return room ? lineOfRoom(room.typeId) : null;
 }
 
@@ -132,7 +132,7 @@ export function staffWhere(state: SimState, s: Staff): Where {
   if (fixed) return fixed;
   let byStaff = recent.get(state);
   if (!byStaff) recent.set(state, (byStaff = new Map()));
-  const here = onSite(s) ? lineAt(state, s.x, s.y) : null;
+  const here = onSite(s) ? lineAt(state, s.x, s.y, s.floor) : null;
   // Corridors and staff areas don't say which department someone works for.
   if (here !== null && here !== "support") {
     const w = byStaff.get(s.id) ?? {};

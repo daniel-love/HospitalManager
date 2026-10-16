@@ -309,7 +309,7 @@ function resultsReason(state: SimState, p: Patient, job: Job): string | null {
 
 /** Whether any free ward bed can be reached by bed from where the patient is. */
 function hasBedRoute(state: SimState, p: Patient, job: Job): boolean {
-  const from = { x: Math.round(p.x), y: Math.round(p.y) };
+  const from = { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor };
   if (!onTrolley(state, p)) return true;
   return freeCouches(state, job.roomType, job.capabilities, from).some(
     (b) => trolleyStop(state, from, b) !== null,

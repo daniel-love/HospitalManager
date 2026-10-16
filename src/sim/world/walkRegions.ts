@@ -10,13 +10,16 @@
  */
 import type { Point } from "../agents";
 import type { SimState } from "../state";
-import { tileIndex } from "./grid";
+import { tileIndex, type FloorGrid } from "./grid";
 import { isWalkable } from "./pathfinding";
 
 interface WalkRegions {
   version: number;
-  /** Walkable tile → connected region label (0 = not walkable). */
-  label: Int32Array;
+  /**
+   * Walkable tile → connected region label (0 = not walkable), one array per
+   * floor. Labels are unique across floors.
+   */
+  label: Int32Array[];
   /** Tiles in each region, by label. */
   size: number[];
 }
@@ -25,10 +28,17 @@ const cache = new WeakMap<SimState, WalkRegions>();
 function walkRegions(state: SimState): WalkRegions {
   const cached = cache.get(state);
   if (cached && cached.version === state.layoutVersion) return cached;
-  const grid = state.floors[0]!;
+  const size = [0];
+  const labels = state.floors.map((grid) => labelFloor(grid, size));
+  const regions = { version: state.layoutVersion, label: labels, size };
+  cache.set(state, regions);
+  return regions;
+}
+
+/** Labels one floor's connected walkable areas, numbering on from `size`. */
+function labelFloor(grid: FloorGrid, size: number[]): Int32Array {
   const { width, height } = grid;
   const label = new Int32Array(width * height);
-  const size = [0];
   const stack: number[] = [];
   for (let start = 0; start < label.length; start++) {
     if (label[start] !== 0 || !isWalkable(grid, start)) continue;
@@ -57,19 +67,20 @@ function walkRegions(state: SimState): WalkRegions {
       }
     }
   }
-  const regions = { version: state.layoutVersion, label, size };
-  cache.set(state, regions);
-  return regions;
+  return label;
 }
 
 /**
- * Regions a point's in: its own, or if it isn't walkable (someone getting up
- * off a couch) those of the tiles around it.
+ * Regions a point's in (on its floor, the ground floor if it doesn't say):
+ * its own, or if it isn't walkable (someone getting up off a couch) those of
+ * the tiles around it.
  */
 function regionsAt(state: SimState, p: Point): Set<number> {
-  const grid = state.floors[0]!;
-  const { label } = walkRegions(state);
+  const floor = p.floor ?? 0;
+  const grid = state.floors[floor];
   const out = new Set<number>();
+  if (!grid) return out;
+  const label = walkRegions(state).label[floor]!;
   const x = Math.round(p.x);
   const y = Math.round(p.y);
   if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return out;
@@ -93,9 +104,9 @@ export function walkRouteExists(state: SimState, from: Point, to: Point): boolea
 }
 
 /** How many tiles can be walked to from a walkable tile (0 if it isn't one). */
-export function walkableArea(state: SimState, x: number, y: number): number {
-  const grid = state.floors[0]!;
-  if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return 0;
+export function walkableArea(state: SimState, x: number, y: number, floor = 0): number {
+  const grid = state.floors[floor];
+  if (!grid || x < 0 || y < 0 || x >= grid.width || y >= grid.height) return 0;
   const { label, size } = walkRegions(state);
-  return size[label[tileIndex(grid, x, y)]!]!;
+  return size[label[floor]![tileIndex(grid, x, y)]!]!;
 }

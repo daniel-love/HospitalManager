@@ -19,14 +19,26 @@ export const PRIVATE = 1;
 /** A door from such a room straight outside: never for patients. */
 export const BACK_DOOR = 2;
 
-const cache = new WeakMap<SimState, { version: number; access: Uint8Array }>();
-const crewCache = new WeakMap<SimState, { version: number; access: Uint8Array }>();
+/** One array per floor, rebuilt when the layout changes. */
+type AccessCache = { version: number; access: Uint8Array[] };
+const cache = new WeakMap<SimState, AccessCache>();
+const crewCache = new WeakMap<SimState, AccessCache>();
 
-/** Patient access for each ground-floor tile (OPEN, PRIVATE or BACK_DOOR), cached per layout. */
-export function patientAccess(state: SimState): Uint8Array {
-  const cached = cache.get(state);
-  if (cached && cached.version === state.layoutVersion) return cached.access;
-  const grid = state.floors[0]!;
+function cachedFor(c: WeakMap<SimState, AccessCache>, state: SimState): Uint8Array[] {
+  let entry = c.get(state);
+  if (!entry || entry.version !== state.layoutVersion) {
+    entry = { version: state.layoutVersion, access: [] };
+    c.set(state, entry);
+  }
+  return entry.access;
+}
+
+/** Patient access for each tile of a floor (OPEN, PRIVATE or BACK_DOOR), cached per layout. */
+export function patientAccess(state: SimState, floor = 0): Uint8Array {
+  const floors = cachedFor(cache, state);
+  const known = floors[floor];
+  if (known) return known;
+  const grid = state.floors[floor]!;
   const { width, height } = grid;
   const access = new Uint8Array(width * height);
   const isPrivate = (i: number) => {
@@ -58,7 +70,7 @@ export function patientAccess(state: SimState): Uint8Array {
     }
     if (privateSide && outsideSide) access[i] = BACK_DOOR;
   }
-  cache.set(state, { version: state.layoutVersion, access });
+  floors[floor] = access;
   return access;
 }
 
@@ -67,11 +79,12 @@ export function patientAccess(state: SimState): Uint8Array {
  * patients, but in by a clinical room's door from outside (the ambulance
  * entrance to Resus, say) when that room is where they're going.
  */
-export function crewAccess(state: SimState): Uint8Array {
-  const cached = crewCache.get(state);
-  if (cached && cached.version === state.layoutVersion) return cached.access;
-  const access = patientAccess(state).map((a) => (a === BACK_DOOR ? OPEN : a));
-  crewCache.set(state, { version: state.layoutVersion, access });
+export function crewAccess(state: SimState, floor = 0): Uint8Array {
+  const floors = cachedFor(crewCache, state);
+  const known = floors[floor];
+  if (known) return known;
+  const access = patientAccess(state, floor).map((a) => (a === BACK_DOOR ? OPEN : a));
+  floors[floor] = access;
   return access;
 }
 
@@ -79,9 +92,14 @@ export function crewAccess(state: SimState): Uint8Array {
  * The rooms that aren't public routes a route (flattened [x0, y0, ...])
  * passes through, other than those in `except`, by id.
  */
-export function privateRoomsCrossed(state: SimState, path: number[], except: number[]): number[] {
-  const grid = state.floors[0]!;
-  const access = patientAccess(state);
+export function privateRoomsCrossed(
+  state: SimState,
+  path: number[],
+  except: number[],
+  floor = 0,
+): number[] {
+  const grid = state.floors[floor]!;
+  const access = patientAccess(state, floor);
   const out: number[] = [];
   for (let k = 0; k < path.length; k += 2) {
     const i = tileIndex(grid, path[k]!, path[k + 1]!);

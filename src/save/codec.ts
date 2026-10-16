@@ -63,7 +63,7 @@ const int = z.number().int();
 const rectSchema = z.object({ x: int, y: int, w: int.min(0), h: int.min(0) });
 const rotationSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
 const floorIndex = int.min(0);
-const pointSchema = z.object({ x: int, y: int });
+const pointSchema = z.object({ x: int, y: int, floor: floorIndex.optional() });
 
 const siteSchema = z.object({
   road: rectSchema,
@@ -123,10 +123,13 @@ const agentFields = {
   name: z.string(),
   x: num,
   y: num,
+  floor: floorIndex,
   prevX: num,
   prevY: num,
   path: z.array(num).refine((p) => p.length % 2 === 0, "path must be x, y pairs"),
-  dest: z.object({ x: num, y: num, ax: int, ay: int, blocked: int }).nullable(),
+  dest: z
+    .object({ x: num, y: num, floor: floorIndex.optional(), ax: int, ay: int, blocked: int })
+    .nullable(),
   pathVersion: int.min(0),
 };
 
@@ -193,7 +196,7 @@ const patientSchema = z.object({
   ]),
   step: int.min(0),
   seat: z.object({ objectId: int.positive(), slot: int.min(0) }).nullable(),
-  standing: z.object({ x: num, y: num }).nullable(),
+  standing: z.object({ x: num, y: num, floor: floorIndex.optional() }).nullable(),
   bed: nullableInt,
   desk: nullableInt,
   bookingLeft: int,
@@ -252,7 +255,7 @@ const patientSchema = z.object({
       transfer: z
         .object({
           started: int,
-          from: z.object({ x: int, y: int }),
+          from: pointSchema,
           seenBy: z.array(int.positive()),
         })
         .nullable(),
@@ -797,7 +800,7 @@ const saveSchema = z.object({
         conditionId: z.string(),
         summary: z.string(),
         where: z.string(),
-        at: z.object({ x: int, y: int }),
+        at: pointSchema,
         causes: z.array(z.string()),
         recommendations: z.array(z.string()),
       }),

@@ -82,6 +82,7 @@ export function updateVisitors(state: SimState): void {
       name: `${pick(state.rng, FIRST_NAMES)} ${pick(state.rng, SURNAMES)}`,
       x: at.x,
       y: at.y,
+      floor: 0,
       prevX: at.x,
       prevY: at.y,
       path: [],

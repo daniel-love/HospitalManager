@@ -144,11 +144,11 @@ export function notice(
   );
 }
 
-const at = (p: Patient): Point => ({ x: Math.round(p.x), y: Math.round(p.y) });
+const at = (p: Patient): Point => ({ x: Math.round(p.x), y: Math.round(p.y), floor: p.floor });
 
 /** Where a patient is, for incident records: the room type's name. */
 function whereIs(state: SimState, p: Patient): string {
-  const grid = state.floors[0]!;
+  const grid = state.floors[p.floor]!;
   const x = Math.round(p.x);
   const y = Math.round(p.y);
   const id = grid.roomId[y * grid.width + x] ?? 0;
@@ -165,7 +165,7 @@ function lowerToFloor(state: SimState, p: Patient): void {
   const seat = p.seat && state.objects[p.seat.objectId];
   const toilet = p.toilet && p.toilet.left > 0 ? state.objects[p.toilet.objectId] : undefined;
   const spot = seat ? seatApproach(seat, p.seat!.slot) : toilet ? frontOf(toilet) : null;
-  if (!spot || !isStandable(state.floors[0]!, spot.x, spot.y)) return;
+  if (!spot || !isStandable(state.floors[p.floor]!, spot.x, spot.y)) return;
   p.x = p.prevX = spot.x;
   p.y = p.prevY = spot.y;
 }

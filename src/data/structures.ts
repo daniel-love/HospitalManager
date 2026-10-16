@@ -7,6 +7,15 @@ import { FloorType, WallType } from "@sim/world/grid";
 /** Turning a grass tile into buildable interior floor (slab, services, finish). */
 export const FOUNDATION_COST_PER_TILE = 1200;
 
+/** Storeys a hospital can have: the ground floor and two above it. */
+export const MAX_FLOORS = 3;
+/** An upper floor's slab on its supporting frame costs this much more than ground-floor foundations. */
+export const UPPER_FLOOR_COST_FACTOR = 1.5;
+/** Longest gap (tiles) a first-floor link bridge may span between supported floor at each end. */
+export const BRIDGE_MAX_SPAN = 8;
+/** A link bridge (a glazed, enclosed footbridge) costs this much more per tile than foundations. */
+export const BRIDGE_COST_FACTOR = 3;
+
 /** Outdoor paving the player lays on their own land, linking the hospital to the public road. */
 export const surfaces = [
   {

@@ -100,6 +100,7 @@ export function startCollection(state: SimState, p: Patient): void {
       name: CREW_NAME,
       x: start.x,
       y: start.y,
+      floor: 0,
       prevX: start.x,
       prevY: start.y,
       path: [],
@@ -115,7 +116,7 @@ export function startCollection(state: SimState, p: Patient): void {
 function pickupSpot(state: SimState, p: Patient): Point {
   const f = p.death?.fridge;
   const fridge = f ? state.objects[f.objectId] : undefined;
-  return fridge ? frontOf(fridge) : { x: Math.round(p.x), y: Math.round(p.y) };
+  return fridge ? frontOf(fridge) : { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor };
 }
 
 /**
@@ -215,11 +216,11 @@ export function updateCollections(state: SimState): void {
         const fresh = p.dest === null;
         let arrival = headTo(state, p, to, to, true);
         if (arrival === "no_route") arrival = headTo(state, p, to);
-        if (fresh && passesPublicArea(state, p.path)) {
+        if (fresh && passesPublicArea(state, p.path, p.floor)) {
           complain(
             state,
             `${p.name} was taken out by the funeral director through a public waiting area. Families have complained.`,
-            { x: Math.round(p.x), y: Math.round(p.y) },
+            { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor },
           );
         }
         // The crew push the stretcher (the renderer draws them behind it).
@@ -303,7 +304,7 @@ function collected(state: SimState, p: Patient, c: Collection | undefined): void
     state,
     `The funeral director has collected ${p.name} from the mortuary.`,
     "info",
-    c?.vehicle?.stop ?? { x: Math.round(p.x), y: Math.round(p.y) },
+    c?.vehicle?.stop ?? { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor },
   );
   delete state.patients[p.id];
   if (!c) return;

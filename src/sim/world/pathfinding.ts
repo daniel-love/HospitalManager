@@ -29,7 +29,7 @@ const WRONG_LANE_COST = 2;
 const SQRT2 = Math.SQRT2;
 
 export function isWalkable(grid: FloorGrid, i: number): boolean {
-  if (grid.wall[i] !== 0) return false;
+  if (grid.wall[i] !== 0 || grid.floorType[i] === FloorType.Void) return false;
   return grid.door[i] !== 0 || grid.objectId[i] === -1;
 }
 

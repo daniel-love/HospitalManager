@@ -159,6 +159,11 @@ export const roomDefSchema = z.object({
   publicRoute: z.boolean().default(false),
   /** Can be zoned on the player's access road as well as on foundations (outdoor hardstanding). */
   onRoad: z.boolean().default(false),
+  /**
+   * Must be on the ground floor: A&E, reached from the street and by
+   * ambulance, and the mortuary, reached by the funeral director's van.
+   */
+  groundOnly: z.boolean().default(false),
   required: z.array(roomRequirementSchema),
   minSeats: z.number().int().positive().optional(),
   /**

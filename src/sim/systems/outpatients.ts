@@ -165,6 +165,7 @@ function setOff(state: SimState): void {
       name: r.name,
       x: at.x,
       y: at.y,
+      floor: 0,
       prevX: at.x,
       prevY: at.y,
       path: [],

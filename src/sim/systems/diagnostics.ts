@@ -66,7 +66,7 @@ export function sendSample(state: SimState, p: Patient): void {
 /** Where a porter collects the sample: from the patient's bedside, or where they are. */
 function sampleSpot(state: SimState, p: Patient): Point {
   const bed = p.bed === null ? undefined : state.objects[p.bed];
-  return bed ? bedside(state, bed) : { x: Math.round(p.x), y: Math.round(p.y) };
+  return bed ? bedside(state, bed) : { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor };
 }
 
 /** Where a diagnostic job happens, or null if it can't start yet. */

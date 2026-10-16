@@ -96,7 +96,7 @@ export function visitSeed(state: SimState, p: Patient): void {
 }
 
 function roomOf(state: SimState, p: Patient): Room | undefined {
-  return roomAt(state, 0, Math.round(p.x), Math.round(p.y));
+  return roomAt(state, p.floor, Math.round(p.x), Math.round(p.y));
 }
 
 /** The key a room's closure is saved under: its floor and first tile, like other room settings. */
@@ -166,7 +166,7 @@ export function updateOutbreaks(state: SimState): void {
     const staffChance = NOROVIRUS.staffCatch * control * load;
     for (const s of Object.values(state.staff)) {
       if (!onSite(s) || s.sickUntil !== null) continue;
-      if (roomAt(state, 0, Math.round(s.x), Math.round(s.y))?.id !== roomId) continue;
+      if (roomAt(state, s.floor, Math.round(s.x), Math.round(s.y))?.id !== roomId) continue;
       if (nextFloat(state.rng) >= staffChance) continue;
       const [lo, hi] = NOROVIRUS.staffOffHours;
       s.sickUntil = state.tick + nextInt(state.rng, lo, hi) * TICKS_PER_HOUR;

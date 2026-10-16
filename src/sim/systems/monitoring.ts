@@ -53,9 +53,7 @@ export function nurseStations(state: SimState): PlacedObject[] {
   const cached = stationCache.get(state);
   if (cached && cached.version === state.layoutVersion) return cached.stations;
   const out = Object.values(state.objects).filter(
-    (o) =>
-      o.floor === 0 &&
-      (equipmentById.get(o.defId)?.capabilities.includes("nurse_station") ?? false),
+    (o) => equipmentById.get(o.defId)?.capabilities.includes("nurse_station") ?? false,
   );
   out.sort((a, b) => a.id - b.id);
   stationCache.set(state, { version: state.layoutVersion, stations: out });
@@ -86,8 +84,10 @@ export function observedBeds(state: SimState): PlacedObject[] {
 
 /** Whether a station can see a tile: in range and in line of sight. */
 function sees(state: SimState, from: Point, t: Point): boolean {
+  const floor = from.floor ?? 0;
+  if ((t.floor ?? floor) !== floor) return false; // Nobody sees through floors.
   if (Math.hypot(t.x - from.x, t.y - from.y) > STATION_SIGHT_RANGE) return false;
-  return hasLineOfSight(state.floors[0]!, from.x, from.y, t.x, t.y);
+  return hasLineOfSight(state.floors[floor]!, from.x, from.y, t.x, t.y);
 }
 
 interface CoverageCache {
@@ -107,7 +107,9 @@ export function stationsSeeing(state: SimState): Map<number, number[]> {
     const tiles = rectTiles(objectRect(bed));
     beds.set(
       bed.id,
-      stations.filter((s) => tiles.some((t) => sees(state, s.at, t))).map((s) => s.id),
+      stations
+        .filter((s) => tiles.some((t) => sees(state, s.at, { ...t, floor: bed.floor })))
+        .map((s) => s.id),
     );
   }
   coverageCache.set(state, { version: state.layoutVersion, beds });
@@ -145,7 +147,10 @@ function isCentralMonitor(defId: string): boolean {
 
 /** Path length in tiles between two points, or null if there's no route. */
 export function walkingDistance(state: SimState, a: Point, b: Point): number | null {
-  const path = findPath(state.floors[0]!, a.x, a.y, b.x, b.y);
+  // Within a floor (a monitor on another floor is never near enough).
+  const floor = a.floor ?? 0;
+  if ((b.floor ?? floor) !== floor) return null;
+  const path = findPath(state.floors[floor]!, a.x, a.y, b.x, b.y);
   return path === null ? null : path.length;
 }
 
@@ -205,7 +210,7 @@ export function watcherOf(
 
 /** Floor tiles a station can see (for the coverage overlay), as tile indices. */
 export function visibleTiles(state: SimState, station: PlacedObject): number[] {
-  const grid = state.floors[0]!;
+  const grid = state.floors[station.floor]!;
   const at = stationSpot(station);
   const r = STATION_SIGHT_RANGE;
   const out: number[] = [];

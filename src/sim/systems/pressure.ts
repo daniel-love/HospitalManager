@@ -22,7 +22,7 @@ import {
   pressureEventById,
   type PressureEventDef,
 } from "@data/pressure";
-import { onSite, type Patient, type Staff } from "../agents";
+import { onSite, type Patient, type Point, type Staff } from "../agents";
 import { emit } from "../events";
 import { chance, nextInt } from "../rng";
 import type { PressureEvent, Room, SimState } from "../state";
@@ -129,10 +129,10 @@ export function isCooled(state: SimState, room: Room): boolean {
 }
 
 /** How hot it is where an agent is: 0 in a cooled room or when there's no heat. */
-export function heatAt(state: SimState, at: { x: number; y: number }): number {
+export function heatAt(state: SimState, at: Point): number {
   const h = heat(state);
   if (h === 0) return 0;
-  const room = roomAt(state, 0, Math.round(at.x), Math.round(at.y));
+  const room = roomAt(state, at.floor ?? 0, Math.round(at.x), Math.round(at.y));
   return room && isCooled(state, room) ? 0 : h;
 }
 
@@ -140,7 +140,7 @@ export function heatAt(state: SimState, at: { x: number; y: number }): number {
 export function heatMoodDecay(state: SimState, p: Patient): number {
   const h = heatAt(state, p);
   if (h === 0) return 0;
-  const room = roomAt(state, 0, Math.round(p.x), Math.round(p.y));
+  const room = roomAt(state, p.floor, Math.round(p.x), Math.round(p.y));
   const water = room?.capabilities.includes("drinking_water") ?? false;
   return h * (HEAT.moodPerHour - (water ? HEAT.waterRelief : 0));
 }

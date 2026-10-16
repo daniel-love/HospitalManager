@@ -76,7 +76,7 @@ describe("arriving by the public road", () => {
 
   it("leaves by the arrival point nearest reception", () => {
     // The A&E's front door is at its bottom left, nearest the west end.
-    expect(siteEntrance(site())).toEqual({ x: 0, y: 24 });
+    expect(siteEntrance(site())).toEqual({ x: 0, y: 24, floor: 0 });
   });
 
   it("still uses the map edge on a map with no road", () => {
@@ -84,6 +84,6 @@ describe("arriving by the public road", () => {
     applyAll(state, SMALL_AE_COMMANDS);
     expect(arrivalPoints(state)).toEqual([]);
     expect(walkInPoint(state)).toBeNull();
-    expect(siteEntrance(state)).toEqual({ x: 6, y: 19 });
+    expect(siteEntrance(state)).toEqual({ x: 6, y: 19, floor: 0 });
   });
 });

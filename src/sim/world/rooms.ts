@@ -245,6 +245,15 @@ function evaluateRoom(state: SimState, room: Room, rooms: Room[]): void {
   const grid = state.floors[room.floor]!;
   const checks: RoomCheck[] = [];
 
+  // A&E and the mortuary need the street and vehicles: shown only when upstairs.
+  if (def.groundOnly && room.floor > 0) {
+    checks.push({
+      label: "On the ground floor",
+      ok: false,
+      detail: "it needs street and vehicle access",
+    });
+  }
+
   const [minW, minH] = def.minSize;
   if (minW * minH > 1) checks.push(sizeCheck(room, minW, minH));
 

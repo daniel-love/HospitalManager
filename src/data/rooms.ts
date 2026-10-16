@@ -23,6 +23,7 @@ export const rooms: RoomInput[] = [
   },
   {
     id: "ae_reception",
+    groundOnly: true,
     code: 2,
     name: "A&E Reception",
     department: "A&E",
@@ -54,6 +55,7 @@ export const rooms: RoomInput[] = [
   },
   {
     id: "triage_room",
+    groundOnly: true,
     code: 4,
     name: "Triage Room",
     department: "A&E",
@@ -69,6 +71,7 @@ export const rooms: RoomInput[] = [
   },
   {
     id: "minors_cubicle",
+    groundOnly: true,
     code: 5,
     name: "Minors Cubicle",
     department: "A&E",
@@ -85,6 +88,7 @@ export const rooms: RoomInput[] = [
   },
   {
     id: "majors_bay",
+    groundOnly: true,
     code: 6,
     name: "Majors Bay",
     department: "A&E",
@@ -104,6 +108,7 @@ export const rooms: RoomInput[] = [
   },
   {
     id: "resus_bay",
+    groundOnly: true,
     code: 7,
     name: "Resus Bay",
     department: "A&E",
@@ -153,6 +158,7 @@ export const rooms: RoomInput[] = [
   },
   {
     id: "ambulance_bay",
+    groundOnly: true,
     code: 10,
     name: "Ambulance Bay",
     department: "A&E",
@@ -209,6 +215,7 @@ export const rooms: RoomInput[] = [
   },
   {
     id: "mortuary",
+    groundOnly: true,
     code: 14,
     name: "Mortuary",
     department: "Support",

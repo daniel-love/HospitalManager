@@ -16,7 +16,7 @@ import { onSite, type Point, type Staff } from "../agents";
 import { equipmentById } from "@data/catalogue";
 import { deskStaffSpot, seatApproach, seatTile } from "../places";
 import type { Room, SimState } from "../state";
-import { tileIndex } from "../world/grid";
+import { tileIndex, type FloorGrid } from "../world/grid";
 import { isStandable } from "../world/objects";
 import { isWalkable } from "../world/pathfinding";
 import { headTo } from "./movement";
@@ -61,7 +61,7 @@ export const BASE_ROOM_TYPES = new Set(
 );
 
 function fits(room: Room, kind: BaseKind, s: Staff): boolean {
-  if (!room.valid || room.typeId !== kind.type || room.floor !== 0) return false;
+  if (!room.valid || room.typeId !== kind.type) return false;
   if ("ownSpecialty" in kind) return s.specialty !== null && room.specialty === s.specialty;
   if ("anySpecialty" in kind) return room.specialty === null;
   return true;
@@ -81,8 +81,9 @@ export function waitAtBase(state: SimState, s: Staff): void {
 }
 
 function goToBase(state: SimState, s: Staff, taken: TakenSpots): void {
-  const grid = state.floors[0]!;
-  const current = s.dest ?? { x: Math.round(s.x), y: Math.round(s.y) };
+  const floor = s.dest?.floor ?? s.floor;
+  const grid = state.floors[floor]!;
+  const current = s.dest ?? { x: Math.round(s.x), y: Math.round(s.y), floor };
   const currentRoom = state.rooms[grid.roomId[tileIndex(grid, current.x, current.y)]! - 1];
 
   for (const kind of BASES[s.role]) {
@@ -90,13 +91,16 @@ function goToBase(state: SimState, s: Staff, taken: TakenSpots): void {
     if (rooms.length === 0) continue;
     // Already there (or on the way), on a spot of their own: stay.
     const here = currentRoom && rooms.includes(currentRoom) ? currentRoom : undefined;
-    const key = tileIndex(grid, current.x, current.y);
+    const key = spotKey(grid, floor, current.x, current.y);
     const sitting =
       here !== undefined &&
       (isDeskSpot(state, here, current) ||
         seats(state, here).some((t) => t.seat.x === current.x && t.seat.y === current.y));
     const seatedOnly = "seatedOnly" in kind;
-    const standing = !seatedOnly && here !== undefined && reachableTiles(state, here).has(key);
+    const standing =
+      !seatedOnly &&
+      here !== undefined &&
+      reachableTiles(state, here).has(tileIndex(grid, current.x, current.y));
     // Standing, they take a desk or seat once one comes free.
     const better = standing && !sitting ? freeSpot(state, [here!], s, taken) : null;
     if (here && !taken.has(key) && (sitting || standing) && !better?.seated) {
@@ -111,7 +115,10 @@ function goToBase(state: SimState, s: Staff, taken: TakenSpots): void {
   }
 }
 
-/** Tiles other staff are standing on or heading to. */
+/** Tiles of walking a base on another floor counts as, when choosing the nearest. */
+const FLOOR_AWAY = 40;
+
+/** Tiles (keyed across floors: see spotKey) other staff are standing on or heading to. */
 interface TakenSpots {
   has(tile: number): boolean;
   /** Notes where `s` is heading now, for the next to look this tick. */
@@ -128,10 +135,15 @@ const spotCounts = new WeakMap<
   { tick: number; count: Map<number, number>; at: Map<number, number> }
 >();
 
+/** A tile's key across floors, for counting who's where. */
+function spotKey(grid: FloorGrid, floor: number, x: number, y: number): number {
+  return floor * grid.width * grid.height + tileIndex(grid, x, y);
+}
+
 function spotOf(state: SimState, o: Staff): number {
-  const grid = state.floors[0]!;
-  const p = o.dest ?? { x: Math.round(o.x), y: Math.round(o.y) };
-  return tileIndex(grid, p.x, p.y);
+  const floor = o.dest?.floor ?? o.floor;
+  const p = o.dest ?? { x: Math.round(o.x), y: Math.round(o.y), floor: o.floor };
+  return spotKey(state.floors[floor]!, floor, p.x, p.y);
 }
 
 function takenSpots(state: SimState, self: Staff): TakenSpots {
@@ -208,19 +220,17 @@ function freeSpot(
   taken: TakenSpots,
   seatedOnly = false,
 ): Spot | null {
-  const grid = state.floors[0]!;
   const centre = (r: Room) => ({ x: r.bounds.x + r.bounds.w / 2, y: r.bounds.y + r.bounds.h / 2 });
   const dist = (a: Point, b: Point) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-  const byDistance = [...rooms].sort(
-    (a, b) => dist(centre(a), s) - dist(centre(b), s) || a.id - b.id,
-  );
+  // A base on another floor is as good as one this far away on their own.
+  const away = (r: Room) => dist(centre(r), s) + Math.abs(r.floor - s.floor) * FLOOR_AWAY;
+  const byDistance = [...rooms].sort((a, b) => away(a) - away(b) || a.id - b.id);
 
   for (const room of byDistance) {
+    const grid = state.floors[room.floor]!;
+    const key = (p: Point) => spotKey(grid, room.floor, p.x, p.y);
     const open = reachableTiles(state, room);
-    const free = (p: Point) => {
-      const i = tileIndex(grid, p.x, p.y);
-      return open.has(i) && !taken.has(i);
-    };
+    const free = (p: Point) => open.has(tileIndex(grid, p.x, p.y)) && !taken.has(key(p));
     for (const id of room.objectIds) {
       const obj = state.objects[id]!;
       if (obj.defId !== "desk") continue;
@@ -229,7 +239,7 @@ function freeSpot(
     }
     const c = centre(room);
     const seat = seats(state, room)
-      .filter((t) => !taken.has(tileIndex(grid, t.seat.x, t.seat.y)))
+      .filter((t) => !taken.has(key(t.seat)))
       .sort((a, b) => dist(a.seat, c) - dist(b.seat, c))[0];
     if (seat) return { to: seat.seat, approach: seat.approach, seated: true };
     if (seatedOnly) continue;
@@ -239,8 +249,8 @@ function freeSpot(
       const x = i % grid.width;
       const y = (i - x) / grid.width;
       const d = dist({ x: x + 0.5, y: y + 0.5 }, c);
-      if (d < bestD && !taken.has(i)) {
-        best = { x, y };
+      if (d < bestD && !taken.has(key({ x, y }))) {
+        best = { x, y, floor: room.floor };
         bestD = d;
       }
     }

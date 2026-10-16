@@ -103,6 +103,7 @@ describe("patient access", () => {
       name: "Patient",
       x: 0,
       y: 5,
+      floor: 0,
       prevX: 0,
       prevY: 5,
       path: [],

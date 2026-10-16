@@ -270,6 +270,7 @@ export function createStaff(
     privateTheatreSessions: 0,
     x: at.x,
     y: at.y,
+    floor: 0,
     prevX: at.x,
     prevY: at.y,
     path: [],
@@ -426,6 +427,7 @@ function updateOnCall(state: SimState): void {
       Object.assign(s, {
         x: exit.x,
         y: exit.y,
+        floor: 0,
         prevX: exit.x,
         prevY: exit.y,
         path: [],

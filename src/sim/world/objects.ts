@@ -137,6 +137,7 @@ export function isStandable(grid: FloorGrid, x: number, y: number, ignoreId = -1
   const occupant = grid.objectId[i];
   return (
     grid.floorType[i] !== FloorType.Grass &&
+    grid.floorType[i] !== FloorType.Void &&
     !isWallOrDoor(grid, i) &&
     (occupant === -1 || occupant === ignoreId)
   );

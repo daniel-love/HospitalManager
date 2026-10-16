@@ -105,7 +105,7 @@ export function sendBack(state: SimState, p: Patient): void {
 /** The object a patient is lying on, if any: where they really are. */
 function lyingOn(state: SimState, p: Patient): number | null {
   if (p.path.length > 0) return null;
-  const grid = state.floors[0]!;
+  const grid = state.floors[p.floor]!;
   const x = Math.round(p.x);
   const y = Math.round(p.y);
   if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return null;
@@ -117,7 +117,7 @@ function lyingOn(state: SimState, p: Patient): number | null {
 export function escortSpot(state: SimState, p: Patient): Point {
   const on = lyingOn(state, p);
   if (on !== null) return bedside(state, state.objects[on]!);
-  return { x: Math.round(p.x), y: Math.round(p.y) };
+  return { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor };
 }
 
 function near(a: Point, b: Point): boolean {
@@ -163,7 +163,7 @@ export function runEscort(state: SimState, job: Job, staff: Staff, p: Patient): 
       6 * 60 * TICKS_PER_MINUTE,
       `A porter couldn't find a bed-width route for ${p.name}'s scan. Trolleys need double doors and corridors at least 2 tiles wide.`,
       "warn",
-      { x: Math.round(p.x), y: Math.round(p.y) },
+      { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor },
     );
     // Rather than strand them, squeeze through on foot.
     arrival = headTo(state, p, restPoint(to), bedside(state, to));

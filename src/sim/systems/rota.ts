@@ -260,7 +260,15 @@ export function consultantOnCall(state: SimState, specialty: string, tick = stat
 function comeIn(state: SimState, s: Staff, shiftEnd: number | null): void {
   if (!onSite(s)) {
     const at = siteEntrance(state) ?? fallbackEntrance(state);
-    Object.assign(s, { x: at.x, y: at.y, prevX: at.x, prevY: at.y, path: [], dest: null });
+    Object.assign(s, {
+      x: at.x,
+      y: at.y,
+      floor: 0,
+      prevX: at.x,
+      prevY: at.y,
+      path: [],
+      dest: null,
+    });
     s.lastActiveTick = state.tick;
   }
   s.onCall = null;

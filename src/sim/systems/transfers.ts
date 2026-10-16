@@ -72,7 +72,7 @@ export function decideToTransfer(state: SimState, p: Patient, reason: string): v
     state,
     `${p.name} (${condition.name.toLowerCase()}) is to be transferred to another hospital: ${lowerFirst(reason)}`,
     "warn",
-    { x: Math.round(p.x), y: Math.round(p.y) },
+    { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor },
   );
 }
 

@@ -7,13 +7,31 @@
  * the change takes effect immediately, even while paused. Removing things
  * refunds RESALE_FRACTION of what they cost.
  */
+import {
+  BRIDGE_CORRIDOR_ONLY,
+  builtAbove,
+  canHoldFloor,
+  HOLDS_UP_FLOOR_ABOVE,
+  isBridge,
+  NO_SUPPORT,
+  supported,
+} from "./world/storeys";
 import { lockReason } from "./systems/scenarios";
 import { objectDef, roomById, wallByType } from "@data/catalogue";
 import { RESALE_FRACTION } from "@data/economy";
-import { FOUNDATION_COST_PER_TILE, surfaceCost, surfaces, type SurfaceId } from "@data/structures";
+import {
+  BRIDGE_COST_FACTOR,
+  FOUNDATION_COST_PER_TILE,
+  MAX_FLOORS,
+  surfaceCost,
+  surfaces,
+  UPPER_FLOOR_COST_FACTOR,
+  type SurfaceId,
+} from "@data/structures";
 import { restPoint } from "./places";
 import type { PlacedObject, Rotation, SimState } from "./state";
 import {
+  createUpperFloor,
   FloorType,
   isPublic,
   isSolidWall,
@@ -126,12 +144,33 @@ export const PUBLIC_LAND = "That's the council's road, not your land";
 const refund = (cost: number) => Math.round(cost * RESALE_FRACTION);
 
 function run(state: SimState, cmd: Command, commit: boolean): Outcome {
-  const grid = state.floors[cmd.floor];
+  // Building on the next storey up starts it.
+  const starting =
+    cmd.floor === state.floors.length &&
+    cmd.floor < MAX_FLOORS &&
+    (cmd.type === "build_floor" || cmd.type === "build_walls");
+  const grid = starting
+    ? createUpperFloor(state.floors[0]!.width, state.floors[0]!.height)
+    : state.floors[cmd.floor];
   if (!grid) return { cost: 0, count: 0, changed: null, error: "No such floor" };
+  if (starting) {
+    state.floors.push(grid); // Taken off again below unless something was built.
+    const out = run(state, cmd, commit);
+    if (!commit || out.error || out.count === 0) state.floors.pop();
+    return out;
+  }
   switch (cmd.type) {
     case "build_floor":
-      return buildFloor(grid, clip(grid, cmd.rect), commit);
+      return buildFloor(state, grid, cmd.floor, clip(grid, cmd.rect), commit);
     case "pave":
+      if (cmd.floor > 0) {
+        return {
+          cost: 0,
+          count: 0,
+          changed: null,
+          error: "Paving is for outside, on the ground floor",
+        };
+      }
       return pave(state, grid, clip(grid, cmd.rect), cmd.surface, commit);
     case "remove_floor":
       return removeFloor(state, grid, cmd.floor, clip(grid, cmd.rect), commit);
@@ -143,7 +182,7 @@ function run(state: SimState, cmd: Command, commit: boolean): Outcome {
       // A scenario may hold some rooms back.
       const locked = cmd.roomType ? lockReason(state, cmd.roomType) : null;
       if (locked) return { cost: 0, count: 0, changed: null, error: `Locked: ${locked}` };
-      return zone(grid, clip(grid, cmd.rect), cmd.roomType, commit);
+      return zone(state, grid, cmd.floor, clip(grid, cmd.rect), cmd.roomType, commit);
     }
     case "place_object": {
       const locked = lockReason(state, cmd.defId);
@@ -163,15 +202,35 @@ function clip(grid: FloorGrid, r: Rect): Rect {
   return clipRect(r, grid.width, grid.height);
 }
 
-/** Cost of replacing a tile's surface with foundations: paving is dug up for half back. */
-function foundationCost(grid: FloorGrid, i: number): number {
-  return FOUNDATION_COST_PER_TILE - refund(surfaceCost(grid.floorType[i]!));
+/**
+ * Cost of laying floor on a tile: foundations on the ground (paving is dug
+ * up for half back), a slab on the frame upstairs, a link bridge over a gap.
+ */
+function foundationCost(
+  state: SimState,
+  grid: FloorGrid,
+  floor: number,
+  x: number,
+  y: number,
+): number {
+  if (floor === 0) {
+    return FOUNDATION_COST_PER_TILE - refund(surfaceCost(grid.floorType[tileIndex(grid, x, y)]!));
+  }
+  const factor = supported(state, floor, x, y) ? UPPER_FLOOR_COST_FACTOR : BRIDGE_COST_FACTOR;
+  return Math.round(FOUNDATION_COST_PER_TILE * factor);
 }
 
-function buildFloor(grid: FloorGrid, rect: Rect, commit: boolean): Outcome {
+function buildFloor(
+  state: SimState,
+  grid: FloorGrid,
+  floor: number,
+  rect: Rect,
+  commit: boolean,
+): Outcome {
   let count = 0;
   let cost = 0;
   let onPublic = false;
+  let unsupported = false;
   for (const { x, y } of rectTiles(rect)) {
     const i = tileIndex(grid, x, y);
     if (isPublic(grid, i)) {
@@ -179,11 +238,17 @@ function buildFloor(grid: FloorGrid, rect: Rect, commit: boolean): Outcome {
       continue;
     }
     if (grid.floorType[i] === FloorType.Floor) continue;
+    if (!canHoldFloor(state, floor, x, y)) {
+      unsupported = true;
+      continue;
+    }
     count++;
-    cost += foundationCost(grid, i);
+    cost += foundationCost(state, grid, floor, x, y);
     if (commit) grid.floorType[i] = FloorType.Floor;
   }
-  const error = count === 0 && onPublic ? PUBLIC_LAND : undefined;
+  let error: string | undefined;
+  if (count === 0 && unsupported) error = NO_SUPPORT;
+  else if (count === 0 && onPublic) error = PUBLIC_LAND;
   return { cost, count, changed: rect, ...(error ? { error } : {}) };
 }
 
@@ -252,7 +317,10 @@ function removeFloor(
       onPublic = true;
       continue;
     }
-    if (grid.floorType[i] === FloorType.Grass) continue;
+    if (grid.floorType[i] === FloorType.Grass || grid.floorType[i] === FloorType.Void) continue;
+    if (builtAbove(state, floor, x, y)) {
+      return { cost: 0, count: 0, changed: null, error: HOLDS_UP_FLOOR_ABOVE };
+    }
     count++;
     cost -= refund(surfaceCost(grid.floorType[i]!) + wallCost(grid.wall[i]!));
   }
@@ -268,7 +336,8 @@ function removeFloor(
     for (const { x, y } of rectTiles(rect)) {
       const i = tileIndex(grid, x, y);
       if (isPublic(grid, i)) continue;
-      grid.floorType[i] = FloorType.Grass;
+      // Upstairs, taking the floor away leaves open air.
+      grid.floorType[i] = floor === 0 ? FloorType.Grass : FloorType.Void;
       grid.wall[i] = WallType.None;
       grid.zone[i] = 0;
     }
@@ -303,9 +372,12 @@ function buildWalls(
       const name = objectDef(state.objects[objId]!.defId)?.def.name ?? "equipment";
       return { cost: 0, count: 0, changed: null, error: `Blocked by ${name}` };
     }
+    if (grid.floorType[i] !== FloorType.Floor && !canHoldFloor(state, floor, x, y)) {
+      return { cost: 0, count: 0, changed: null, error: NO_SUPPORT };
+    }
     count++;
     cost += def.costPerTile - refund(wallCost(grid.wall[i]!));
-    if (grid.floorType[i] !== FloorType.Floor) cost += foundationCost(grid, i);
+    if (grid.floorType[i] !== FloorType.Floor) cost += foundationCost(state, grid, floor, x, y);
   }
   const victim = accessBlockedBy(state, floor, tiles, new Set());
   if (victim) return { cost: 0, count: 0, changed: null, error: blockedMessage(victim) };
@@ -356,7 +428,14 @@ function demolish(
   return { cost, count, changed };
 }
 
-function zone(grid: FloorGrid, rect: Rect, roomType: string | null, commit: boolean): Outcome {
+function zone(
+  state: SimState,
+  grid: FloorGrid,
+  floor: number,
+  rect: Rect,
+  roomType: string | null,
+  commit: boolean,
+): Outcome {
   let code = 0;
   // Clearing zoning works on access road too, wherever an Ambulance Bay was.
   let onRoad = true;
@@ -373,10 +452,16 @@ function zone(grid: FloorGrid, rect: Rect, roomType: string | null, commit: bool
   };
   let count = 0;
   let skipped = 0;
+  let onBridge = false;
   for (const { x, y } of rectTiles(rect)) {
     const i = tileIndex(grid, x, y);
     if (!zoneable(i)) {
       skipped++;
+      continue;
+    }
+    // A link bridge is a corridor and nothing else.
+    if (code !== 0 && roomType !== "corridor" && isBridge(state, floor, x, y)) {
+      onBridge = true;
       continue;
     }
     if (grid.zone[i] === code) continue;
@@ -384,7 +469,8 @@ function zone(grid: FloorGrid, rect: Rect, roomType: string | null, commit: bool
     if (commit) grid.zone[i] = code;
   }
   let error: string | undefined;
-  if (count === 0 && skipped > 0 && code !== 0) {
+  if (count === 0 && onBridge) error = BRIDGE_CORRIDOR_ONLY;
+  else if (count === 0 && skipped > 0 && code !== 0) {
     error = onRoad ? "Needs access road or floor" : "Rooms need floor";
   }
   return { cost: 0, count, changed: rect, ...(error ? { error } : {}) };

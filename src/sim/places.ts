@@ -148,14 +148,15 @@ export function kitFor(
 
 /** Tile of seat `slot` on a seating object (benches have one seat per tile). */
 export function seatTile(obj: PlacedObject, slot: number): Point {
-  return rectTiles(objectRect(obj))[slot] ?? { x: obj.x, y: obj.y };
+  const t = rectTiles(objectRect(obj))[slot] ?? { x: obj.x, y: obj.y };
+  return { x: t.x, y: t.y, floor: obj.floor };
 }
 
 /** Where to stand before sitting down: in front of the seat. */
 export function seatApproach(obj: PlacedObject, slot: number): Point {
   const t = seatTile(obj, slot);
   const { dx, dy } = frontDirection(obj.rotation);
-  return { x: t.x + dx, y: t.y + dy };
+  return { x: t.x + dx, y: t.y + dy, floor: obj.floor };
 }
 
 /**
@@ -210,17 +211,17 @@ export function standingSpot(
   pick: (n: number) => number,
   who?: WaitingFor,
 ): Point | null {
-  const grid = state.floors[0]!;
   const passes: ((room: Room) => boolean)[] =
     who === undefined ? [() => true] : [(r) => r.waitingFor === who, (r) => r.waitingFor === null];
   for (const roomTest of passes) {
     const tiles: Point[] = [];
     for (const room of state.rooms) {
       if (!room.valid || room.typeId !== roomType || !roomTest(room)) continue;
+      const grid = state.floors[room.floor]!;
       for (const i of room.tiles) {
         const x = i % grid.width;
         const y = (i - x) / grid.width;
-        if (isStandable(grid, x, y)) tiles.push({ x, y });
+        if (isStandable(grid, x, y)) tiles.push({ x, y, floor: room.floor });
       }
     }
     if (tiles.length > 0) return tiles[pick(tiles.length)]!;
@@ -262,7 +263,7 @@ export function isCouch(defId: string): boolean {
 /** Centre of an item's footprint, where a patient lies. */
 export function restPoint(obj: PlacedObject): Point {
   const r = objectRect(obj);
-  return { x: r.x + (r.w - 1) / 2, y: r.y + (r.h - 1) / 2 };
+  return { x: r.x + (r.w - 1) / 2, y: r.y + (r.h - 1) / 2, floor: obj.floor };
 }
 
 /**
@@ -278,13 +279,13 @@ export function bedside(state: SimState, obj: PlacedObject): Point {
   let bestArea = -1;
   for (const t of sides) {
     if (!isStandable(grid, t.x, t.y)) continue;
-    const area = walkableArea(state, t.x, t.y);
+    const area = walkableArea(state, t.x, t.y, obj.floor);
     if (area > bestArea) {
-      best = t;
+      best = { x: t.x, y: t.y, floor: obj.floor };
       bestArea = area;
     }
   }
-  return best ?? sides[0]!;
+  return best ?? { x: sides[0]!.x, y: sides[0]!.y, floor: obj.floor };
 }
 
 export const MAX_COUCH_DIRT = 0;
@@ -464,8 +465,9 @@ export function frontOf(obj: PlacedObject): Point {
   const { dx, dy } = frontDirection(obj.rotation);
   const cx = r.x + Math.floor((r.w - 1) / 2);
   const cy = r.y + Math.floor((r.h - 1) / 2);
-  if (dy !== 0) return { x: cx, y: dy > 0 ? r.y + r.h : r.y - 1 };
-  return { x: dx > 0 ? r.x + r.w : r.x - 1, y: cy };
+  const floor = obj.floor;
+  if (dy !== 0) return { x: cx, y: dy > 0 ? r.y + r.h : r.y - 1, floor };
+  return { x: dx > 0 ? r.x + r.w : r.x - 1, y: cy, floor };
 }
 
 // ---------- Reception desks ----------
@@ -476,8 +478,9 @@ export function deskStaffSpot(obj: PlacedObject): Point {
   const { dx, dy } = frontDirection(obj.rotation);
   const cx = r.x + Math.floor((r.w - 1) / 2);
   const cy = r.y + Math.floor((r.h - 1) / 2);
-  if (dy !== 0) return { x: cx, y: dy > 0 ? r.y - 1 : r.y + r.h };
-  return { x: dx > 0 ? r.x - 1 : r.x + r.w, y: cy };
+  const floor = obj.floor;
+  if (dy !== 0) return { x: cx, y: dy > 0 ? r.y - 1 : r.y + r.h, floor };
+  return { x: dx > 0 ? r.x - 1 : r.x + r.w, y: cy, floor };
 }
 
 export function receptionDesks(state: SimState): PlacedObject[] {
@@ -505,7 +508,9 @@ export function queueSpots(state: SimState, roomId?: number): Point[] {
     (d) => roomId === undefined || state.objectRoom[d.id] === roomId,
   );
   if (desks.length === 0) return [];
-  const grid = state.floors[0]!;
+  // A&E Reception is on the ground floor; one room's desks share its floor.
+  const floor = desks[0]!.floor;
+  const grid = state.floors[floor]!;
   const roomIds = new Set(desks.map((d) => state.objectRoom[d.id]!));
   const seen = new Set<number>();
   const out: Point[] = [];
@@ -533,7 +538,7 @@ export function queueSpots(state: SimState, roomId?: number): Point[] {
       const i = tileIndex(grid, nx, ny);
       if (seen.has(i) || !roomIds.has(grid.roomId[i]!) || !isStandable(grid, nx, ny)) continue;
       seen.add(i);
-      queue.push({ x: nx, y: ny });
+      queue.push({ x: nx, y: ny, floor });
     }
   }
   return out;
@@ -576,6 +581,8 @@ export function siteEntrance(state: SimState): Point | null {
   let at: Point | null = null;
   if (from && points.size > 0) at = nearestTile(grid, from.x, from.y, (i) => points.has(i));
   else if (from) at = nearestEdgeTile(grid, from.x, from.y);
+  // The way in from the road is on the ground floor.
+  if (at) at = { x: at.x, y: at.y, floor: 0 };
   entranceCache.set(state, { version: state.layoutVersion, at });
   return at;
 }
@@ -583,7 +590,7 @@ export function siteEntrance(state: SimState): Point | null {
 /** Where to put new arrivals when the building is unreachable: bottom middle of the map. */
 export function fallbackEntrance(state: SimState): Point {
   const grid = state.floors[0]!;
-  return { x: Math.floor(grid.width / 2), y: grid.height - 1 };
+  return { x: Math.floor(grid.width / 2), y: grid.height - 1, floor: 0 };
 }
 
 // ---------- Rooms patients can't reach ----------

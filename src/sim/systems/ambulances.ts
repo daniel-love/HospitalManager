@@ -371,7 +371,7 @@ export function handoverDone(state: SimState, p: Patient, bedId: number | null):
       state,
       `${p.name}'s ambulance crew waited ${Math.round(mins)} minutes to hand over`,
       "warn",
-      { x: Math.round(p.x), y: Math.round(p.y) },
+      { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor },
     );
   }
 

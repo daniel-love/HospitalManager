@@ -84,7 +84,9 @@ describe("coverage from a nurse station", () => {
     const seen = new Set(view.seen);
     expect(seen.has(tileIndex(grid, 16, BAY_ROWS[0]))).toBe(true);
     expect(seen.has(tileIndex(grid, 16, BAY_ROWS[2]))).toBe(false);
-    expect(view.stations).toEqual([expect.objectContaining({ at: STATION_SPOT, staffed: false })]);
+    expect(view.stations).toEqual([
+      expect.objectContaining({ at: { ...STATION_SPOT, floor: 0 }, staffed: false }),
+    ]);
   });
 
   it("works on unzoned floor, facing either way, right in front of a bay", () => {

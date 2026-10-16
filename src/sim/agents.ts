@@ -12,6 +12,11 @@ import type { NurseBand } from "@data/staff";
 export interface Point {
   x: number;
   y: number;
+  /**
+   * The floor (0 = ground), for a point taken from something placed (a bed,
+   * a seat, a desk). Left out, it means the same floor as whoever uses it.
+   */
+  floor?: number | undefined;
 }
 
 /** Where an agent is heading: `approach` is the tile it walks to, then it steps to (x, y). */
@@ -25,6 +30,8 @@ export interface Destination extends Point {
 export interface AgentBase extends Point {
   id: number;
   name: string;
+  /** The floor they're on: 0 is the ground floor. */
+  floor: number;
   /** Position at the start of this tick, for smooth drawing between ticks. */
   prevX: number;
   prevY: number;

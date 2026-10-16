@@ -116,7 +116,7 @@ function observe(state: SimState, room: Room, found: CsiFinding[]): void {
     (p) =>
       !p.death &&
       p.stage !== "leaving" &&
-      roomAt(state, 0, Math.round(p.x), Math.round(p.y))?.id === room.id,
+      roomAt(state, p.floor, Math.round(p.x), Math.round(p.y))?.id === room.id,
   );
   if (here.length > 0) {
     const mood = here.reduce((n, p) => n + p.mood, 0) / here.length;
@@ -490,6 +490,7 @@ function startTour(
       name: kind === "inspector" ? "CSI inspector" : "VIP visitor",
       x: at.x,
       y: at.y,
+      floor: 0,
       prevX: at.x,
       prevY: at.y,
       path: [],

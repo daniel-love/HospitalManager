@@ -188,7 +188,7 @@ describe("toilet trips from a cubicle or trolley", () => {
     // Back on their bed.
     expect(p.stage).toBe("in_cubicle");
     expect(p.bed).toBe(bed);
-    expect({ x: p.x, y: p.y }).toEqual(home);
+    expect({ x: p.x, y: p.y, floor: p.floor }).toEqual(home);
   });
 
   it("explain what's in the way for a patient in a cubicle", () => {

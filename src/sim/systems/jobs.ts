@@ -448,7 +448,7 @@ function patientSpot(state: SimState, p: Patient): Point {
   if (bed && onBed) return bedside(state, bed);
   const seat = p.seat && state.objects[p.seat.objectId];
   if (seat && p.path.length === 0) return seatApproach(seat, p.seat!.slot);
-  return { x: Math.round(p.x), y: Math.round(p.y) };
+  return { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor };
 }
 
 /** Observations and crash calls: go to the patient once they've settled, then work. */

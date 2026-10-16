@@ -43,7 +43,7 @@ import { createFloorGrid, type FloorGrid } from "./world/grid";
 import type { Rect } from "./world/rect";
 import { layOutSite, type Site } from "./world/site";
 
-export const SIM_STATE_VERSION = 50;
+export const SIM_STATE_VERSION = 51;
 
 /** Quarter turns clockwise. */
 export type Rotation = 0 | 1 | 2 | 3;

@@ -70,11 +70,11 @@ const TICKS_PER_HOUR = 60 * TICKS_PER_MINUTE;
 /** Rooms where the public wait: a covered trolley shouldn't pass through them. */
 const PUBLIC_ROOMS = new Set(["waiting_area", "ae_reception"]);
 
-const tileOf = (p: Patient): Point => ({ x: Math.round(p.x), y: Math.round(p.y) });
+const tileOf = (p: Patient): Point => ({ x: Math.round(p.x), y: Math.round(p.y), floor: p.floor });
 
 /** The name of the room someone is in, for records ("Majors Bay"), or "department". */
 export function roomNameAt(state: SimState, at: Point): string {
-  const room = roomAt(state, 0, at.x, at.y);
+  const room = roomAt(state, at.floor ?? 0, at.x, at.y);
   return room ? (roomById.get(room.typeId)?.name ?? "department") : "department";
 }
 
@@ -512,13 +512,16 @@ function noticeTransfer(state: SimState, p: Patient): void {
   const t = p.death?.transfer;
   if (!t) return;
   const at = tileOf(p);
-  const room = roomAt(state, 0, at.x, at.y);
-  if (!room || room === roomAt(state, 0, t.from.x, t.from.y)) return;
+  const room = roomAt(state, p.floor, at.x, at.y);
+  if (!room || room === roomAt(state, t.from.floor ?? 0, t.from.x, t.from.y)) return;
   const r2 = TRANSFER_SEEN.radius * TRANSFER_SEEN.radius;
   const sees = (a: Point): boolean => {
     const dx = a.x - p.x;
     const dy = a.y - p.y;
-    return dx * dx + dy * dy <= r2 && roomAt(state, 0, Math.round(a.x), Math.round(a.y)) === room;
+    return (
+      dx * dx + dy * dy <= r2 &&
+      roomAt(state, a.floor ?? 0, Math.round(a.x), Math.round(a.y)) === room
+    );
   };
   const before = t.seenBy.length;
   for (const w of Object.values(state.patients)) {
@@ -544,9 +547,9 @@ function noticeTransfer(state: SimState, p: Patient): void {
 }
 
 /** Whether a route ([x0, y0, x1, y1, …]) crosses a waiting area or reception. */
-export function passesPublicArea(state: SimState, path: number[]): boolean {
+export function passesPublicArea(state: SimState, path: number[], floor = 0): boolean {
   for (let i = 0; i < path.length; i += 2) {
-    const room = roomAt(state, 0, Math.round(path[i]!), Math.round(path[i + 1]!));
+    const room = roomAt(state, floor, Math.round(path[i]!), Math.round(path[i + 1]!));
     if (room && PUBLIC_ROOMS.has(room.typeId)) return true;
   }
   return false;

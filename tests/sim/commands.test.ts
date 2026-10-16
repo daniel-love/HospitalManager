@@ -431,14 +431,14 @@ describe("bedside access", () => {
       bed(2, 2),
     ]);
     const hospitalBed = state.objects[1]!;
-    expect(bedside(state, hospitalBed)).toEqual({ x: 1, y: 2 });
+    expect(bedside(state, hospitalBed)).toEqual({ x: 1, y: 2, floor: 0 });
     // Plants at either end of the gap between the wall and the bed seal it off.
     const plant = (x: number, y: number) =>
       ({ type: "place_object", floor: 0, defId: "plant", x, y, rotation: 0 }) as const;
     applyAll(state, [plant(1, 1), plant(1, 4)]);
     expect(isStandable(state.floors[0]!, 1, 2)).toBe(true);
     expect(walkRouteExists(state, { x: 8, y: 8 }, { x: 1, y: 2 })).toBe(false);
-    expect(bedside(state, hospitalBed)).toEqual({ x: 3, y: 2 });
+    expect(bedside(state, hospitalBed)).toEqual({ x: 3, y: 2, floor: 0 });
   });
 });
 

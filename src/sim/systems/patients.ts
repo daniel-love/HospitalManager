@@ -216,7 +216,7 @@ function updateQueue(state: SimState): void {
       if (
         p.path.length > 0 &&
         p.dest &&
-        roomAt(state, 0, Math.round(p.x), Math.round(p.y))?.id !== room
+        roomAt(state, p.floor, Math.round(p.x), Math.round(p.y))?.id !== room
       ) {
         return;
       }
@@ -236,7 +236,7 @@ function receptionFor(
 ): number | null {
   const x = Math.round(p.x);
   const y = Math.round(p.y);
-  const here = roomAt(state, 0, x, y);
+  const here = roomAt(state, p.floor, x, y);
   const choices = open.size > 0 ? open : new Set(rooms.keys());
   if (here && choices.has(here.id)) return here.id;
   let best: number | null = null;
@@ -313,9 +313,9 @@ function waitInArea(state: SimState, p: Patient, beingSeen: boolean): void {
     return;
   }
   // No free seat: stand in a Waiting Area they may use (or, failing that, reception).
-  const grid = state.floors[0]!;
+  const grid = state.floors[p.floor]!;
   let spot = p.standing;
-  const spotRoom = spot && roomAt(state, 0, spot.x, spot.y);
+  const spotRoom = spot && roomAt(state, spot.floor ?? p.floor, spot.x, spot.y);
   if (
     !spot ||
     !isStandable(grid, spot.x, spot.y) ||
@@ -323,7 +323,11 @@ function waitInArea(state: SimState, p: Patient, beingSeen: boolean): void {
   ) {
     const pickN = (n: number) => nextInt(state.rng, 0, n - 1);
     spot = standingSpot(state, "waiting_area", pickN, "ae") ??
-      standingSpot(state, "ae_reception", pickN) ?? { x: Math.round(p.x), y: Math.round(p.y) };
+      standingSpot(state, "ae_reception", pickN) ?? {
+        x: Math.round(p.x),
+        y: Math.round(p.y),
+        floor: p.floor,
+      };
     p.standing = spot;
   }
   headTo(state, p, spot);
@@ -461,7 +465,7 @@ function goToBed(state: SimState, p: Patient): void {
 function wheelInFromAmbulance(state: SimState, p: Patient, bed: PlacedObject): Arrival {
   const to = restPoint(bed);
   const side = bedside(state, bed);
-  const from = { x: Math.round(p.x), y: Math.round(p.y) };
+  const from = { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor };
   const planned = p.dest;
   // Already on the way: keep to the stop they set off for.
   const onTheWay =
@@ -480,7 +484,7 @@ function wheelInFromAmbulance(state: SimState, p: Patient, bed: PlacedObject): A
     planned.ay === side.y &&
     p.pathVersion === state.layoutVersion;
   if (squeezing) return headTo(state, p, to, side, false, true);
-  const grid = state.floors[0]!;
+  const grid = state.floors[p.floor]!;
   // Ruling out stops with no stretcher-width way to them at all first saves
   // searching the whole site for each.
   // The stops are all beside the same trolley, in the same room: if public
@@ -490,8 +494,10 @@ function wheelInFromAmbulance(state: SimState, p: Patient, bed: PlacedObject): A
   const crewRoute = (at: Point) => {
     if (publicRouteFailed || !bedRouteExists(state, from, at)) return false;
     const ok =
-      findPath(grid, from.x, from.y, at.x, at.y, { bed: true, patient: crewAccess(state) }) !==
-      null;
+      findPath(grid, from.x, from.y, at.x, at.y, {
+        bed: true,
+        patient: crewAccess(state, p.floor),
+      }) !== null;
     if (!ok) publicRouteFailed = true;
     return ok;
   };
@@ -512,7 +518,7 @@ function squeezeIn(state: SimState, p: Patient, to: Point, side: Point): Arrival
     6 * 60 * TICKS_PER_MINUTE,
     `An ambulance crew couldn't find a stretcher-width route in for ${p.name}. Stretchers need double doors and corridors at least 2 tiles wide.`,
     "warn",
-    { x: Math.round(p.x), y: Math.round(p.y) },
+    { x: Math.round(p.x), y: Math.round(p.y), floor: p.floor },
   );
   // Rather than strand them, they squeeze through on foot with the crew.
   return headTo(state, p, to, side, false, true);
@@ -520,10 +526,10 @@ function squeezeIn(state: SimState, p: Patient, to: Point, side: Point): Arrival
 
 /** Just set off: the crew had to go through another clinical room to get there. */
 function warnIfCutThrough(state: SimState, p: Patient, from: Point, bed: PlacedObject): void {
-  const grid = state.floors[0]!;
+  const grid = state.floors[p.floor]!;
   const start = grid.roomId[tileIndex(grid, from.x, from.y)]!;
   const end = roomOfObject(state, bed.id);
-  const crossed = privateRoomsCrossed(state, p.path, [start, end?.id ?? 0]);
+  const crossed = privateRoomsCrossed(state, p.path, [start, end?.id ?? 0], p.floor);
   const room = state.rooms.find((r) => r.id === crossed[0]);
   if (!room) return;
   const name = (id: string) => roomById.get(id)?.name ?? "clinical room";
@@ -640,7 +646,7 @@ export function waitingCrowd(state: SimState): Map<number, number> {
   if (c && c.tick === state.tick) return c.byRoom;
   const byRoom = new Map<number, number>();
   const count = (a: Point) => {
-    const room = roomAt(state, 0, Math.round(a.x), Math.round(a.y));
+    const room = roomAt(state, a.floor ?? 0, Math.round(a.x), Math.round(a.y));
     if (room && WAITING_ROOMS.has(room.typeId)) byRoom.set(room.id, (byRoom.get(room.id) ?? 0) + 1);
   };
   for (const p of Object.values(state.patients)) {
@@ -653,7 +659,7 @@ export function waitingCrowd(state: SimState): Map<number, number> {
 
 /** People waiting in the room this patient is in, if it's somewhere people wait. */
 export function crowdAround(state: SimState, p: Patient): number {
-  const room = roomAt(state, 0, Math.round(p.x), Math.round(p.y));
+  const room = roomAt(state, p.floor, Math.round(p.x), Math.round(p.y));
   return room ? (waitingCrowd(state).get(room.id) ?? 0) : 0;
 }
 
@@ -829,6 +835,7 @@ function maybeGiveUp(state: SimState, p: Patient): void {
   emit(state, `${p.name} left without being seen after ${formatWait(mins)}`, "warn", {
     x: Math.round(p.x),
     y: Math.round(p.y),
+    floor: p.floor,
   });
   leave(state, p, "lwbs");
 }

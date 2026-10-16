@@ -273,6 +273,7 @@ export function newPatient(
     name: `${pick(rng, FIRST_NAMES)} ${pick(rng, SURNAMES)}`,
     x: at.x,
     y: at.y,
+    floor: 0,
     prevX: at.x,
     prevY: at.y,
     lastVisit: null,

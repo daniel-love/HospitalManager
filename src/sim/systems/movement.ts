@@ -49,7 +49,12 @@ export function headTo(
 ): Arrival {
   const d = agent.dest;
   const same =
-    d !== null && d.x === to.x && d.y === to.y && d.ax === approach.x && d.ay === approach.y;
+    d !== null &&
+    d.x === to.x &&
+    d.y === to.y &&
+    d.ax === approach.x &&
+    d.ay === approach.y &&
+    (d.floor ?? agent.floor) === (to.floor ?? agent.floor);
   if (same) {
     if (d.blocked >= 0) {
       if (state.tick - d.blocked < RETRY_TICKS) return "no_route";
@@ -71,7 +76,12 @@ export function stop(agent: AgentBase): void {
 
 /** Whether an agent is at a point (and not walking somewhere else). */
 export function isAt(agent: AgentBase, p: Point): boolean {
-  return agent.path.length === 0 && Math.abs(agent.x - p.x) < EPS && Math.abs(agent.y - p.y) < EPS;
+  return (
+    agent.path.length === 0 &&
+    (p.floor ?? agent.floor) === agent.floor &&
+    Math.abs(agent.x - p.x) < EPS &&
+    Math.abs(agent.y - p.y) < EPS
+  );
 }
 
 function plan(
@@ -84,17 +94,25 @@ function plan(
 ): Arrival {
   // Over budget this tick: try again next tick, carrying on as they were
   // (their old destination kept, so the old route isn't taken for the new one).
-  const arrived = Math.abs(agent.x - to.x) < EPS && Math.abs(agent.y - to.y) < EPS;
+  const floor = to.floor ?? agent.floor;
+  const arrived =
+    floor === agent.floor && Math.abs(agent.x - to.x) < EPS && Math.abs(agent.y - to.y) < EPS;
   const budget = planned.get(state);
   if (!arrived && budget?.tick === state.tick && budget.n >= MAX_PLANS_PER_TICK) return "moving";
-  const dest = { x: to.x, y: to.y, ax: approach.x, ay: approach.y, blocked: -1 };
+  const dest = { x: to.x, y: to.y, floor, ax: approach.x, ay: approach.y, blocked: -1 };
   agent.dest = dest;
   agent.pathVersion = state.layoutVersion;
   if (arrived) {
     agent.path = [];
     return "arrived";
   }
-  const grid = state.floors[0]!;
+  // Another floor: no way up or down yet.
+  if (floor !== agent.floor) {
+    dest.blocked = state.tick;
+    agent.path = [];
+    return "no_route";
+  }
+  const grid = state.floors[floor]!;
   const sx = Math.round(agent.x);
   const sy = Math.round(agent.y);
   // Patients on foot keep to public routes, and the ambulance crew mostly
@@ -102,14 +120,18 @@ function plan(
   const onFoot = !bed && !withCrew && !("role" in agent);
   // Nowhere joins them up: say so without searching the whole site first.
   const there = sx === approach.x && sy === approach.y;
-  if (!bed && !there && !walkRouteExists(state, { x: sx, y: sy }, approach)) {
+  if (!bed && !there && !walkRouteExists(state, { x: sx, y: sy, floor }, { ...approach, floor })) {
     dest.blocked = state.tick;
     agent.path = [];
     return "no_route";
   }
   if (budget?.tick === state.tick) budget.n++;
   else planned.set(state, { tick: state.tick, n: 1 });
-  const access = withCrew ? crewAccess(state) : onFoot ? patientAccess(state) : undefined;
+  const access = withCrew
+    ? crewAccess(state, floor)
+    : onFoot
+      ? patientAccess(state, floor)
+      : undefined;
   let tiles = findPath(grid, sx, sy, approach.x, approach.y, {
     bed,
     ...(access ? { patient: access } : {}),
@@ -130,11 +152,11 @@ function plan(
 }
 
 export function moveAgents(state: SimState): void {
-  const grid = state.floors[0]!;
   const step = (agent: AgentBase, speed: number) => {
     agent.prevX = agent.x;
     agent.prevY = agent.y;
     if (agent.path.length === 0) return;
+    const grid = state.floors[agent.floor]!;
     const tx = Math.round(agent.x);
     const ty = Math.round(agent.y);
     let budget = speed;

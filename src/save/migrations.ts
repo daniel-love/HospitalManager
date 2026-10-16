@@ -1066,6 +1066,28 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
   // toilet trip may be on its way back to their bed (left 0). Older saves
   // have neither, so there's nothing to change.
   49: (save) => save,
+  // v51: multiple floors. Every agent says which floor it's on; everyone in
+  // an older save is on the ground floor.
+  50: (save) => {
+    const state = save.state as Record<string, unknown>;
+    const ground = (list: unknown) =>
+      Array.isArray(list) ? list.map((a: object) => ({ ...a, floor: 0 })) : list;
+    const collections = Array.isArray(state.collections)
+      ? state.collections.map((c: { crew: object }) => ({ ...c, crew: { ...c.crew, floor: 0 } }))
+      : state.collections;
+    return {
+      ...save,
+      state: {
+        ...state,
+        patients: ground(state.patients),
+        staff: ground(state.staff),
+        visitors: ground(state.visitors),
+        outpatients: ground(state.outpatients),
+        tours: ground(state.tours),
+        collections,
+      },
+    };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */
