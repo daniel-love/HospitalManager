@@ -22,6 +22,7 @@ import { rectTiles } from "./world/rect";
 import { capabilitiesOf, roomOfObject } from "./world/rooms";
 import { isMobile, kitReach, sharedKitIds } from "./world/sharedKit";
 import { walkableArea } from "./world/walkRegions";
+import { portals, portalStop } from "./world/portals";
 
 export type Slot = number | "staff";
 
@@ -494,7 +495,7 @@ export function staffedDesks(state: SimState): PlacedObject[] {
     const s = id === undefined ? undefined : state.staff[id];
     if (!s) return false;
     const spot = deskStaffSpot(d);
-    return s.path.length === 0 && s.x === spot.x && s.y === spot.y;
+    return s.path.length === 0 && s.floor === d.floor && s.x === spot.x && s.y === spot.y;
   });
 }
 
@@ -574,7 +575,8 @@ export function siteEntrance(state: SimState): Point | null {
   if (desk) from = frontOf(desk);
   else {
     const room = state.rooms.find((r) => r.floor === 0);
-    const i = room?.tiles[0];
+    // A tile someone could stand on, not one under an item.
+    const i = room?.tiles.find((t) => isWalkable(grid, t)) ?? room?.tiles[0];
     if (i !== undefined) from = { x: i % grid.width, y: Math.floor(i / grid.width) };
   }
   const points = new Set(arrivalPoints(state).map((p) => tileIndex(grid, p.x, p.y)));
@@ -614,17 +616,20 @@ const unreachableCache = new WeakMap<SimState, { version: number; rooms: Room[] 
 export function roomsPatientsCantReach(state: SimState): Room[] {
   const cached = unreachableCache.get(state);
   if (cached && cached.version === state.layoutVersion) return cached.rooms;
-  const grid = state.floors[0]!;
-  const { width, height } = grid;
+  const ground = state.floors[0]!;
+  const { width, height } = ground;
   const start = siteEntrance(state);
   let rooms: Room[] = [];
   if (start) {
-    // Flood from the entrance over tiles any patient may cross.
-    const access = patientAccess(state);
-    const open = (i: number) => access[i] === OPEN && isWalkable(grid, i);
-    const reached = new Uint8Array(width * height);
-    const queue = [tileIndex(grid, start.x, start.y)];
-    reached[queue[0]!] = 1;
+    // Flood from the entrance over tiles any patient may cross, on every
+    // floor, up and down by any stairs or lift whose stop is reached.
+    const reached = state.floors.map(() => new Uint8Array(width * height));
+    const open = state.floors.map((grid, f) => {
+      const access = patientAccess(state, f);
+      return (i: number) => access[i] === OPEN && isWalkable(grid, i);
+    });
+    const queue: [number, number][] = [[0, tileIndex(ground, start.x, start.y)]];
+    reached[0]![queue[0]![1]] = 1;
     const step = (i: number, f: (n: number) => void) => {
       const x = i % width;
       const y = (i - x) / width;
@@ -633,20 +638,34 @@ export function roomsPatientsCantReach(state: SimState): Room[] {
       if (y > 0) f(i - width);
       if (y < height - 1) f(i + width);
     };
-    for (let head = 0; head < queue.length; head++) {
-      step(queue[head]!, (n) => {
-        if (reached[n] || !open(n)) return;
-        reached[n] = 1;
-        queue.push(n);
+    // Each portal's stop on each floor, by floor and tile.
+    const stops = new Map<string, { floor: number; tile: number }[]>();
+    for (const portal of portals(state)) {
+      const all = portal.floors.map((f) => {
+        const p = portalStop(portal, f);
+        return { floor: f, tile: tileIndex(ground, p.x, p.y) };
       });
+      for (const s of all)
+        stops.set(`${s.floor}:${s.tile}`, [...(stops.get(`${s.floor}:${s.tile}`) ?? []), ...all]);
+    }
+    const visit = (f: number, n: number) => {
+      if (reached[f]![n] || !open[f]!(n)) return;
+      reached[f]![n] = 1;
+      queue.push([f, n]);
+    };
+    for (let head = 0; head < queue.length; head++) {
+      const [f, i] = queue[head]!;
+      step(i, (n) => visit(f, n));
+      for (const other of stops.get(`${f}:${i}`) ?? []) visit(other.floor, other.tile);
     }
     // A room is reachable if one of its tiles is, or borders a reached tile.
     rooms = state.rooms.filter((room) => {
-      if (!room.valid || room.floor !== 0 || !PATIENT_ROOMS.has(room.typeId)) return false;
+      if (!room.valid || !PATIENT_ROOMS.has(room.typeId)) return false;
+      const here = reached[room.floor]!;
       return !room.tiles.some((t) => {
-        if (reached[t]) return true;
+        if (here[t]) return true;
         let near = false;
-        step(t, (n) => (near ||= reached[n] === 1));
+        step(t, (n) => (near ||= here[n] === 1));
         return near;
       });
     });

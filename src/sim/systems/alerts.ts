@@ -22,8 +22,9 @@ import {
   receptionDesks,
   roomsPatientsCantReach,
   seatCount,
+  siteEntrance,
 } from "../places";
-import type { SimState } from "../state";
+import type { Room, SimState } from "../state";
 import { clockFromTick, TICKS_PER_MINUTE } from "../time";
 import { sessionsOn } from "./clinics";
 import { outpatientDesks } from "./outpatients";
@@ -33,7 +34,7 @@ import { roomOfObject } from "../world/rooms";
 import { ambulancesWaiting, needsTrolley } from "./ambulances";
 import { hasCleaningJob, postJob, ticksFor } from "./jobBoard";
 import { inAE } from "./patients";
-import { wardBedsOutOfReach } from "./admissions";
+import { trolleyStop, wardBedsOutOfReach } from "./admissions";
 import { unwellToTravel } from "./escorts";
 import { inCare } from "./curtains";
 import { bedCover, nurseStations, stationsSeeing } from "./monitoring";
@@ -163,18 +164,45 @@ export function updateAlerts(state: SimState): void {
   }
 
   // Rooms patients can't walk to without crossing a clinical room.
-  const grid = state.floors[0]!;
+  const width = state.floors[0]!.width;
+  const pin = (room: Room) => {
+    const t = room.tiles[0]!;
+    return { x: t % width, y: Math.floor(t / width), floor: room.floor };
+  };
   for (const room of roomsPatientsCantReach(state)) {
     const name = roomById.get(room.typeId)?.name ?? room.typeId;
-    const t = room.tiles[0]!;
+    const upstairs =
+      room.floor > 0
+        ? " Upstairs, patients also need stairs or a lift that opens onto a public area on both floors."
+        : "";
     warn(
       state,
-      `unreachable_${t}`,
+      `unreachable_${room.floor}_${room.tiles[0]!}`,
       COOLDOWN * 2,
-      `Patients can't reach a ${name} without walking through another clinical room. Give it a door onto a corridor, waiting area or reception.`,
+      `Patients can't reach a ${name} without walking through another clinical room. Give it a door onto a corridor, waiting area or reception.${upstairs}`,
       "warn",
-      { x: t % grid.width, y: Math.floor(t / grid.width) },
+      pin(room),
     );
+  }
+
+  // Beds upstairs that no bed can be wheeled to: no bed lift.
+  const entrance = siteEntrance(state);
+  if (entrance) {
+    for (const room of state.rooms) {
+      if (!room.valid || room.floor === 0) continue;
+      const couch = room.objectIds.map((id) => state.objects[id]!).find((o) => isCouch(o.defId));
+      // Somewhere beside it a trolley can be wheeled to, as porters look for.
+      if (!couch || trolleyStop(state, entrance, couch) !== null) continue;
+      const name = roomById.get(room.typeId)?.name ?? room.typeId;
+      warn(
+        state,
+        `no_bed_lift_${room.floor}_${room.tiles[0]!}`,
+        COOLDOWN * 2,
+        `Beds and trolleys can't be wheeled to the ${name} upstairs: it needs a bed lift (stairs won't do), with a bed-width route from the lift to the room on each floor.`,
+        "bad",
+        pin(room),
+      );
+    }
   }
 
   // After deaths: the mortuary and Medical Examiner.

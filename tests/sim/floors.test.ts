@@ -22,7 +22,7 @@ import { bedRouteExists, decideToAdmit } from "@sim/systems/admissions";
 import { spawnPatient } from "@sim/systems/arrivals";
 import { removeJob } from "@sim/systems/jobBoard";
 import { tick } from "@sim/sim";
-import { siteEntrance } from "@sim/places";
+import { roomsPatientsCantReach, siteEntrance } from "@sim/places";
 import { headTo, moveAgents } from "@sim/systems/movement";
 import { updatePortals } from "@sim/systems/portals";
 import { FloorType, tileIndex, WallType } from "@sim/world/grid";
@@ -490,5 +490,70 @@ describe("a ward upstairs", () => {
     expect(p.floor).toBe(1);
     expect(rode).toBe(true);
     expect(state.objects[p.bed!]!.floor).toBe(1);
+  });
+});
+
+describe("checks upstairs", () => {
+  /**
+   * A small site with a road: a ground-floor corridor from the pavement to
+   * a staircase and/or lift, and a first-floor ward reached from them
+   * through a corridor.
+   */
+  function site(opts: { stairs: boolean; lift: boolean }): SimState {
+    const state = createSimState({ seed: 1, width: 40, height: 40, money: 10_000_000, site: true });
+    const cmds: Command[] = [];
+    for (const floor of [0, 1]) {
+      cmds.push(
+        { type: "build_floor", floor, rect: rect(2, 2, 16, 10) },
+        { type: "build_walls", floor, rect: rect(2, 2, 16, 10), wall: WallType.Standard },
+      );
+      if (opts.stairs) {
+        cmds.push({ type: "place_object", floor, defId: "stairs", x: 3, y: 3, rotation: 0 });
+      }
+      if (opts.lift) {
+        cmds.push({ type: "place_object", floor, defId: "lift", x: 6, y: 3, rotation: 0 });
+      }
+    }
+    cmds.push(
+      // Ground: one corridor with a double door out to the south.
+      { type: "zone", floor: 0, rect: rect(3, 3, 14, 8), roomType: "corridor" },
+      { type: "place_object", floor: 0, defId: "door_double", x: 9, y: 11, rotation: 0 },
+      // First floor: a corridor by the stairs and lift, a wall, and a ward beyond.
+      { type: "build_walls", floor: 1, rect: rect(10, 2, 1, 10), wall: WallType.Standard },
+      { type: "place_object", floor: 1, defId: "door_double", x: 10, y: 8, rotation: 1 },
+      { type: "zone", floor: 1, rect: rect(3, 3, 7, 8), roomType: "corridor" },
+      { type: "zone", floor: 1, rect: rect(11, 3, 6, 8), roomType: "ward" },
+      { type: "place_object", floor: 1, defId: "hospital_bed", x: 12, y: 3, rotation: 0 },
+      { type: "place_object", floor: 1, defId: "hospital_bed", x: 15, y: 3, rotation: 0 },
+      { type: "place_object", floor: 1, defId: "sink", x: 16, y: 10, rotation: 2 },
+    );
+    applyAll(state, cmds);
+    // A path from the door down to the pavement.
+    const pavement = state.site!.pavements[0];
+    applyAll(state, [
+      { type: "pave", floor: 0, rect: rect(9, 12, 2, pavement.y - 12), surface: "path" },
+    ]);
+    return state;
+  }
+
+  const ward = (state: SimState) => state.rooms.find((r) => r.typeId === "ward")!;
+  const alertsFor = (state: SimState) => {
+    for (let i = 0; i < 31 * 10; i++) tick(state); // Alerts are checked every half hour.
+    return state.events.map((e) => e.text);
+  };
+
+  it("find upstairs rooms patients can reach by the stairs", () => {
+    const noWayUp = site({ stairs: false, lift: false });
+    expect(roomsPatientsCantReach(noWayUp)).toEqual([ward(noWayUp)]);
+    const withStairs = site({ stairs: true, lift: false });
+    expect(ward(withStairs).valid).toBe(true);
+    expect(roomsPatientsCantReach(withStairs)).toEqual([]);
+  });
+
+  it("say a ward upstairs needs a bed lift, not just stairs", () => {
+    const text = alertsFor(site({ stairs: true, lift: false }));
+    expect(text.some((t) => t.includes("needs a bed lift"))).toBe(true);
+    const lifted = alertsFor(site({ stairs: true, lift: true }));
+    expect(lifted.some((t) => t.includes("needs a bed lift"))).toBe(false);
   });
 });

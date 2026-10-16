@@ -302,6 +302,7 @@ export function wheelTo(state: SimState, p: AgentBase, bed: PlacedObject): Point
   const d = p.dest;
   if (
     d &&
+    (d.floor ?? p.floor) === bed.floor &&
     d.x === rest.x &&
     d.y === rest.y &&
     d.blocked < 0 &&

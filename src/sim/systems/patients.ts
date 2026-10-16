@@ -266,7 +266,9 @@ function updateBooking(state: SimState, p: Patient): void {
   const sid = holder(state, desk.id, "staff");
   const s = sid === undefined ? undefined : state.staff[sid];
   const spot = deskStaffSpot(desk);
-  if (!s || s.path.length > 0 || s.x !== spot.x || s.y !== spot.y) return;
+  if (!s || s.path.length > 0 || s.floor !== desk.floor || s.x !== spot.x || s.y !== spot.y) {
+    return;
+  }
   if (--p.bookingLeft > 0) return;
   release(state, desk.id, 0, p.id);
   p.desk = null;
