@@ -87,7 +87,7 @@ export function buildOutpatients(
   const state = createSimState({ seed, width: 20, height: 16, money: FIXTURE_MONEY });
   applyAll(state, OUTPATIENTS_COMMANDS);
   setRoomSpecialty(state, roomAt(state, F, CLINIC_A.x, CLINIC_A.y)!, "cardiology");
-  applyStaffCommand(state, { type: "hire_staff", role: "receptionist" });
+  applyStaffCommand(state, { type: "hire_staff", role: "outpatient_receptionist" });
   for (const c of clinicians) {
     const r = applyStaffCommand(state, {
       type: "hire_staff",

@@ -314,12 +314,9 @@ export function staffingPlan(state: SimState): StaffingPlan {
       "receptionist",
       atLeast(
         1,
-        both(
-          (n) =>
-            forArrivals("receptionist", n) + (!n && count("outpatients_reception") > 0 ? 1 : 0),
-        ),
+        both((n) => forArrivals("receptionist", n)),
       ),
-      `Booking walk-ins in at A&E reception, round the clock${count("outpatients_reception") > 0 ? ", plus one at Outpatients Reception by day" : ""}.`,
+      "Booking walk-ins in at A&E reception, round the clock. Outpatients Reception has its own receptionists, on weekdays.",
     );
   } else if (privateHospital && wardBeds > 0) {
     push(
@@ -327,9 +324,6 @@ export function staffingPlan(state: SimState): StaffingPlan {
       { day: 1, night: 1 },
       "A resident medical officer looking after inpatients day and night.",
     );
-  }
-  if (!ae && count("outpatients_reception") > 0) {
-    push("receptionist", { day: 1, night: 0 }, "Outpatients Reception, by day.");
   }
 
   // A registrar of each admitting specialty on every shift, to take A&E referrals.

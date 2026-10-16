@@ -36,9 +36,9 @@ export interface GuideSection {
  * kit they work from. Duties come from the role descriptions and pathways.
  */
 const ROLE_NEEDS: Partial<Record<StaffRoleId, string[]>> = {
-  receptionist: [
-    "A&E Reception with a reception desk (one receptionist per desk)",
-    "Outpatients Reception, for clinics: A&E's desks are staffed first",
+  receptionist: ["A&E Reception with a reception desk (one receptionist per desk)"],
+  outpatient_receptionist: [
+    "Outpatients Reception with a reception desk (one receptionist per desk)",
   ],
   nurse: [
     "A Triage Room to triage walk-ins",
@@ -83,7 +83,8 @@ const ROLE_NEEDS: Partial<Record<StaffRoleId, string[]>> = {
 
 /** Duties that aren't treatment steps in a pathway. */
 const ROLE_DUTIES: Partial<Record<StaffRoleId, string[]>> = {
-  receptionist: ["Books in every walk-in", "Books in outpatients for clinic"],
+  receptionist: ["Books in every walk-in"],
+  outpatient_receptionist: ["Books in outpatients for clinic"],
   nurse: [
     "Triages every patient",
     "Takes over ambulance patients from the crew",
@@ -203,6 +204,7 @@ export function roomGuide(): GuideSection[] {
         for (const s of c.pathway) if (s.room === r.id) s.roles.forEach((x) => roles.add(x));
       if (r.id === "triage_room") roles.add("nurse");
       if (r.id === "ae_reception") roles.add("receptionist");
+      if (r.id === "outpatients_reception") roles.add("outpatient_receptionist");
       const extras = conditionEquipment(r.id).map(
         (e) => `${e.items.join(" and ")}: ${e.conditions.join(", ").toLowerCase()}`,
       );

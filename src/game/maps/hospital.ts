@@ -67,7 +67,8 @@ export function buildHospital(seed = 1): SimState {
 
 /** Everyone the fixture needs at once (per shift, with rotas). */
 export const HOSPITAL_TEAM: Partial<Record<StaffRoleId, number>> = {
-  receptionist: 2,
+  receptionist: 1,
+  outpatient_receptionist: 1,
   nurse: 7,
   junior_doctor: 4,
   cleaner: 2,

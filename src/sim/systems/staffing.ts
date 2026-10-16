@@ -353,8 +353,9 @@ export function updateStaff(state: SimState): void {
     if (s.duty === "off") continue;
     if (s.duty === "leaving") {
       if (s.jobId === null && !inClinic(state, s) && !inTheatre(state, s)) goHome(state, s);
-    } else if (s.role === "receptionist") staffDesk(state, s);
-    else if (s.onCall?.state === "leaving") {
+    } else if (s.role === "receptionist" || s.role === "outpatient_receptionist") {
+      staffDesk(state, s);
+    } else if (s.onCall?.state === "leaving") {
       if (s.jobId !== null) s.onCall = { state: "in", at: state.tick };
       else walkHome(state, s);
     } else if (onSite(s) && !inClinic(state, s) && !inTheatre(state, s)) {
@@ -511,19 +512,21 @@ function waitAtStation(state: SimState, s: Staff): void {
   headTo(state, s, stationSpot(state.objects[s.desk]!));
 }
 
-/** Receptionists find a free desk in a valid A&E reception and sit behind it. */
-/** Receptionists staff A&E's desks first, then Outpatients'. */
+/**
+ * Receptionists find a free desk in a valid reception and sit behind it: A&E
+ * Reception's, or Outpatients Reception's for an outpatients receptionist.
+ */
 function staffDesk(state: SimState, s: Staff): void {
+  const outpatients = s.role === "outpatient_receptionist";
   const valid =
     s.desk !== null &&
-    (inValidRoom(state, s.desk, "ae_reception") ||
-      inValidRoom(state, s.desk, "outpatients_reception"));
+    inValidRoom(state, s.desk, outpatients ? "outpatients_reception" : "ae_reception");
   if (s.desk !== null && !valid) {
     release(state, s.desk, "staff", s.id);
     s.desk = null;
   }
   if (s.desk === null) {
-    const desk = [...receptionDesks(state), ...outpatientDesks(state)].find(
+    const desk = (outpatients ? outpatientDesks(state) : receptionDesks(state)).find(
       (d) => holder(state, d.id, "staff") === undefined,
     );
     if (!desk) return;

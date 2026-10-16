@@ -336,7 +336,7 @@ export const rooms: RoomInput[] = [
     required: [{ label: "Reception desk", anyOf: ["reception_desk"] }],
     connectedTo: [{ roomType: "waiting_area", label: "Opens onto a Waiting Area" }],
     description:
-      "Outpatients book in here for their appointment, then wait in the Waiting Area it opens onto. Needs its own receptionist: one at A&E Reception stays there.",
+      "Outpatients book in here for their appointment, then wait in the Waiting Area it opens onto. Needs an outpatients receptionist, who works weekdays when clinics run.",
   },
   {
     id: "outpatient_clinic",

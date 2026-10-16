@@ -354,8 +354,8 @@ export function describeAdvice(state: SimState): AdviceData {
       ),
       item(
         deskStaffed,
-        "A receptionist at its desk",
-        "Receptionists fill A&E's desks first, so hire one more than A&E needs.",
+        "An outpatients receptionist at its desk",
+        "They work weekdays 08:00 to 18:00, when clinics run, off the shift rota.",
         !started,
       ),
       item(

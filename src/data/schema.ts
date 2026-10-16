@@ -198,6 +198,7 @@ export type CapabilityCombo = z.infer<typeof capabilityComboSchema>;
 
 export const staffRoleIds = [
   "receptionist",
+  "outpatient_receptionist",
   "nurse",
   "nurse_practitioner",
   "junior_doctor",

@@ -10,7 +10,9 @@ import { decodeSave, encodeSave } from "@save/codec";
 import { applyCommand } from "@sim/commands";
 import { tick } from "@sim/sim";
 import type { SimState } from "@sim/state";
-import { DNA_CHANCE, inClinic } from "@sim/systems/outpatients";
+import { staffingPlan } from "@game/staffingPlan";
+import { DNA_CHANCE, inClinic, outpatientDesks } from "@sim/systems/outpatients";
+import { rotaGroup } from "@sim/systems/rota";
 import { bookAppointments, offersClinic, refer, waitingLists } from "@sim/systems/referrals";
 import { applyStaffCommand } from "@sim/systems/staffing";
 import { clockFromTick, TICKS_PER_DAY, TICKS_PER_MINUTE, tickAt } from "@sim/time";
@@ -226,5 +228,42 @@ describe("advice and alerts", () => {
     expect(state.events.map((e) => e.text).join("\n")).toMatch(
       /on the Cardiology waiting list, but its clinics aren't running/,
     );
+  });
+});
+
+describe("outpatients receptionists", () => {
+  const receptionist = (state: SimState) =>
+    Object.values(state.staff).find((s) => s.role === "outpatient_receptionist")!;
+  const runTo = (state: SimState, at: number) => {
+    while (state.tick < at) tick(state);
+  };
+
+  it("work weekdays 08:00 to 18:00, off the shift rota", () => {
+    const state = buildOutpatients(1);
+    state.settings.rotas = true;
+    expect(rotaGroup(receptionist(state))).toBeNull();
+    runTo(state, tickAt(1, 10)); // Monday morning
+    const desk = receptionist(state).desk;
+    expect(receptionist(state).duty).toBe("on");
+    expect(outpatientDesks(state).some((d) => d.id === desk)).toBe(true);
+    runTo(state, tickAt(1, 19)); // Monday evening
+    expect(receptionist(state).duty).not.toBe("on");
+    state.tick = tickAt(6, 9); // Saturday
+    runTo(state, tickAt(6, 11));
+    expect(receptionist(state).duty).not.toBe("on");
+  });
+
+  it("aren't asked of A&E's receptionists, and A&E's don't sit at their desks", () => {
+    const state = buildOutpatients(1);
+    for (const s of Object.values(state.staff)) {
+      if (s.role === "outpatient_receptionist") {
+        applyStaffCommand(state, { type: "dismiss_staff", id: s.id });
+      }
+    }
+    applyStaffCommand(state, { type: "hire_staff", role: "receptionist" });
+    runDays(state, 0.01);
+    const ae = Object.values(state.staff).find((s) => s.role === "receptionist")!;
+    expect(ae.desk).toBeNull();
+    expect(staffingPlan(state).groups.some((g) => g.role === "receptionist")).toBe(false);
   });
 });

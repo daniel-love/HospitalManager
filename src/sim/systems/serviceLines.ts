@@ -57,6 +57,7 @@ const FIXED_LINE: Partial<Record<StaffRoleId, ServiceLine>> = {
   biomedical_scientist: "diagnostics",
   theatre_practitioner: "theatres",
   discharge_coordinator: "wards",
+  outpatient_receptionist: "outpatients",
   clinical_engineer: "support",
 };
 
@@ -73,6 +74,7 @@ const DEFAULT_LINE: Record<StaffRoleId, ServiceLine> = {
   porter: "support",
   cleaner: "support",
   receptionist: "ae",
+  outpatient_receptionist: "outpatients",
   discharge_coordinator: "wards",
   clinical_engineer: "support",
 };

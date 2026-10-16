@@ -46,7 +46,7 @@ const COVER: Cover[] = [
   ["nurse", 6, 5],
   ["nurse", 1, 1, { band: 7 }],
   ["junior_doctor", 4, 2],
-  ["receptionist", 2, 1],
+  ["receptionist", 1, 1],
   ["cleaner", 2, 1],
   ["porter", 2, 1],
   ["radiographer", 1, 1],
@@ -161,6 +161,10 @@ function staff(state: SimState, copies: number): void {
     const n = Math.ceil(((w.day + w.night) * 7) / 3);
     for (let i = 0; i < n; i++)
       applyStaffCommand(state, { type: "hire_staff", role: w.role, ...e });
+  }
+  // Outpatients Reception's desk, on weekdays (off the rota).
+  for (let i = 0; i < copies; i++) {
+    applyStaffCommand(state, { type: "hire_staff", role: "outpatient_receptionist" });
   }
   const consultant = (specialty: SpecialtyId, clinics: number, lists: number, onCall = false) => {
     const r = applyStaffCommand(state, {

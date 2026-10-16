@@ -4,7 +4,7 @@
  * that transforms a version-N save into a version-N+1 save.
  */
 import { dateOf } from "@sim/time";
-import { specialtyById } from "@data/catalogue";
+import { roomById, specialtyById } from "@data/catalogue";
 import type { SpecialtyId } from "@data/schema";
 import { SIM_STATE_VERSION } from "@sim/state";
 import { createFloorGrid } from "@sim/world/grid";
@@ -1091,6 +1091,29 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
   // v52: stairs and lifts. Lift cars are new state; nobody in an older save
   // is on the way between floors.
   51: (save) => ({ ...save, state: { ...(save.state as object), lifts: {} } }),
+  // v53: Outpatients Reception has its own receptionists, on weekdays. A
+  // receptionist sitting at a desk zoned Outpatients Reception becomes one.
+  52: (save) => {
+    const state = save.state as {
+      floors?: { width: number; zone: string }[];
+      objects?: { id: number; floor: number; x: number; y: number }[];
+      staff?: { role: string; desk: number | null }[];
+    };
+    if (!state.floors || !state.objects || !state.staff) return save;
+    const code = roomById.get("outpatients_reception")!.code;
+    const zones = state.floors.map((f) => fromBase64(f.zone));
+    const desks = new Set(
+      state.objects
+        .filter((o) => zones[o.floor]?.[o.y * state.floors![o.floor]!.width + o.x] === code)
+        .map((o) => o.id),
+    );
+    const staff = state.staff.map((s) =>
+      s.role === "receptionist" && s.desk !== null && desks.has(s.desk)
+        ? { ...s, role: "outpatient_receptionist" }
+        : s,
+    );
+    return { ...save, state: { ...state, staff } };
+  },
 };
 
 /** Base64 of n zero bytes, without building them. */

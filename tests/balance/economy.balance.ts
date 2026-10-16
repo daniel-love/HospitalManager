@@ -34,10 +34,7 @@ const AE_COVER: Cover[] = [
   ["registrar", 1, 1, { specialty: "general_medicine" }],
 ];
 /** On top, for outpatients and theatres. */
-const ELECTIVE_COVER: Cover[] = [
-  ["receptionist", 1, 0],
-  ["theatre_practitioner", 2, 1],
-];
+const ELECTIVE_COVER: Cover[] = [["theatre_practitioner", 2, 1]];
 
 /** Sets each group's cover and hires enough people (three shifts a week each) to meet it. */
 function staff(state: SimState, cover: Cover[]): void {
@@ -66,6 +63,10 @@ function staff(state: SimState, cover: Cover[]): void {
     const n = Math.ceil(((w.day + w.night) * 7) / 3);
     for (let i = 0; i < n; i++)
       applyStaffCommand(state, { type: "hire_staff", role: w.role, ...e });
+  }
+  // Outpatients Reception, on weekdays (off the rota).
+  if (state.rooms.some((r) => r.valid && r.typeId === "outpatients_reception")) {
+    applyStaffCommand(state, { type: "hire_staff", role: "outpatient_receptionist" });
   }
 }
 
@@ -176,7 +177,6 @@ function privateHospital(catchment: number, phs: boolean): SimState {
     ["nurse", 3, 2],
     ["nurse", 1, 0, { band: 7 }],
     ["junior_doctor", 1, 1],
-    ["receptionist", 1, 0],
     ["cleaner", 1, 1],
     ["porter", 1, 1],
     ["theatre_practitioner", 2, 0],

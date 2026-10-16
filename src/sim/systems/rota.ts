@@ -60,10 +60,13 @@ function clash(a: number, b: number): boolean {
   return isNight(b) && !isNight(a) && (db + 1) % 7 === da;
 }
 
-/** Doctors who work weekdays: consultants, and registrars with clinics or theatre lists. */
+/**
+ * Staff who work weekdays: consultants, registrars with clinics or theatre
+ * lists, discharge coordinators and outpatients receptionists.
+ */
 export function worksWeekdays(s: Staff): boolean {
   if (s.role === "consultant") return s.contract !== "privileges";
-  if (s.role === "discharge_coordinator") return true;
+  if (s.role === "discharge_coordinator" || s.role === "outpatient_receptionist") return true;
   return (
     s.role === "registrar" &&
     ((runsClinics(s) && s.clinicSessions > 0) || (operates(s) && s.theatreSessions > 0))

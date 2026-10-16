@@ -664,3 +664,20 @@ describe("the health service's name in saves", () => {
     expect(migrated.referrals[id]?.payer).toBe("phs");
   });
 });
+
+describe("outpatients receptionists in saves", () => {
+  it("makes a version-52 receptionist at an Outpatients Reception desk an outpatients receptionist", async () => {
+    const { buildOutpatients } = await import("../fixtures/outpatients");
+    const state = buildOutpatients(1);
+    for (let i = 0; i < 100; i++) tick(state);
+    const save = JSON.parse(JSON.stringify(encodeSave(state, "old")));
+    save.version = 52;
+    for (const s of save.state.staff as { role: string }[]) {
+      if (s.role === "outpatient_receptionist") s.role = "receptionist";
+    }
+    const loaded = decodeSave(save).state;
+    const roles = Object.values(loaded.staff).map((s) => s.role);
+    expect(roles).toContain("outpatient_receptionist");
+    expect(roles).not.toContain("receptionist");
+  });
+});

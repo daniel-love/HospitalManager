@@ -734,7 +734,7 @@ export function staffState(state: SimState, s: Staff): StaffState {
         }
       : { status: "at_desk", activity: `${name} clinic: waiting for the next patient`, ...none };
   }
-  if (s.role === "receptionist") {
+  if (s.role === "receptionist" || s.role === "outpatient_receptionist") {
     if (s.desk === null) return { status: "no_desk", activity: "No free reception desk", ...none };
     if (walking) return { status: "on_the_way", activity: "Going to the reception desk", ...none };
     const outpatient = Object.values(state.outpatients).find(

@@ -25,6 +25,7 @@ export const APPLICANTS_PER_WEEK: Record<string, number> = {
   porter: 3,
   cleaner: 3,
   receptionist: 3,
+  outpatient_receptionist: 1,
   discharge_coordinator: 0.6,
   clinical_engineer: 0.5,
 };

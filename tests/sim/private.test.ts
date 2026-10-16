@@ -27,12 +27,12 @@ import { CLINIC_A, CLINIC_B, OUTPATIENTS_COMMANDS } from "../fixtures/outpatient
 import { applyAll, buildSmallAE, FIXTURE_MONEY } from "../fixtures/smallAE";
 import { buildTheatres } from "../fixtures/theatres";
 
-/** The outpatients department under a funding model, with a receptionist. */
+/** The outpatients department under a funding model, with an outpatients receptionist. */
 function outpatients(funding: Funding): SimState {
   const state = createSimState({ seed: 1, width: 20, height: 16, money: FIXTURE_MONEY, funding });
   applyAll(state, OUTPATIENTS_COMMANDS);
   setRoomSpecialty(state, roomAt(state, 0, CLINIC_A.x, CLINIC_A.y)!, "cardiology");
-  applyStaffCommand(state, { type: "hire_staff", role: "receptionist" });
+  applyStaffCommand(state, { type: "hire_staff", role: "outpatient_receptionist" });
   // Plenty of patients, so a fortnight shows the pattern.
   state.settings.catchment = 2_000_000;
   return state;

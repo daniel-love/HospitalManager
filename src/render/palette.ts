@@ -53,6 +53,7 @@ export const GHOST_REMOVE = 0xe0a040;
  */
 export const ROLE_COLOURS: Record<StaffRoleId, number> = {
   receptionist: 0x8a7fb8,
+  outpatient_receptionist: 0x8a7fb8,
   nurse: 0x2f6fd8,
   nurse_practitioner: 0x16255c,
   junior_doctor: 0x9c2d4a,

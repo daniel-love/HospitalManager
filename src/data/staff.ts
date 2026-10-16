@@ -291,6 +291,15 @@ export const staffRoles: StaffRoleInput[] = [
     description:
       "Band 2. Sits behind an A&E reception desk and books patients in. Without one, the queue at the desk never moves.",
   },
+  {
+    id: "outpatient_receptionist",
+    name: "Outpatients Receptionist",
+    short: "Outpatients reception",
+    group: "admin",
+    annualCost: 31_500,
+    description:
+      "Band 2, working weekdays 08:00 to 18:00, when clinics run. Sits behind an Outpatients Reception desk and books in patients arriving for their appointment. Without one, outpatients can't book in for clinic.",
+  },
 ];
 
 /** Headings for each staff group, as the Staff screen shows them. */
