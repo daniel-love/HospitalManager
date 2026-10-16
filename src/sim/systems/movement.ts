@@ -10,6 +10,7 @@ import type { AgentBase, Point } from "../agents";
 import type { SimState } from "../state";
 import { FloorType, tileIndex } from "../world/grid";
 import { crewAccess, patientAccess } from "../world/access";
+import { accessRouteExists } from "../world/accessRegions";
 import { findPath } from "../world/pathfinding";
 import { portals, portalStop, portalWorking, serves, type Portal } from "../world/portals";
 import { walkRouteExists } from "../world/walkRegions";
@@ -182,10 +183,17 @@ function walk(
     : onFoot
       ? patientAccess(state, floor)
       : undefined;
-  let tiles = findPath(grid, sx, sy, approach.x, approach.y, {
-    bed,
-    ...(access ? { patient: access } : {}),
-  });
+  // Nor any way by the routes they may take: the crew go another way, and
+  // patients on foot have none.
+  const allowed =
+    !access ||
+    accessRouteExists(state, floor, { x: sx, y: sy }, approach, withCrew ? "crew" : "patient", bed);
+  let tiles = allowed
+    ? findPath(grid, sx, sy, approach.x, approach.y, {
+        bed,
+        ...(access ? { patient: access } : {}),
+      })
+    : null;
   if (!tiles && withCrew) tiles = findPath(grid, sx, sy, approach.x, approach.y, { bed });
   if (!tiles) {
     dest.blocked = state.tick;

@@ -64,6 +64,7 @@ import { chance, nextInt } from "../rng";
 import type { PlacedObject, SimState } from "../state";
 import { TICKS_PER_MINUTE } from "../time";
 import { crewAccess, privateRoomsCrossed } from "../world/access";
+import { accessRouteExists } from "../world/accessRegions";
 import { tileIndex } from "../world/grid";
 import { isStandable } from "../world/objects";
 import { findPath } from "../world/pathfinding";
@@ -496,6 +497,7 @@ function wheelInFromAmbulance(state: SimState, p: Patient, bed: PlacedObject): A
   const crewRoute = (at: Point) => {
     if (publicRouteFailed || !bedRouteExists(state, from, at)) return false;
     const ok =
+      accessRouteExists(state, p.floor, from, at, "crew", true) &&
       findPath(grid, from.x, from.y, at.x, at.y, {
         bed: true,
         patient: crewAccess(state, p.floor),
