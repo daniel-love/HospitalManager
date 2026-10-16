@@ -389,6 +389,45 @@ export function freeToilet(
   );
 }
 
+/**
+ * Why a waiting patient who needs the toilet can't find one free, or null if
+ * one is (they'll go shortly). Mirrors freeToilet's rules.
+ */
+export function toiletBlocker(state: SimState, patientId: number): string | null {
+  const all = objectsIn(state, "toilets", isToiletFixture);
+  if (all.length === 0) {
+    return state.rooms.some((r) => r.typeId === "toilets")
+      ? "the Toilets room isn't finished: select it to see what it still needs"
+      : "there are no toilets: build a Toilets room";
+  }
+  const cantReach = new Set(roomsPatientsCantReach(state).map((r) => r.id));
+  const reachable = all.filter((o) => !cantReach.has(roomOfObject(state, o.id)?.id ?? -1));
+  if (reachable.length === 0) {
+    return "patients can't reach the toilets: they need a door onto a corridor";
+  }
+  const suitable = usesUrinal(patientId)
+    ? reachable
+    : reachable.filter((o) => o.defId !== "urinal");
+  if (suitable.length === 0) return "the toilets only have urinals";
+  const status = cleaningStatuses(state);
+  let inUse = 0;
+  let cleaning = 0;
+  let dirty = 0;
+  for (const o of suitable) {
+    if (status.get(o.id) === "cleaning") cleaning++;
+    else if (holder(state, o.id, 0) !== undefined) inUse++;
+    else if ((state.dirt[o.id] ?? 0) >= MAX_TOILET_DIRT) dirty++;
+  }
+  if (inUse + cleaning + dirty < suitable.length) return null;
+  const why = [
+    inUse > 0 && "in use",
+    cleaning > 0 && "being cleaned",
+    dirty > 0 && "too dirty to use until a cleaner gets to them",
+  ].filter(Boolean);
+  const subject = suitable.length === 1 ? "the only toilet is" : "the toilets are all";
+  return `${subject} ${why.join(" or ")}`;
+}
+
 // ---------- Cleaning ----------
 
 /**

@@ -43,6 +43,7 @@ import {
   fallbackEntrance,
   freeSeat,
   freeToilet,
+  toiletBlocker,
   frontOf,
   holder,
   inValidRoom,
@@ -627,26 +628,110 @@ function updateNeeds(state: SimState, p: Patient, beingSeen: boolean): void {
   if (p.death || ["leaving", "collapsed", "transferring"].includes(p.stage)) return;
   if (!p.toilet || p.toilet.left < 0) p.bladder = Math.min(100, p.bladder + p.bladderRate);
   let decay = 0;
+  for (const f of moodFactors(state, p, beingSeen)) decay += f.perHour;
+  p.mood = Math.min(100, Math.max(0, p.mood - decay / TICKS_PER_HOUR));
+}
+
+/** Something wearing a patient's mood down (perHour > 0) or lifting it (< 0). */
+export interface MoodFactor {
+  label: string;
+  /** Mood lost an hour; negative for mood gained. */
+  perHour: number;
+}
+
+/**
+ * What's changing an A&E patient's mood right now, and by how much an hour:
+ * updateNeeds sums these, so the inspector can say why they're unhappy.
+ * Inpatients settle on the ward instead (see wardMoodFactors).
+ */
+export function moodFactors(state: SimState, p: Patient, beingSeen: boolean): MoodFactor[] {
+  const out: MoodFactor[] = [];
+  let decay = 0;
+  const add = (label: string, perHour: number) => {
+    if (perHour === 0) return;
+    out.push({ label, perHour });
+    decay += perHour;
+  };
+  const forTriage = p.stage === "waiting_triage" || p.stage === "called_triage";
   if (p.stage === "awaiting_handover") {
-    decay = MOOD_DECAY_SEATED;
+    add("Waiting on the stretcher to be handed over", MOOD_DECAY_SEATED);
   } else if (
     WAITING.has(p.stage) ||
     p.stage === "called_triage" ||
     p.stage === "called_treatment"
   ) {
     const seated = p.seat !== null && p.path.length === 0 && !p.toilet;
-    decay = seated || p.toilet ? MOOD_DECAY_SEATED : MOOD_DECAY_STANDING;
+    const waitingFor = forTriage ? "Waiting for triage" : "Waiting to be seen";
+    if (seated || p.toilet) add(waitingFor, MOOD_DECAY_SEATED);
+    else if (p.stage === "queueing") add("Queueing to book in", MOOD_DECAY_STANDING);
+    else if (p.seat === null && WAITING.has(p.stage)) {
+      add(`${waitingFor}, standing: no free seat`, MOOD_DECAY_STANDING);
+    } else add(waitingFor, MOOD_DECAY_STANDING);
     // A packed waiting room is worse, and worse again on your feet.
-    if (!p.toilet && WAITING.has(p.stage)) decay += crowdMoodDecay(crowdAround(state, p), !seated);
+    if (!p.toilet && WAITING.has(p.stage)) {
+      const crowd = crowdAround(state, p);
+      add(`Crowded: ${crowd} waiting around them`, crowdMoodDecay(crowd, !seated));
+    }
   } else if ((p.stage === "in_cubicle" || p.stage === "awaiting_bed") && !beingSeen) {
-    decay = MOOD_DECAY_IN_CUBICLE;
+    add(
+      p.stage === "awaiting_bed"
+        ? "Waiting for a ward bed"
+        : "Waiting in the cubicle for what's next",
+      MOOD_DECAY_IN_CUBICLE,
+    );
   }
-  if (p.bladder >= 90 && !p.toilet) decay += MOOD_DECAY_TOILET;
+  if (p.bladder >= 90 && !p.toilet) add("Desperate for the toilet", MOOD_DECAY_TOILET);
   // Waiting in the heat, without cooling (water helps).
-  if (decay > 0) decay += heatMoodDecay(state, p);
+  if (decay > 0) add("Too hot: no cooling here", heatMoodDecay(state, p));
   // A clinician with them (triage, treatment, review) reassures them.
-  if (beingSeen) decay -= MOOD_RECOVERY_BEING_SEEN;
-  p.mood = Math.min(100, Math.max(0, p.mood - decay / TICKS_PER_HOUR));
+  if (beingSeen) add("A clinician is with them", -MOOD_RECOVERY_BEING_SEEN);
+  return out;
+}
+
+/** What's keeping an inpatient's mood down (or up) on the ward. */
+export function wardMoodFactors(state: SimState, p: Patient): MoodFactor[] {
+  if (onEscalationBed(state, p)) {
+    return [{ label: "On an escalation trolley in a corridor", perHour: MOOD_DECAY_IN_CUBICLE }];
+  }
+  const out: MoodFactor[] = [];
+  if (hasVisitor(state, p.id))
+    out.push({ label: "A visitor is with them", perHour: -WARD_MOOD.withVisitor });
+  else if (!visitedLately(state, p)) {
+    out.push({ label: "No visitor in the last day, so they settle lower", perHour: 0 });
+  }
+  if (heatWardMood(state, p) > 0) {
+    out.push({ label: "The ward is too hot: no cooling", perHour: 0 });
+  }
+  return out;
+}
+
+/**
+ * Why a patient who needs the toilet hasn't gone, or null if nothing's in the
+ * way (they'll go shortly). Patients only go from the Waiting Area for now.
+ */
+export function toiletHoldUp(state: SimState, p: Patient, beingSeen: boolean): string | null {
+  if (p.toilet) return null;
+  switch (p.stage) {
+    case "waiting_triage":
+    case "waiting_treatment":
+      return beingSeen ? "they'll go once the clinician is done" : toiletBlocker(state, p.id);
+    case "queueing":
+    case "booking":
+      return "they'll go once they've booked in";
+    case "awaiting_handover":
+      return "still on the ambulance stretcher, waiting to be handed over";
+    case "called_triage":
+    case "called_treatment":
+    case "triage":
+    case "in_cubicle":
+      return "in a cubicle: patients only go to the toilet from the Waiting Area for now";
+    case "awaiting_bed":
+      return "on a trolley waiting for a ward bed: patients only go to the toilet from the Waiting Area for now";
+    case "discharge_lounge":
+      return "in the discharge lounge: patients only go to the toilet from the Waiting Area for now";
+    default:
+      return null;
+  }
 }
 
 function maybeGiveUp(state: SimState, p: Patient): void {

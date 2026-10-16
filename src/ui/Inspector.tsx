@@ -251,6 +251,25 @@ export function Inspector({
   );
 }
 
+/**
+ * A patient's mood, 0–100. Near zero the bar would look empty, so an angry
+ * patient's meter flashes red instead.
+ */
+export function MoodMeter({ mood, small = false }: { mood: number; small?: boolean }) {
+  const angry = mood < 25;
+  return (
+    <div
+      class={`meter${small ? " small" : ""}${angry ? " alarm" : ""}`}
+      title={`Mood ${mood} / 100`}
+    >
+      <div
+        class={`meter-fill${angry ? " bad" : mood < 50 ? " warn" : ""}`}
+        style={{ width: `${mood}%` }}
+      />
+    </div>
+  );
+}
+
 function moodWord(mood: number): string {
   if (mood >= 75) return "Content";
   if (mood >= 50) return "Fed up";
@@ -487,13 +506,24 @@ function AgentSection({
         </>
       )}
       <h4>Mood</h4>
-      <div class="meter" title={`${agent.mood} / 100`}>
-        <div
-          class={`meter-fill${agent.mood < 25 ? " bad" : agent.mood < 50 ? " warn" : ""}`}
-          style={{ width: `${agent.mood}%` }}
-        />
-      </div>
-      <p class="dim">{moodWord(agent.mood)}</p>
+      <MoodMeter mood={agent.mood} />
+      <p class={agent.mood < 25 ? "bad-text" : "dim"}>{moodWord(agent.mood)}</p>
+      {agent.moodWhy.length > 0 && (
+        <ul class="mood-why">
+          {agent.moodWhy.map((f) => (
+            <li key={f.label} class={f.perHour < 0 ? "ok-text" : f.perHour > 0 ? "" : "dim"}>
+              {f.label}
+              {f.perHour !== 0 && (
+                <span class="dim">
+                  {" "}
+                  ({f.perHour > 0 ? "−" : "+"}
+                  {Math.round(Math.abs(f.perHour) * 10) / 10} an hour)
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       {agent.needs.length > 0 && (
         <ul class="items">
           {agent.needs.map((n) => (

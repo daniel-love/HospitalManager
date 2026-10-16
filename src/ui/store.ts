@@ -87,6 +87,8 @@ export type AgentInfo =
       inDept: string;
       breached: boolean;
       mood: number;
+      /** What's changing their mood now: mood lost an hour (negative: gained; 0: where it settles). */
+      moodWhy: { label: string; perHour: number }[];
       needs: string[];
       timeline: { label: string; at: string }[];
       /** After a death: each step of the process, and whether it's done. */

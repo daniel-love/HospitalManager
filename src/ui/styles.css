@@ -1402,6 +1402,30 @@ body.planning #game::after {
 .meter-fill.bad {
   background: var(--bad);
 }
+/* Angry: the bar is all but empty, so the whole meter flashes red. */
+.meter.alarm {
+  background: var(--bad);
+  animation: meter-alarm 1s ease-in-out infinite alternate;
+}
+@keyframes meter-alarm {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meter.alarm {
+    animation: none;
+  }
+}
+.mood-why {
+  margin: 2px 0 6px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
 .timeline {
   margin: 4px 0 0;
   padding: 0;

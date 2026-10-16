@@ -7,6 +7,7 @@
  */
 import type { Game } from "@game/game";
 import { useState } from "preact/hooks";
+import { MoodMeter } from "./Inspector";
 import { patientsOpen, patientTable, type PatientRow } from "./store";
 
 const noFocus = (e: MouseEvent) => e.preventDefault();
@@ -173,12 +174,7 @@ function PatientsTab({ onShow }: { onShow: (id: number) => void }) {
                     <td class={`num${r.breached ? " bad-text" : ""}`}>{r.inDept}</td>
                   )}
                   <td>
-                    <div class="meter small" title={`Mood ${r.mood} / 100`}>
-                      <div
-                        class={`meter-fill${r.mood < 25 ? " bad" : r.mood < 50 ? " warn" : ""}`}
-                        style={{ width: `${r.mood}%` }}
-                      />
-                    </div>
+                    <MoodMeter mood={r.mood} small />
                     {r.needs.length > 0 && <span class="sub warn-text">{r.needs.join(" · ")}</span>}
                   </td>
                 </tr>

@@ -49,7 +49,13 @@ import { inCare } from "@sim/systems/curtains";
 import { wardBedUse } from "@sim/systems/escalation";
 import { bedCover, obsInterval, stationsSeeing } from "@sim/systems/monitoring";
 import { annualCost } from "@sim/systems/finance";
-import { crowdAround, crowdMoodDecay, formatWait, inAE } from "@sim/systems/patients";
+import {
+  formatWait,
+  inAE,
+  moodFactors,
+  toiletHoldUp,
+  wardMoodFactors,
+} from "@sim/systems/patients";
 import {
   canDo,
   MAX_WEEK_SESSIONS,
@@ -460,17 +466,11 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
   }
 
   const needs: string[] = [];
-  if (p.stage.startsWith("waiting") && !p.toilet) {
-    needs.push(p.seat ? "Has a seat" : "Standing: no free seat");
-    const crowd = crowdAround(state, p);
-    if (crowdMoodDecay(crowd, false) > 0) needs.push(`Crowded: ${crowd} waiting around them`);
-  }
-  // Ward toilet needs aren't modelled yet (left to the ward team), so a
-  // bladder carried up from A&E isn't shown once they're on the ward.
-  if (p.stage !== "on_ward" && !p.toilet) {
-    if (p.bladder >= 90) needs.push("Desperate for the toilet");
-    else if (p.bladder >= 70) needs.push("Needs the toilet");
-  }
+  if (p.stage.startsWith("waiting") && !p.toilet && p.seat) needs.push("Has a seat");
+  const toilet = toiletNeed(state, p);
+  if (toilet) needs.push(toilet);
+  const moodWhy =
+    p.stage === "on_ward" ? wardMoodFactors(state, p) : moodFactors(state, p, beingSeen(state, p));
 
   const t = p.times;
   const byAmbulance = p.ambulanceId !== null;
@@ -544,6 +544,7 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
     inDept: formatWait(inDept),
     breached: inDept > FOUR_HOUR_MINS,
     mood: Math.round(p.mood),
+    moodWhy,
     needs,
     timeline,
     ...monitoringInfo(state, p),
@@ -551,6 +552,23 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
       ? { afterDeath: afterDeathSteps(state, p), deathStatus: deathStatus(state, p) }
       : {}),
   };
+}
+
+/** A clinician is with them right now (triage, treatment, a review). */
+function beingSeen(state: SimState, p: Patient): boolean {
+  return Object.values(state.jobs).some((j) => j.patientId === p.id && j.state === "working");
+}
+
+/**
+ * "Needs the toilet" (or desperate), with what's stopping them going, or
+ * null. Ward toilet needs aren't modelled yet (left to the ward team), so a
+ * bladder carried up from A&E isn't shown once they're on the ward.
+ */
+function toiletNeed(state: SimState, p: Patient): string | null {
+  if (p.toilet || p.stage === "on_ward" || p.bladder < 70) return null;
+  const need = p.bladder >= 90 ? "Desperate for the toilet" : "Needs the toilet";
+  const holdUp = toiletHoldUp(state, p, beingSeen(state, p));
+  return holdUp ? `${need}, but ${holdUp}` : `${need}: on their way soon`;
 }
 
 const DEATH_STEP_LABELS: Record<DeathStep, string> = {
@@ -1502,10 +1520,9 @@ export function describePatientTable(state: SimState): PatientTable {
     const short: string[] = [];
     if (STAGE_GROUPS[p.stage] === "waiting" && !p.seat && !p.toilet) short.push("Standing");
     if (p.toilet) short.push("At the toilet");
-    else if (p.stage !== "on_ward") {
-      // Ward toilet needs aren't modelled yet.
-      if (p.bladder >= 90) short.push("Desperate for the toilet");
-      else if (p.bladder >= 70) short.push("Needs the toilet");
+    else {
+      const toilet = toiletNeed(state, p);
+      if (toilet) short.push(toilet);
     }
     rows.push({
       id: p.id,

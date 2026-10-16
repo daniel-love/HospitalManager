@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { applyCommand, type Command } from "@sim/commands";
-import { freeToilet, slotKey, usesUrinal } from "@sim/places";
+import { freeToilet, MAX_TOILET_DIRT, slotKey, toiletBlocker, usesUrinal } from "@sim/places";
 import { tick } from "@sim/sim";
 import type { SimState } from "@sim/state";
 import { TICKS_PER_DAY } from "@sim/time";
@@ -106,5 +106,22 @@ describe("toilet blocks", () => {
     expect(users.toilet_cubicle.size).toBeGreaterThan(0);
     for (const id of users.urinal) expect(usesUrinal(id)).toBe(true);
     expect(cleaned).toBeGreaterThan(0);
+  });
+
+  it("say why a patient can't go: in use, too dirty, or none built", () => {
+    const state = block();
+    const woman = 3;
+    expect(toiletBlocker(state, woman)).toBeNull();
+    const cubicles = [at(state, 3, 3), at(state, 4, 3)];
+    state.reserved[slotKey(cubicles[0]!.id, 0)] = 99;
+    state.reserved[slotKey(cubicles[1]!.id, 0)] = 99;
+    expect(toiletBlocker(state, woman)).toBe("the toilets are all in use");
+    // A man can still use a urinal.
+    expect(toiletBlocker(state, 2)).toBeNull();
+    delete state.reserved[slotKey(cubicles[0]!.id, 0)];
+    state.dirt[cubicles[0]!.id] = MAX_TOILET_DIRT;
+    expect(toiletBlocker(state, woman)).toMatch(/in use or too dirty/);
+    apply(state, [{ type: "remove_objects", floor: 0, rect: { x: 3, y: 3, w: 2, h: 1 } }]);
+    expect(toiletBlocker(state, woman)).toMatch(/isn't finished/);
   });
 });
