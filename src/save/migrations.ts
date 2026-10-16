@@ -1062,6 +1062,10 @@ const migrations: Record<number, (save: RawSave) => RawSave> = {
       state: { ...state, incidents: state.incidents.map((i) => ({ ...i, recommendations: [] })) },
     };
   },
+  // v50: a nurse may be bringing a commode (a new job kind), and a patient's
+  // toilet trip may be on its way back to their bed (left 0). Older saves
+  // have neither, so there's nothing to change.
+  49: (save) => save,
 };
 
 /** Base64 of n zero bytes, without building them. */

@@ -138,9 +138,9 @@ describe("an A&E that struggles", () => {
       return n;
     };
     // A quieter day, so that with seats nearly everyone can sit.
-    const seated = staffedSmallAE(11);
+    const seated = staffedSmallAE(8);
     // Selling a bench drops the waiting area below its 6 seats, so it stops working.
-    const cramped = staffedSmallAE(11);
+    const cramped = staffedSmallAE(8);
     seated.settings.patientVolume = cramped.settings.patientVolume = 0.4;
     const bench = Object.values(cramped.objects).find((o) => o.defId === "waiting_bench")!;
     expect(applyCommand(cramped, { type: "remove_object", floor: 0, id: bench.id }).ok).toBe(true);

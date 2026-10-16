@@ -17,6 +17,7 @@ const HANDS_ON: ReadonlySet<JobKind> = new Set<JobKind>([
   "treat",
   "referral",
   "resus",
+  "commode",
   "verify_death",
   "last_offices",
 ]);

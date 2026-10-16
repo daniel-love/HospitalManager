@@ -3,11 +3,24 @@
  */
 import { describe, expect, it } from "vitest";
 import { applyCommand, type Command } from "@sim/commands";
-import { freeToilet, MAX_TOILET_DIRT, slotKey, toiletBlocker, usesUrinal } from "@sim/places";
+import { TOILET_URGE } from "@data/patients";
+import {
+  freeToilet,
+  MAX_TOILET_DIRT,
+  release,
+  restPoint,
+  slotKey,
+  toiletBlocker,
+  usesUrinal,
+} from "@sim/places";
 import { tick } from "@sim/sim";
 import type { SimState } from "@sim/state";
-import { TICKS_PER_DAY } from "@sim/time";
+import { toiletHoldUp } from "@sim/systems/patients";
+import { TICKS_PER_DAY, TICKS_PER_MINUTE } from "@sim/time";
 import { WallType } from "@sim/world/grid";
+import { roomOfObject } from "@sim/world/rooms";
+import type { Patient } from "@sim/agents";
+import { staffedMajorsAE } from "../fixtures/majorsAE";
 import { staffedSmallAE } from "../fixtures/smallAE";
 
 const place = (defId: string, x: number, y: number, rotation: 0 | 1 | 2 | 3 = 0): Command => ({
@@ -123,5 +136,113 @@ describe("toilet blocks", () => {
     expect(toiletBlocker(state, woman)).toMatch(/in use or too dirty/);
     apply(state, [{ type: "remove_objects", floor: 0, rect: { x: 3, y: 3, w: 2, h: 1 } }]);
     expect(toiletBlocker(state, woman)).toMatch(/isn't finished/);
+  });
+});
+
+describe("toilet trips from a cubicle or trolley", () => {
+  /**
+   * Runs the small A&E with everyone in a cubicle bursting for the toilet,
+   * until one of them leaves it for the toilet; returns them, or undefined.
+   */
+  function firstToGo(state: SimState) {
+    for (let i = 0; i < TICKS_PER_DAY; i++) {
+      for (const p of Object.values(state.patients)) {
+        if (p.stage === "in_cubicle" && !p.toilet) p.bladder = Math.max(p.bladder, 95);
+      }
+      tick(state);
+      const p = Object.values(state.patients).find((q) => q.stage === "in_cubicle" && q.toilet);
+      if (p) return p;
+    }
+    return undefined;
+  }
+
+  it("walk to the toilet and back to the bed kept for them, and aren't seen while away", () => {
+    const state = staffedSmallAE(3);
+    const p = firstToGo(state)!;
+    expect(p).toBeDefined();
+    const bed = p.bed!;
+    const home = restPoint(state.objects[bed]!);
+    const homeTile = { x: Math.round(home.x), y: Math.round(home.y) };
+    let used = false;
+    let leftBed = false;
+    let seenWhileAway = false;
+    for (let i = 0; i < 60 * TICKS_PER_MINUTE && p.toilet; i++) {
+      tick(state);
+      if (!p.toilet) break;
+      if (p.toilet.left > 0) used = true;
+      if (Math.round(p.x) !== homeTile.x || Math.round(p.y) !== homeTile.y) leftBed = true;
+      // Their cubicle stays theirs while they're away.
+      expect(p.stage).toBe("in_cubicle");
+      expect(p.bed).toBe(bed);
+      expect(state.reserved[slotKey(bed, 0)]).toBe(p.id);
+      const working = Object.values(state.jobs).some(
+        (j) => j.patientId === p.id && j.state === "working",
+      );
+      if (working) seenWhileAway = true;
+    }
+    expect(p.toilet).toBeNull();
+    expect(leftBed).toBe(true);
+    expect(used).toBe(true);
+    expect(seenWhileAway).toBe(false);
+    expect(p.bladder).toBeLessThan(TOILET_URGE);
+    // Back on their bed.
+    expect(p.stage).toBe("in_cubicle");
+    expect(p.bed).toBe(bed);
+    expect({ x: p.x, y: p.y }).toEqual(home);
+  });
+
+  it("explain what's in the way for a patient in a cubicle", () => {
+    const state = staffedSmallAE(3);
+    const p = firstToGo(state)!;
+    // Pretend they haven't gone yet.
+    release(state, p.toilet!.objectId, 0, p.id);
+    p.toilet = null;
+    const open = Object.values(state.jobs).filter((j) => j.patientId === p.id);
+    expect(open.every((j) => j.state === "open")).toBe(true);
+    expect(toiletHoldUp(state, p, true)).toBe("they'll go once the clinician is done");
+    expect(toiletHoldUp(state, p, false)).toBeNull();
+    for (const o of Object.values(state.objects)) {
+      if (o.defId === "toilet" || o.defId === "toilet_cubicle") {
+        state.reserved[slotKey(o.id, 0)] = 99;
+      }
+    }
+    expect(toiletHoldUp(state, p, false)).toMatch(/in use/);
+  });
+});
+
+describe("a commode for a patient too unwell to walk to the toilet", () => {
+  it("is brought by a nurse to their Majors trolley, which they never leave", () => {
+    const state = staffedMajorsAE(3);
+    const onMajorsTrolley = (p: Patient) =>
+      p.stage === "in_cubicle" &&
+      p.bed !== null &&
+      roomOfObject(state, p.bed)?.typeId === "majors_bay";
+    let p: Patient | undefined;
+    for (let i = 0; !p && i < TICKS_PER_DAY; i++) {
+      tick(state);
+      p = Object.values(state.patients).find(onMajorsTrolley);
+    }
+    expect(p).toBeDefined();
+    const patient = p!;
+    const bed = patient.bed!;
+    let commodeJob = false;
+    for (let i = 0; i < 3 * 60 * TICKS_PER_MINUTE; i++) {
+      // Very sick (category 1): not to be walking to the toilet.
+      if (onMajorsTrolley(patient)) {
+        patient.category = 1;
+        if (!commodeJob) patient.bladder = Math.max(patient.bladder, 95);
+      }
+      tick(state);
+      expect(patient.toilet).toBeNull();
+      if (
+        Object.values(state.jobs).some((j) => j.patientId === patient.id && j.kind === "commode")
+      ) {
+        commodeJob = true;
+        expect(patient.bed).toBe(bed);
+        expect(state.reserved[slotKey(bed, 0)]).toBe(patient.id);
+      } else if (commodeJob) break;
+    }
+    expect(commodeJob).toBe(true);
+    expect(patient.bladder).toBeLessThan(TOILET_URGE);
   });
 });

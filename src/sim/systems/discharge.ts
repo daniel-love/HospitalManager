@@ -136,6 +136,7 @@ export function updateDischarges(state: SimState): void {
     if (!d || d.fit === null) continue;
     if (p.stage === "discharge_lounge") {
       const seat = p.seat;
+      if (p.toilet) continue; // Back from the toilet before they go.
       if (seat) {
         const obj = state.objects[seat.objectId];
         if (obj) headTo(state, p, seatTile(obj, seat.slot), seatApproach(obj, seat.slot));

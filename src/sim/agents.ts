@@ -390,6 +390,8 @@ export type JobKind =
   | "triage"
   | "treat"
   | "obs"
+  /** A nurse brings a commode to a patient too unwell to walk to the toilet. */
+  | "commode"
   | "resus"
   | "clean_cubicle"
   | "clean_toilet"

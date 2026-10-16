@@ -336,6 +336,7 @@ const jobSchema = z.object({
     "triage",
     "treat",
     "obs",
+    "commode",
     "resus",
     "clean_cubicle",
     "clean_toilet",

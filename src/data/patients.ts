@@ -127,6 +127,11 @@ export const TOILET_FIXTURES: Record<
 };
 /** Uses before a toilet, cubicle or urinal is posted for cleaning. */
 export const TOILET_USES_BEFORE_CLEAN = 8;
+/**
+ * A nurse's minutes helping a patient too unwell to walk to the toilet onto
+ * a commode behind the curtain, and taking it away to the sluice afterwards.
+ */
+export const COMMODE_MINS: [number, number] = [8, 15];
 
 /**
  * Walking speeds in tiles (metres) per tick. Real walking is ~1.2 m/s (7 tiles

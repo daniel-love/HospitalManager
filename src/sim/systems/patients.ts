@@ -16,6 +16,7 @@
 import { conditionById, roomById } from "@data/catalogue";
 import {
   BOOKING_MINS,
+  COMMODE_MINS,
   FOUR_HOUR_MINS,
   LWBS_ACUITY_FACTOR,
   LWBS_MAX_CHANCE_PER_MIN,
@@ -79,7 +80,7 @@ import {
 } from "./jobBoard";
 import { type Arrival, headTo, stop } from "./movement";
 import { leaveScanner } from "./diagnostics";
-import { isEscorted } from "./escorts";
+import { isEscorted, unwellToTravel } from "./escorts";
 import { bedRouteExists, trolleyStop } from "./admissions";
 import { withAmbulanceCrew } from "./ambulances";
 import { hasTeam } from "./staffing";
@@ -120,22 +121,28 @@ export function updatePatients(state: SimState): void {
       case "awaiting_bed":
         // Admitted from a Minors cubicle: they sit in the Waiting Area until a porter comes.
         if (p.bed === null && inAE(p)) waitInArea(state, p, beingSeen.has(p.id));
-        break;
+        else toiletFromBed(state, p, beingSeen.has(p.id));
+        break; // Otherwise on a trolley; porters move them (systems/admissions.ts).
       case "transferring":
       case "on_ward":
         break; // On a bed; porters move them (systems/admissions.ts).
       case "discharge_lounge":
-        break; // See systems/discharge.ts.
+        // Waiting for transport home (systems/discharge.ts), free to use the toilet.
+        if (p.toilet) toiletTrip(state, p);
+        else if (p.bladder >= TOILET_URGE && (state.tick + p.id) % 10 === 0) goToToilet(state, p);
+        break;
       case "deceased":
       case "to_mortuary":
       case "in_mortuary":
         break; // See systems/deaths.ts.
       case "collapsed":
         break; // The crash team comes to them (systems/deterioration.ts).
+      case "in_cubicle":
+        if (!toiletFromBed(state, p, beingSeen.has(p.id))) goToBed(state, p);
+        break;
       case "called_triage":
       case "called_treatment":
       case "triage":
-      case "in_cubicle":
         goToBed(state, p);
         break;
       case "leaving":
@@ -285,15 +292,7 @@ function waitInArea(state: SimState, p: Patient, beingSeen: boolean): void {
   }
   // Staggered so not every patient searches every tick.
   const myTurn = (state.tick + p.id) % 10 === 0;
-  if (p.bladder >= TOILET_URGE && myTurn && !beingSeen) {
-    const toilet = freeToilet(state, p, p.id);
-    if (toilet) {
-      reserve(state, toilet.id, 0, p.id);
-      p.toilet = { objectId: toilet.id, left: -1 };
-      toiletTrip(state, p);
-      return;
-    }
-  }
+  if (p.bladder >= TOILET_URGE && myTurn && !beingSeen && goToToilet(state, p)) return;
   if (p.seat) {
     const room = inValidRoom(state, p.seat.objectId, "waiting_area")
       ? roomOfObject(state, p.seat.objectId)
@@ -330,29 +329,43 @@ function waitInArea(state: SimState, p: Patient, beingSeen: boolean): void {
   headTo(state, p, spot);
 }
 
+/** Off to the nearest free toilet that suits them, if there is one. */
+function goToToilet(state: SimState, p: Patient): boolean {
+  const toilet = freeToilet(state, p, p.id);
+  if (!toilet) return false;
+  reserve(state, toilet.id, 0, p.id);
+  p.toilet = { objectId: toilet.id, left: -1 };
+  toiletTrip(state, p);
+  return true;
+}
+
+/**
+ * A toilet trip: `left` is -1 on the way, the ticks left once there, and 0
+ * on the way back to the cubicle or trolley kept for them (from the Waiting
+ * Area or the discharge lounge they're done once they leave the toilet).
+ */
 function toiletTrip(state: SimState, p: Patient): void {
   const trip = p.toilet!;
+  if (trip.left === 0) {
+    backToBed(state, p);
+    return;
+  }
   const toilet = state.objects[trip.objectId];
   if (!toilet || !inValidRoom(state, toilet.id, "toilets")) {
-    release(state, trip.objectId, 0, p.id);
-    p.toilet = null;
+    endToiletVisit(state, p);
     return;
   }
   if (trip.left < 0) {
     const arrival = headTo(state, p, { x: toilet.x, y: toilet.y }, frontOf(toilet));
     if (arrival === "arrived") trip.left = ticksFor(state.rng, TOILET_FIXTURES[toilet.defId]!.mins);
-    else if (arrival === "no_route") {
-      release(state, toilet.id, 0, p.id);
-      p.toilet = null;
-    }
+    else if (arrival === "no_route") endToiletVisit(state, p);
     return;
   }
   if (--trip.left > 0) return;
   p.bladder = 0;
   const dirt = (state.dirt[toilet.id] ?? 0) + 1;
   state.dirt[toilet.id] = dirt;
-  release(state, toilet.id, 0, p.id);
-  p.toilet = null;
+  endToiletVisit(state, p);
   if (dirt >= TOILET_USES_BEFORE_CLEAN && !hasCleaningJob(state, toilet.id)) {
     postJob(state, {
       kind: "clean_toilet",
@@ -363,6 +376,60 @@ function toiletTrip(state: SimState, p: Patient): void {
       durationTicks: ticksFor(state.rng, TOILET_FIXTURES[toilet.defId]!.cleanMins),
     });
   }
+}
+
+/** Leaves the toilet: back to their bed if one is kept for them, otherwise done. */
+function endToiletVisit(state: SimState, p: Patient): void {
+  const trip = p.toilet!;
+  release(state, trip.objectId, 0, p.id);
+  if (keptBed(state, p)) trip.left = 0;
+  else p.toilet = null;
+}
+
+/** The cubicle or trolley kept for a patient who's left it for the toilet. */
+function keptBed(state: SimState, p: Patient): PlacedObject | undefined {
+  if (p.stage !== "in_cubicle" && p.stage !== "awaiting_bed") return undefined;
+  return p.bed === null ? undefined : state.objects[p.bed];
+}
+
+/** Walks back from the toilet; the trip is over once they're on their bed again. */
+function backToBed(state: SimState, p: Patient): void {
+  const bed = keptBed(state, p);
+  if (bed && headTo(state, p, restPoint(bed), bedside(state, bed)) === "moving") return;
+  p.toilet = null;
+}
+
+/**
+ * A patient in a cubicle or on a trolley who needs the toilet, while nobody
+ * is seeing them. Most walk there and back, their bed kept for them; one too
+ * unwell to leave it (unwellToTravel: Resus, category 1, deteriorating or on
+ * continuous monitoring) has a nurse bring a commode instead. True while
+ * they're away from their bed.
+ */
+function toiletFromBed(state: SimState, p: Patient, beingSeen: boolean): boolean {
+  if (p.toilet) {
+    toiletTrip(state, p);
+    return true;
+  }
+  if (p.bladder < TOILET_URGE || (state.tick + p.id) % 10 !== 0) return false;
+  if (!keptBed(state, p) || p.homeBed !== null || p.path.length > 0 || p.death) return false;
+  if (withAmbulanceCrew(p) || isEscorted(state, p)) return false;
+  if (unwellToTravel(state, p)) {
+    if (!jobsForPatient(state, p.id).some((j) => j.kind === "commode")) {
+      postJob(state, {
+        kind: "commode",
+        roles: ["nurse"],
+        patientId: p.id,
+        roomType: "",
+        dueTick: state.tick,
+        durationTicks: ticksFor(state.rng, COMMODE_MINS),
+      });
+    }
+    return false;
+  }
+  // Not while a clinician is with them or on the way.
+  if (beingSeen || jobsForPatient(state, p.id).some((j) => j.state !== "open")) return false;
+  return goToToilet(state, p);
 }
 
 export function releaseSeat(state: SimState, p: Patient): void {
@@ -626,7 +693,7 @@ function updateNeeds(state: SimState, p: Patient, beingSeen: boolean): void {
     return;
   }
   if (p.death || ["leaving", "collapsed", "transferring"].includes(p.stage)) return;
-  if (!p.toilet || p.toilet.left < 0) p.bladder = Math.min(100, p.bladder + p.bladderRate);
+  if (!p.toilet || p.toilet.left <= 0) p.bladder = Math.min(100, p.bladder + p.bladderRate);
   let decay = 0;
   for (const f of moodFactors(state, p, beingSeen)) decay += f.perHour;
   p.mood = Math.min(100, Math.max(0, p.mood - decay / TICKS_PER_HOUR));
@@ -707,7 +774,7 @@ export function wardMoodFactors(state: SimState, p: Patient): MoodFactor[] {
 
 /**
  * Why a patient who needs the toilet hasn't gone, or null if nothing's in the
- * way (they'll go shortly). Patients only go from the Waiting Area for now.
+ * way (they'll go shortly).
  */
 export function toiletHoldUp(state: SimState, p: Patient, beingSeen: boolean): string | null {
   if (p.toilet) return null;
@@ -722,16 +789,36 @@ export function toiletHoldUp(state: SimState, p: Patient, beingSeen: boolean): s
       return "still on the ambulance stretcher, waiting to be handed over";
     case "called_triage":
     case "called_treatment":
+      return "on their way to be seen: they'll go once they're settled";
     case "triage":
+      return "being triaged: they'll go afterwards";
     case "in_cubicle":
-      return "in a cubicle: patients only go to the toilet from the Waiting Area for now";
     case "awaiting_bed":
-      return "on a trolley waiting for a ward bed: patients only go to the toilet from the Waiting Area for now";
+      return bedToiletHoldUp(state, p, beingSeen);
     case "discharge_lounge":
-      return "in the discharge lounge: patients only go to the toilet from the Waiting Area for now";
+      return toiletBlocker(state, p.id);
     default:
       return null;
   }
+}
+
+/** toiletHoldUp for a patient in a cubicle or on a trolley (see toiletFromBed). */
+function bedToiletHoldUp(state: SimState, p: Patient, beingSeen: boolean): string | null {
+  if (withAmbulanceCrew(p)) return "still with the ambulance crew, waiting to be handed over";
+  if (p.homeBed !== null || isEscorted(state, p))
+    return "being taken for a scan: they'll go once back";
+  if (unwellToTravel(state, p)) {
+    const commode = jobsForPatient(state, p.id).find((j) => j.kind === "commode");
+    if (commode?.state === "working") return "a nurse is with them with a commode now";
+    if (commode?.state === "assigned")
+      return "too unwell to walk there: a nurse is bringing a commode";
+    return "too unwell to walk there: waiting for a free nurse to bring a commode";
+  }
+  if (beingSeen) return "they'll go once the clinician is done";
+  if (jobsForPatient(state, p.id).some((j) => j.state !== "open")) {
+    return "staff are on their way to see them: they'll go afterwards";
+  }
+  return toiletBlocker(state, p.id);
 }
 
 function maybeGiveUp(state: SimState, p: Patient): void {

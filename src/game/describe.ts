@@ -199,7 +199,11 @@ export function waitReason(state: SimState, p: Patient): string | null {
     const s = job.staffId === null ? undefined : state.staff[job.staffId];
     return s ? `${roleTitle(s)} ${s.name} is on the way` : null;
   }
-  if (p.toilet) return "At the toilet, so the next patient is called instead";
+  if (p.toilet) {
+    return p.stage === "in_cubicle" || p.stage === "awaiting_bed"
+      ? "At the toilet: they'll be seen once they're back"
+      : "At the toilet, so the next patient is called instead";
+  }
   const results = resultsReason(state, p, job);
   if (results) return results;
 
@@ -441,6 +445,16 @@ export function describePatient(state: SimState, p: Patient): AgentInfo {
       mins >= 0
         ? `Waiting for emergency surgery (${op.toLowerCase()}): due within ${formatWait(mins)}`
         : `Waiting for emergency surgery (${op.toLowerCase()}): ${formatWait(-mins)} overdue`;
+  }
+  if (p.stage === "in_cubicle" || p.stage === "awaiting_bed") {
+    if (p.toilet) {
+      status =
+        p.toilet.left === 0
+          ? "Walking back from the toilet to their bed"
+          : "Gone to the toilet: their bed is kept for them";
+    } else if (working?.kind === "commode") {
+      status = "A nurse is helping them with a commode";
+    }
   }
   const porter = p.death ? undefined : porterJob(state, p);
   if (porter && p.stage !== "collapsed") status = escortStatus(state, p, porter);
@@ -834,6 +848,9 @@ export function staffState(state: SimState, s: Staff): StaffState {
       break;
     case "obs":
       what = `Observations: ${who}`;
+      break;
+    case "commode":
+      what = `Bringing a commode to ${who}`;
       break;
     case "resus":
       what = `Crash call: resuscitating ${who}`;

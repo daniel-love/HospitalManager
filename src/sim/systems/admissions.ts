@@ -301,7 +301,7 @@ export function wheelTo(state: SimState, p: AgentBase, bed: PlacedObject): Point
  */
 export function claimWardBed(state: SimState, job: Job): Point | null {
   const p = job.patientId === null ? undefined : state.patients[job.patientId];
-  if (!p || p.stage !== "awaiting_bed" || p.path.length > 0) return null;
+  if (!p || p.stage !== "awaiting_bed" || p.path.length > 0 || p.toilet) return null;
   if (jobsForPatient(state, p.id).some((j) => j.state === "working")) return null;
   const from = tileOf(p);
   const wheeled = onTrolley(state, p);

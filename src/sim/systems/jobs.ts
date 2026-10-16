@@ -79,6 +79,7 @@ const DEATH_JOBS = new Set<Job["kind"]>([
 function atPatient(job: Job): boolean {
   return (
     job.kind === "obs" ||
+    job.kind === "commode" ||
     job.kind === "pre_op_check" ||
     job.kind === "recovery" ||
     job.kind === "resus" ||
@@ -175,7 +176,7 @@ function claimPlace(state: SimState, job: Job): Point | null {
   if (DIAGNOSTIC_JOBS.has(job.kind)) return claimDiagnosticPlace(state, job);
   if (job.kind === "escort") {
     const p = job.patientId === null ? undefined : state.patients[job.patientId];
-    return p ? escortSpot(state, p) : null;
+    return p && !p.toilet ? escortSpot(state, p) : null;
   }
   const step = treatStep(state, job);
   if (step && isEscorted(state, state.patients[job.patientId!]!)) return null; // On the move.
@@ -184,8 +185,15 @@ function claimPlace(state: SimState, job: Job): Point | null {
   }
   if (atPatient(job)) {
     const p = job.patientId === null ? undefined : state.patients[job.patientId];
-    // Obs wait until they're back from the toilet.
-    if (!p || (job.kind === "obs" && p.toilet)) return null;
+    // Wait until they're back from the toilet (a crash call can't).
+    if (!p || (job.kind !== "resus" && p.toilet)) return null;
+    if (job.kind === "commode") {
+      if (!onTrolleyStage(p)) {
+        removeJob(state, job); // Moved on (to a ward, say): no longer needed.
+        return null;
+      }
+      if (isBeingSeen(state, p.id) || isEscorted(state, p)) return null;
+    }
     return p;
   }
   if (job.objectId !== null) {
@@ -404,7 +412,8 @@ export function runJobs(state: SimState): void {
     if (job.state === "assigned") {
       if (arrival !== "arrived") continue;
       const onBed = ["triage", "in_cubicle", "on_ward"].includes(patient?.stage ?? "triage");
-      if (patient && !onBed) continue;
+      // Off to the toilet: wait at the bedside for them to come back.
+      if (patient && (!onBed || patient.toilet)) continue;
       job.state = "working";
       if (job.kit) job.kit.at = "patient";
       if (job.kind === "treat" && patient && patient.times.seen === null) {
@@ -419,6 +428,11 @@ export function runJobs(state: SimState): void {
     job.progress += workRate(state, staff);
     if (job.progress >= job.durationTicks) complete(state, job, obj);
   }
+}
+
+/** In a cubicle or on an A&E trolley, where a commode can be brought to them. */
+function onTrolleyStage(p: Patient): boolean {
+  return (p.stage === "in_cubicle" || p.stage === "awaiting_bed") && p.bed !== null;
 }
 
 /** Where staff stand to see a patient: beside their couch, in front of their seat, or with them. */
@@ -443,6 +457,10 @@ function runAtPatient(state: SimState, job: Job, staff: Staff, p: Patient): void
     removeJob(state, job);
     return;
   }
+  if (job.kind === "commode" && (!onTrolleyStage(p) || p.death)) {
+    removeJob(state, job);
+    return;
+  }
   const arrival = headTo(state, staff, patientSpot(state, p));
   if (job.state === "assigned") {
     if (arrival !== "arrived" || p.path.length > 0 || p.toilet) return;
@@ -451,7 +469,9 @@ function runAtPatient(state: SimState, job: Job, staff: Staff, p: Patient): void
   job.progress += workRate(state, staff);
   if (job.progress < job.durationTicks) return;
   removeJob(state, job);
-  if (job.kind === "obs") {
+  if (job.kind === "commode") {
+    p.bladder = 0;
+  } else if (job.kind === "obs") {
     p.obs = { tick: state.tick, news: newsScore(state, p) };
     const d = p.deterioration;
     if (d && d.noticed === null && state.tick >= d.onset && p.obs.news >= NEWS_URGENT) {

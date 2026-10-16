@@ -34,6 +34,7 @@ import { ambulancesWaiting, needsTrolley } from "./ambulances";
 import { hasCleaningJob, postJob, ticksFor } from "./jobBoard";
 import { inAE } from "./patients";
 import { wardBedsOutOfReach } from "./admissions";
+import { unwellToTravel } from "./escorts";
 import { inCare } from "./curtains";
 import { bedCover, nurseStations, stationsSeeing } from "./monitoring";
 
@@ -406,9 +407,15 @@ export function updateAlerts(state: SimState): void {
     warn(state, "standing", COOLDOWN, text);
   }
 
-  // Only urinals free still leaves those who can't use one stuck.
+  // Only urinals free still leaves those who can't use one stuck. Those too
+  // unwell to walk there wait for a commode instead.
   const desperate = count(
-    (p) => p.bladder >= 90 && !p.toilet && inAE(p) && !freeToilet(state, p, p.id),
+    (p) =>
+      p.bladder >= 90 &&
+      !p.toilet &&
+      inAE(p) &&
+      !unwellToTravel(state, p) &&
+      !freeToilet(state, p, p.id),
   );
   if (desperate > 0) {
     warn(

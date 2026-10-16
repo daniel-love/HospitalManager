@@ -163,7 +163,7 @@ function whereIs(state: SimState, p: Patient): string {
 function lowerToFloor(state: SimState, p: Patient): void {
   if (p.path.length > 0) return; // Walking: already on the floor.
   const seat = p.seat && state.objects[p.seat.objectId];
-  const toilet = p.toilet && p.toilet.left >= 0 ? state.objects[p.toilet.objectId] : undefined;
+  const toilet = p.toilet && p.toilet.left > 0 ? state.objects[p.toilet.objectId] : undefined;
   const spot = seat ? seatApproach(seat, p.seat!.slot) : toilet ? frontOf(toilet) : null;
   if (!spot || !isStandable(state.floors[0]!, spot.x, spot.y)) return;
   p.x = p.prevX = spot.x;
@@ -177,6 +177,7 @@ function collapse(state: SimState, p: Patient): void {
   for (const job of jobsForPatient(state, p.id)) removeJob(state, job);
   lowerToFloor(state, p);
   releaseSeat(state, p);
+  const atToilet = p.toilet !== null;
   if (p.toilet) release(state, p.toilet.objectId, 0, p.id);
   if (p.desk !== null) release(state, p.desk, 0, p.id);
   p.desk = null;
@@ -185,7 +186,7 @@ function collapse(state: SimState, p: Patient): void {
   p.standing = null;
   // Still on the couch only if they'd got there; otherwise it's free again.
   const onBed = p.stage === "in_cubicle" || p.stage === "triage";
-  if (p.bed !== null && (!onBed || p.path.length > 0)) {
+  if (p.bed !== null && (!onBed || p.path.length > 0 || atToilet)) {
     release(state, p.bed, 0, p.id);
     p.bed = null;
   }
